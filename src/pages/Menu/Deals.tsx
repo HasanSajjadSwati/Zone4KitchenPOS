@@ -4,8 +4,8 @@ import { Button, Card, Modal, Input, Select } from '@/components/ui';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import {
 import { createId } from '@/utils/uuid';
+import {
   createDeal,
   updateDeal,
   deleteDeal,
