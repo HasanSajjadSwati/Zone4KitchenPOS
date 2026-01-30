@@ -72,19 +72,6 @@ export const Settings: React.FC = () => {
     },
   });
 
-  useEffect(() => {
-    loadData();
-  }, [activeTab]);
-
-  useEffect(() => {
-    if (activeTab === 'users' && !canViewUsers) {
-      setActiveTab('business');
-    }
-    if (activeTab === 'audit' && !canViewAudit) {
-      setActiveTab('business');
-    }
-  }, [activeTab, canViewUsers, canViewAudit]);
-
   const loadData = async () => {
     const currentSettings = await getSettings();
     if (currentSettings) {
@@ -158,6 +145,19 @@ export const Settings: React.FC = () => {
     hasPermission('users', 'update') ||
     hasPermission('users', 'delete');
   const canViewAudit = hasPermission('audit', 'read');
+
+  useEffect(() => {
+    loadData();
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'users' && !canViewUsers) {
+      setActiveTab('business');
+    }
+    if (activeTab === 'audit' && !canViewAudit) {
+      setActiveTab('business');
+    }
+  }, [activeTab, canViewUsers, canViewAudit]);
 
   const getRoleLabel = (roleId: string) => {
     return roles.find((role) => role.id === roleId)?.name || roleId;
