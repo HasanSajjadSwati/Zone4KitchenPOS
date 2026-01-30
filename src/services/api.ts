@@ -84,6 +84,23 @@ class APIClient {
     return this.post(`/users/${id}/change-password`, { oldPassword, newPassword });
   }
 
+  async resetUserPassword(id: string, adminUserId: string, newPassword: string) {
+    return this.post(`/users/${id}/reset-password`, { adminUserId, newPassword });
+  }
+
+  // Audit logs
+  async getAuditLogs(limit: number = 100, offset: number = 0) {
+    const params = new URLSearchParams({
+      limit: String(limit),
+      offset: String(offset),
+    });
+    return this.get(`/audit-logs?${params.toString()}`);
+  }
+
+  async createAuditLog(data: any) {
+    return this.post('/audit-logs', data);
+  }
+
   // Roles
   async getRoles() {
     return this.get('/roles');

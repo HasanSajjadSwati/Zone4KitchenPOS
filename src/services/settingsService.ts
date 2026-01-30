@@ -46,3 +46,7 @@ export async function getAuditLogs(
 export async function getAllUsers() {
   return await db.users.toArray();
 }
+
+export async function getAllRoles() {
+  return await db.roles.toArray();
+}

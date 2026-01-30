@@ -121,6 +121,51 @@ userRoutes.post('/:id/change-password', async (req, res) => {
   }
 });
 
+// Admin reset password
+userRoutes.post('/:id/reset-password', async (req, res) => {
+  try {
+    const { adminUserId, newPassword } = req.body;
+
+    if (!adminUserId || !newPassword) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const admin = await getAsync(
+      `SELECT u.id, r.name as roleName
+       FROM users u
+       JOIN roles r ON u.roleId = r.id
+       WHERE u.id = ?`,
+      [adminUserId]
+    );
+
+    if (!admin) {
+      return res.status(404).json({ error: 'Admin user not found' });
+    }
+
+    if (String(admin.roleName).toLowerCase() !== 'admin') {
+      return res.status(403).json({ error: 'Only admins can reset passwords' });
+    }
+
+    const targetUser = await getAsync('SELECT id FROM users WHERE id = ?', [req.params.id]);
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const now = new Date().toISOString();
+
+    await runAsync('UPDATE users SET passwordHash = ?, updatedAt = ? WHERE id = ?', [
+      hashedPassword,
+      now,
+      req.params.id,
+    ]);
+
+    res.json({ message: 'Password reset successfully' });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
 // Delete user
 userRoutes.delete('/:id', async (req, res) => {
   try {

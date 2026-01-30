@@ -21,6 +21,7 @@ import { settingsRoutes } from './routes/settings.js';
 import { registerSessionRoutes } from './routes/registerSessions.js';
 import { paymentRoutes } from './routes/payments.js';
 import { maintenanceRoutes } from './routes/maintenance.js';
+import { auditLogRoutes } from './routes/auditLogs.js';
 import { initializeDatabase } from './db/migrate.js';
 import { logger } from './utils/logger.js';
 
@@ -69,6 +70,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/register-sessions', registerSessionRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/maintenance', maintenanceRoutes);
+app.use('/api/audit-logs', auditLogRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

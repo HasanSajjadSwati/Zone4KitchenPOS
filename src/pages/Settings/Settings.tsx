@@ -9,15 +9,12 @@ import { Button, Card, Input, Modal, Select } from '@/components/ui';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { getSettings, updateSettings, getAllUsers, getAuditLogs } from '@/services/settingsService';
-import { exportMenuData, downloadMenuData, importMenuData } from '@/services/menuImportExportService';
-import { seedZoneKitchenMenu } from '@/services/seedMenuService';
-import { wipeAllData, wipeMenuData, wipeOrderData } from '@/services/dataWipeService';
-import { createUser, updateUser, deleteUser } from '@/services/userService';
+import { getSettings, updateSettings, getAllUsers, getAuditLogs, getAllRoles } from '@/services/settingsService';
+import { createUser, updateUser, deleteUser, resetUserPassword } from '@/services/userService';
 import { useAuthStore } from '@/stores/authStore';
 import { useDialog } from '@/hooks/useDialog';
 import { formatDateTime, phoneSchema } from '@/utils/validation';
-import type { User, AuditLog } from '@/db/types';
+import type { User, AuditLog, Role } from '@/db/types';
 
 const businessInfoSchema = z.object({
   restaurantName: z.string().min(1, 'Restaurant name is required'),
@@ -37,7 +34,7 @@ const userSchema = z.object({
   username: z.string().min(3, 'Username must be at least 3 characters'),
   password: z.string().min(4, 'Password must be at least 4 characters').optional(),
   fullName: z.string().min(1, 'Full name is required'),
-  roleId: z.enum(['manager', 'cashier']),
+  roleId: z.string().min(1, 'Role is required'),
   isActive: z.boolean(),
 });
 
@@ -48,12 +45,13 @@ type TabType = 'business' | 'kot' | 'users' | 'audit';
 
 export const Settings: React.FC = () => {
   const currentUser = useAuthStore((state) => state.currentUser);
+  const currentRole = useAuthStore((state) => state.currentRole);
   const dialog = useDialog();
   const [activeTab, setActiveTab] = useState<TabType>('business');
   const [users, setUsers] = useState<User[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedMenuFile, setSelectedMenuFile] = useState<File | null>(null);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
 
@@ -69,7 +67,7 @@ export const Settings: React.FC = () => {
     resolver: zodResolver(userSchema),
     defaultValues: {
       isActive: true,
-      roleId: 'cashier',
+      roleId: '',
     },
   });
 
@@ -97,8 +95,9 @@ export const Settings: React.FC = () => {
     }
 
     if (activeTab === 'users') {
-      const allUsers = await getAllUsers();
+      const [allUsers, allRoles] = await Promise.all([getAllUsers(), getAllRoles()]);
       setUsers(allUsers);
+      setRoles(allRoles);
     }
 
     if (activeTab === 'audit') {
@@ -137,183 +136,15 @@ export const Settings: React.FC = () => {
     }
   };
 
-  const handleExportMenu = async () => {
-    if (!currentUser) return;
-
-    setIsLoading(true);
-    try {
-      const menuData = await exportMenuData(currentUser.id);
-      downloadMenuData(menuData);
-      await dialog.alert('Menu data exported successfully!', 'Success');
-    } catch (error) {
-      await dialog.alert(error instanceof Error ? error.message : 'Failed to export menu data', 'Error');
-    } finally {
-      setIsLoading(false);
-    }
+  const getDefaultRoleId = () => {
+    const cashierRole = roles.find((role) => role.name.toLowerCase() === 'cashier');
+    return cashierRole?.id || roles[0]?.id || '';
   };
 
-  const handleMenuFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setSelectedMenuFile(file);
-    }
-  };
+  const isAdmin = currentRole?.name === 'Admin';
 
-  const handleImportMenu = async () => {
-    if (!currentUser || !selectedMenuFile) return;
-
-    const confirmImport = await dialog.confirm({
-      title: 'Warning',
-      message: 'WARNING: Importing menu data will replace ALL menu items, categories, variants, and deals. This action cannot be undone.\n\nDo you want to proceed?',
-      variant: 'danger',
-      confirmLabel: 'Yes, Import',
-      cancelLabel: 'Cancel',
-    });
-
-    if (!confirmImport) return;
-
-    setIsLoading(true);
-    try {
-      const fileContent = await selectedMenuFile.text();
-      const menuData = JSON.parse(fileContent);
-
-      await importMenuData(menuData, currentUser.id, { replaceExisting: true });
-      await dialog.alert('Menu data imported successfully! The page will now reload.', 'Success');
-      setSelectedMenuFile(null);
-
-      // Reload the page to reflect changes
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
-    } catch (error) {
-      await dialog.alert(error instanceof Error ? error.message : 'Failed to import menu data', 'Error');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleWipeAllData = async () => {
-    if (!currentUser) return;
-
-    const confirmStep1 = await dialog.confirm({
-      title: '🚨 CRITICAL WARNING',
-      message: 'This will DELETE ALL DATA from the system including:\n- All orders and payments\n- All menu items and categories\n- All customers\n- All staff members\n- All register sessions\n\nOnly settings and users will be preserved.\n\nAre you ABSOLUTELY SURE you want to proceed?',
-      variant: 'danger',
-      confirmLabel: 'Yes, Continue',
-      cancelLabel: 'Cancel',
-    });
-
-    if (!confirmStep1) return;
-
-    const typeConfirm = await dialog.prompt({
-      title: 'FINAL CONFIRMATION',
-      message: 'Type "DELETE" to confirm data wipe.\n\nThis action CANNOT be undone!',
-      placeholder: 'Type DELETE here',
-      confirmLabel: 'Wipe Data',
-      cancelLabel: 'Cancel',
-    });
-
-    if (typeConfirm !== 'DELETE') {
-      await dialog.alert('Data wipe cancelled.', 'Cancelled');
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      await wipeAllData(currentUser.id, true);
-      await dialog.alert('All data has been wiped. The page will now reload.', 'Complete');
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
-    } catch (error) {
-      await dialog.alert(error instanceof Error ? error.message : 'Failed to wipe data', 'Error');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleWipeMenuData = async () => {
-    if (!currentUser) return;
-
-    const confirm1 = await dialog.confirm({
-      title: 'Warning',
-      message: 'This will delete ALL menu items, categories, variants, and deals.\n\nThis action cannot be undone. Proceed?',
-      variant: 'danger',
-      confirmLabel: 'Yes, Wipe',
-      cancelLabel: 'Cancel',
-    });
-
-    if (!confirm1) return;
-
-    setIsLoading(true);
-    try {
-      await wipeMenuData(currentUser.id);
-      await dialog.alert('Menu data has been wiped. The page will now reload.', 'Complete');
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
-    } catch (error) {
-      await dialog.alert(error instanceof Error ? error.message : 'Failed to wipe menu data', 'Error');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleWipeOrderData = async () => {
-    if (!currentUser) return;
-
-    const confirm1 = await dialog.confirm({
-      title: 'Warning',
-      message: 'This will delete ALL orders, payments, and KOT records.\n\nThis action cannot be undone. Proceed?',
-      variant: 'danger',
-      confirmLabel: 'Yes, Wipe',
-      cancelLabel: 'Cancel',
-    });
-
-    if (!confirm1) return;
-
-    setIsLoading(true);
-    try {
-      await wipeOrderData(currentUser.id);
-      await dialog.alert('Order data has been wiped. The page will now reload.', 'Complete');
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
-    } catch (error) {
-      await dialog.alert(error instanceof Error ? error.message : 'Failed to wipe order data', 'Error');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSeedMenu = async () => {
-    if (!currentUser) return;
-
-    const confirmSeed = await dialog.confirm({
-      title: 'Seed Zone Kitchen Menu',
-      message: 'This will REPLACE all existing menu data (categories, items, variants, deals) with the Zone Kitchen menu.\n\nThis action cannot be undone. Proceed?',
-      variant: 'danger',
-      confirmLabel: 'Yes, Seed Menu',
-      cancelLabel: 'Cancel',
-    });
-
-    if (!confirmSeed) return;
-
-    setIsLoading(true);
-    try {
-      const result = await seedZoneKitchenMenu(currentUser.id);
-      await dialog.alert(
-        `Menu seeded successfully!\n\n- Categories: ${result.categories}\n- Menu Items: ${result.menuItems}\n- Variants: ${result.variants}\n- Variant Options: ${result.variantOptions}\n- Deals: ${result.deals}\n\nThe page will now reload.`,
-        'Success'
-      );
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
-    } catch (error) {
-      await dialog.alert(error instanceof Error ? error.message : 'Failed to seed menu', 'Error');
-    } finally {
-      setIsLoading(false);
-    }
+  const getRoleLabel = (roleId: string) => {
+    return roles.find((role) => role.id === roleId)?.name || roleId;
   };
 
   const handleOpenUserModal = (user?: User) => {
@@ -322,7 +153,7 @@ export const Settings: React.FC = () => {
       userForm.reset({
         username: user.username,
         fullName: user.fullName,
-        roleId: user.roleId as 'manager' | 'cashier',
+        roleId: user.roleId,
         isActive: user.isActive,
         password: undefined, // Don't show password
       });
@@ -331,7 +162,7 @@ export const Settings: React.FC = () => {
       userForm.reset({
         username: '',
         fullName: '',
-        roleId: 'cashier',
+        roleId: getDefaultRoleId(),
         isActive: true,
         password: '',
       });
@@ -345,15 +176,23 @@ export const Settings: React.FC = () => {
     setIsLoading(true);
     try {
       if (editingUser) {
+        if (data.password && !isAdmin) {
+          await dialog.alert('Only admins can reset passwords. Password will not be changed.', 'Error');
+          data.password = undefined;
+        }
+
         // Update existing user
         await updateUser({
           id: editingUser.id,
           fullName: data.fullName,
           roleId: data.roleId,
           isActive: data.isActive,
-          password: data.password || undefined,
           updatedBy: currentUser.id,
         });
+
+        if (data.password) {
+          await resetUserPassword(editingUser.id, data.password, currentUser.id);
+        }
         await dialog.alert('User updated successfully', 'Success');
       } else {
         // Create new user
@@ -553,149 +392,6 @@ export const Settings: React.FC = () => {
           </Card>
         )}
 
-        {/* Seed Menu Section - Separate from tabs */}
-        <Card padding="lg">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">Data Management</h2>
-
-          {/* Seed Menu Section */}
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Seed Menu Data</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Load the complete Zone Kitchen menu (categories, items, variants, deals) into the system. This will replace all existing menu data.
-            </p>
-            <Button
-              onClick={handleSeedMenu}
-              variant="danger"
-              isLoading={isLoading}
-            >
-              Seed Zone Kitchen Menu
-            </Button>
-          </div>
-
-          {/* Menu Import/Export Section */}
-          <div className="mt-8 border-t border-gray-200 pt-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Menu Import/Export</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Export or import menu data separately (categories, items, variants, and deals only).
-            </p>
-
-              {/* Export Menu */}
-              <div className="mb-6">
-                <h4 className="text-sm font-semibold text-gray-900 mb-2">Export Menu Data</h4>
-                <p className="text-sm text-gray-600 mb-3">
-                  Download all menu items, categories, variants, and deals as a JSON file.
-                </p>
-                <Button
-                  onClick={handleExportMenu}
-                  variant="primary"
-                  isLoading={isLoading}
-                >
-                  Export Menu Data
-                </Button>
-              </div>
-
-              {/* Import Menu */}
-              <div>
-                <h4 className="text-sm font-semibold text-gray-900 mb-2">Import Menu Data</h4>
-                <p className="text-sm text-red-600 font-semibold mb-2">
-                  ⚠️ WARNING: This will replace all menu items, categories, variants, and deals!
-                </p>
-                <p className="text-sm text-gray-600 mb-3">
-                  Select a menu export file (.json) to import.
-                </p>
-                <div className="space-y-4">
-                  <div>
-                    <input
-                      type="file"
-                      accept=".json"
-                      onChange={handleMenuFileSelect}
-                      className="block w-full text-sm text-gray-500
-                        file:mr-4 file:py-2 file:px-4
-                        file:rounded-lg file:border-0
-                        file:text-sm file:font-semibold
-                        file:bg-primary-50 file:text-primary-700
-                        hover:file:bg-primary-100"
-                    />
-                  </div>
-                  {selectedMenuFile && (
-                    <div className="flex items-center space-x-4">
-                      <span className="text-sm text-gray-700">
-                        Selected: {selectedMenuFile.name}
-                      </span>
-                      <Button
-                        onClick={handleImportMenu}
-                        variant="danger"
-                        isLoading={isLoading}
-                      >
-                        Import Menu Data
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
-          </div>
-
-          {/* Data Wipe Section */}
-          <div className="mt-8 border-t-2 border-red-300 pt-6 bg-red-50 p-6 rounded-lg">
-            <h3 className="text-lg font-semibold text-red-900 mb-4">⚠️ Danger Zone - Data Wipe</h3>
-            <p className="text-sm text-red-700 font-semibold mb-4">
-              These actions are PERMANENT and CANNOT be undone.
-            </p>
-
-            <div className="space-y-4">
-              {/* Wipe Menu Data */}
-              <div className="bg-white p-4 rounded border border-red-200">
-                <h4 className="text-sm font-semibold text-gray-900 mb-2">Wipe Menu Data</h4>
-                <p className="text-sm text-gray-600 mb-3">
-                  Delete all menu items, categories, variants, and deals.
-                </p>
-                <Button
-                  onClick={handleWipeMenuData}
-                  variant="danger"
-                  size="sm"
-                  isLoading={isLoading}
-                >
-                  Wipe Menu Data
-                </Button>
-              </div>
-
-              {/* Wipe Order Data */}
-              <div className="bg-white p-4 rounded border border-red-200">
-                <h4 className="text-sm font-semibold text-gray-900 mb-2">Wipe Order Data</h4>
-                <p className="text-sm text-gray-600 mb-3">
-                  Delete all orders, payments, and KOT records.
-                </p>
-                <Button
-                  onClick={handleWipeOrderData}
-                  variant="danger"
-                  size="sm"
-                  isLoading={isLoading}
-                >
-                  Wipe Order Data
-                </Button>
-              </div>
-
-              {/* Wipe ALL Data */}
-              <div className="bg-white p-4 rounded border-2 border-red-500">
-                <h4 className="text-sm font-semibold text-red-900 mb-2">🚨 Wipe ALL Data</h4>
-                <p className="text-sm text-red-700 font-semibold mb-2">
-                  CRITICAL: This will delete EVERYTHING except settings and users!
-                </p>
-                <p className="text-sm text-gray-600 mb-3">
-                  All orders, menu items, customers, staff, and register data will be permanently deleted.
-                </p>
-                <Button
-                  onClick={handleWipeAllData}
-                  variant="danger"
-                  isLoading={isLoading}
-                >
-                  Wipe ALL Data
-                </Button>
-              </div>
-            </div>
-          </div>
-        </Card>
-
         {activeTab === 'users' && (
           <Card padding="lg">
             <div className="flex items-center justify-between mb-6">
@@ -738,7 +434,7 @@ export const Settings: React.FC = () => {
                         {user.fullName}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">
-                        {user.roleId}
+                        {getRoleLabel(user.roleId)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
@@ -860,9 +556,11 @@ export const Settings: React.FC = () => {
           />
 
           <Input
-            label={editingUser ? 'New Password (leave blank to keep current)' : 'Password'}
+            label={editingUser ? 'Reset Password (leave blank to keep current)' : 'Password'}
             type="password"
             error={userForm.formState.errors.password?.message}
+            helperText={editingUser ? (isAdmin ? 'Admins can reset passwords.' : 'Only admins can reset passwords.') : undefined}
+            disabled={!!editingUser && !isAdmin}
             {...userForm.register('password')}
           />
 
@@ -877,8 +575,14 @@ export const Settings: React.FC = () => {
             error={userForm.formState.errors.roleId?.message}
             {...userForm.register('roleId')}
           >
-            <option value="manager">Manager</option>
-            <option value="cashier">Cashier</option>
+            <option value="" disabled>
+              Select role
+            </option>
+            {roles.map((role) => (
+              <option key={role.id} value={role.id}>
+                {role.name}
+              </option>
+            ))}
           </Select>
 
           <div className="flex items-center space-x-2">
@@ -914,3 +618,5 @@ export const Settings: React.FC = () => {
     </div>
   );
 };
+
+

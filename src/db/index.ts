@@ -1297,34 +1297,23 @@ export const db = {
 
   // Audit Logs proxy
   auditLogs: {
-    toArray: async () => [],
+    toArray: async () => apiClient.getAuditLogs(100, 0),
     get: async (id: string) => {
-      void id;
-      return null;
+      const logs = await apiClient.getAuditLogs(100, 0);
+      return logs.find((log: any) => log.id === id) || null;
     },
     add: async (log: any) => {
-      void log;
-      return null;
+      return apiClient.createAuditLog(log);
     },
-    clear: async () => {
-      const deals = await apiClient.getDeals();
-      for (const deal of deals) {
-        const variants = await apiClient.getDealVariants(deal.id);
-        for (const variant of variants) {
-          await apiClient.deleteDealVariant(deal.id, variant.variantId);
-        }
-      }
-    },
-    where: createWhereEquals(async () => []),
+    clear: async () => {},
+    where: createWhereEquals(() => apiClient.getAuditLogs(500, 0)),
     orderBy: (sortField: string) => ({
       reverse: () => ({
         offset: (offset: number) => ({
           limit: (limit: number) => ({
             toArray: async () => {
               void sortField;
-              void offset;
-              void limit;
-              return [];
+              return apiClient.getAuditLogs(limit, offset);
             },
           }),
         }),
@@ -1332,8 +1321,7 @@ export const db = {
     }),
     limit: (n: number) => ({
       toArray: async () => {
-        void n;
-        return [];
+        return apiClient.getAuditLogs(n, 0);
       },
     }),
   },

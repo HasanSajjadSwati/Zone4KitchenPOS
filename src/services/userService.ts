@@ -1,14 +1,13 @@
 import { db } from '@/db';
+import { apiClient } from '@/services/api';
 import { logAudit } from '@/utils/audit';
 import type { User } from '@/db/types';
-import * as bcrypt from 'bcryptjs';
-import { createId } from '@/utils/uuid';
 
 export interface CreateUserParams {
   username: string;
   password: string;
   fullName: string;
-  roleId: 'manager' | 'cashier';
+  roleId: string;
   isActive: boolean;
   createdBy: string;
 }
@@ -16,7 +15,7 @@ export interface CreateUserParams {
 export interface UpdateUserParams {
   id: string;
   fullName?: string;
-  roleId?: 'manager' | 'cashier';
+  roleId?: string;
   isActive?: boolean;
   password?: string;
   updatedBy: string;
@@ -29,20 +28,13 @@ export async function createUser(params: CreateUserParams): Promise<User> {
     throw new Error('Username already exists');
   }
 
-  const passwordHash = await bcrypt.hash(params.password, 10);
-
-  const user: User = {
-    id: createId(),
+  const user = await apiClient.createUser({
     username: params.username,
-    passwordHash: passwordHash,
+    password: params.password,
     fullName: params.fullName,
     roleId: params.roleId,
     isActive: params.isActive,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
-
-  await db.users.add(user);
+  });
 
   await logAudit({
     userId: params.createdBy,
@@ -62,18 +54,17 @@ export async function updateUser(params: UpdateUserParams): Promise<void> {
     throw new Error('User not found');
   }
 
-  const updates: Partial<User> = {
-    updatedAt: new Date(),
-  };
+  const updates: Partial<User> = {};
 
   if (params.fullName !== undefined) updates.fullName = params.fullName;
   if (params.roleId !== undefined) updates.roleId = params.roleId;
   if (params.isActive !== undefined) updates.isActive = params.isActive;
-  if (params.password) {
-    updates.passwordHash = await bcrypt.hash(params.password, 10);
-  }
 
-  await db.users.update(params.id, updates);
+  await apiClient.updateUser(params.id, updates);
+
+  if (params.password) {
+    throw new Error('Password updates require the reset password flow.');
+  }
 
   await logAudit({
     userId: params.updatedBy,
@@ -83,6 +74,25 @@ export async function updateUser(params: UpdateUserParams): Promise<void> {
     description: `Updated user ${user.username}`,
     before: user,
     after: { ...user, ...updates },
+  });
+}
+
+export async function resetUserPassword(userId: string, newPassword: string, adminUserId: string): Promise<void> {
+  const user = await db.users.get(userId);
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  await apiClient.resetUserPassword(userId, adminUserId, newPassword);
+
+  await logAudit({
+    userId: adminUserId,
+    action: 'update',
+    tableName: 'users',
+    recordId: userId,
+    description: `Reset password for user ${user.username}`,
+    before: user,
+    after: { ...user, updatedAt: new Date() },
   });
 }
 
