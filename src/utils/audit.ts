@@ -1,5 +1,6 @@
 import { db } from '@/db';
 import type { AuditLog } from '@/db/types';
+import { createId } from '@/utils/uuid';
 
 interface LogAuditParams {
   userId: string;
@@ -14,7 +15,7 @@ interface LogAuditParams {
 export async function logAudit(params: LogAuditParams): Promise<void> {
   try {
     await db.auditLogs.add({
-      id: crypto.randomUUID(),
+      id: createId(),
       userId: params.userId,
       action: params.action,
       tableName: params.tableName,

@@ -2,6 +2,7 @@ import { db } from '@/db';
 import { logAudit } from '@/utils/audit';
 import type { User } from '@/db/types';
 import * as bcrypt from 'bcryptjs';
+import { createId } from '@/utils/uuid';
 
 export interface CreateUserParams {
   username: string;
@@ -31,7 +32,7 @@ export async function createUser(params: CreateUserParams): Promise<User> {
   const passwordHash = await bcrypt.hash(params.password, 10);
 
   const user: User = {
-    id: crypto.randomUUID(),
+    id: createId(),
     username: params.username,
     passwordHash: passwordHash,
     fullName: params.fullName,

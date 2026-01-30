@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
+import { createId } from '@/utils/uuid';
   createDeal,
   updateDeal,
   deleteDeal,
@@ -180,7 +181,7 @@ export const Deals: React.FC = () => {
 
         for (const item of selectedDealItems) {
           await db.dealItems.add({
-            id: crypto.randomUUID(),
+            id: createId(),
             dealId: editingDeal.id,
             menuItemId: item.menuItemId,
             quantity: item.quantity,

@@ -2,6 +2,7 @@ import { db } from '@/db';
 import type { Order, OrderItem, Settings, KOTTicket, KOTItemDisplay } from '@/db/types';
 import { formatDateTime, formatCurrency } from '@/utils/validation';
 import { logAudit } from '@/utils/audit';
+import { createId } from '@/utils/uuid';
 
 // KOT Printing
 export async function printKOT(
@@ -61,7 +62,7 @@ export async function printKOT(
   // Save to kotPrints table
   for (const ticket of kotTickets) {
     await db.kotPrints.add({
-      id: crypto.randomUUID(),
+      id: createId(),
       orderId,
       printNumber: order.kotPrintCount + 1,
       majorCategory: ticket.category,
@@ -625,7 +626,7 @@ export async function printRiderReceipt(orderId: string, userId: string): Promis
 
   // Log in riderReceipts table
   await db.riderReceipts.add({
-    id: crypto.randomUUID(),
+    id: createId(),
     orderId,
     printedAt: new Date(),
     printedBy: userId,

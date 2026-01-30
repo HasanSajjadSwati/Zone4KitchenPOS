@@ -1,6 +1,7 @@
 import { db } from '@/db';
 import type { Waiter, Rider, TableRecord } from '@/db/types';
 import { logAudit } from '@/utils/audit';
+import { createId } from '@/utils/uuid';
 
 // Waiters
 export async function createWaiter(
@@ -8,7 +9,7 @@ export async function createWaiter(
   userId: string
 ): Promise<Waiter> {
   const newWaiter: Waiter = {
-    id: crypto.randomUUID(),
+    id: createId(),
     ...waiter,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -82,7 +83,7 @@ export async function createRider(
   userId: string
 ): Promise<Rider> {
   const newRider: Rider = {
-    id: crypto.randomUUID(),
+    id: createId(),
     ...rider,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -156,7 +157,7 @@ export async function createTable(
   userId: string
 ): Promise<TableRecord> {
   const newTable: TableRecord = {
-    id: crypto.randomUUID(),
+    id: createId(),
     ...table,
     createdAt: new Date(),
   };

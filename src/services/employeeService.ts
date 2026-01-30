@@ -1,6 +1,7 @@
 import { db } from '@/db';
 import type { Employee, EmployeeLoan } from '@/db/types';
 import { logAudit } from '@/utils/audit';
+import { createId } from '@/utils/uuid';
 
 // Employee CRUD Operations
 
@@ -17,7 +18,7 @@ interface CreateEmployeeParams {
 
 export async function createEmployee(data: CreateEmployeeParams, userId: string): Promise<Employee> {
   const employee: Employee = {
-    id: crypto.randomUUID(),
+    id: createId(),
     name: data.name,
     phone: data.phone,
     cnic: data.cnic || null,
@@ -151,7 +152,7 @@ export async function createEmployeeLoan(
   const installmentAmount = data.amount / data.totalInstallments;
 
   const loan: EmployeeLoan = {
-    id: crypto.randomUUID(),
+    id: createId(),
     employeeId: data.employeeId,
     amount: data.amount,
     issueDate: data.issueDate,

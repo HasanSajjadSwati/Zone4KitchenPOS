@@ -1,6 +1,7 @@
 import { db } from '@/db';
 import { logAudit } from '@/utils/audit';
 import type { Category, MenuItem, Variant, VariantOption, MenuItemVariant, Deal, DealItem } from '@/db/types';
+import { createId } from '@/utils/uuid';
 
 /**
  * Seeds the Zone Kitchen menu into the POS system.
@@ -14,27 +15,27 @@ export async function seedZoneKitchenMenu(userId: string) {
   // ═══════════════════════════════════════════════════════════
 
   // Major
-  const FAST = crypto.randomUUID();
-  const DESI = crypto.randomUUID();
+  const FAST = createId();
+  const DESI = createId();
 
   // Fastfood sub-categories
-  const BURGERS = crypto.randomUUID();
-  const ROLLS = crypto.randomUUID();
-  const PIZZAS = crypto.randomUUID();
-  const PASTA = crypto.randomUUID();
-  const WINGS = crypto.randomUUID();
-  const DRINKS = crypto.randomUUID();
-  const DEAL_PARTS = crypto.randomUUID();
+  const BURGERS = createId();
+  const ROLLS = createId();
+  const PIZZAS = createId();
+  const PASTA = createId();
+  const WINGS = createId();
+  const DRINKS = createId();
+  const DEAL_PARTS = createId();
 
   // Pakistani/Desi sub-categories
-  const PLATTERS = crypto.randomUUID();
-  const PULAO = crypto.randomUUID();
-  const KARAHI = crypto.randomUUID();
-  const BBQ = crypto.randomUUID();
-  const VEG = crypto.randomUUID();
-  const FISH = crypto.randomUUID();
-  const TANDOOR = crypto.randomUUID();
-  const DESI_EXTRAS = crypto.randomUUID();
+  const PLATTERS = createId();
+  const PULAO = createId();
+  const KARAHI = createId();
+  const BBQ = createId();
+  const VEG = createId();
+  const FISH = createId();
+  const TANDOOR = createId();
+  const DESI_EXTRAS = createId();
 
   const categories: Category[] = [
     { id: FAST, name: 'Fastfood', type: 'major', parentId: null, sortOrder: 1, isActive: true, createdAt: now, updatedAt: now },
@@ -62,24 +63,24 @@ export async function seedZoneKitchenMenu(userId: string) {
   //  VARIANTS & OPTIONS
   // ═══════════════════════════════════════════════════════════
 
-  const VAR_FLAVOUR = crypto.randomUUID();
-  const VAR_BRAND = crypto.randomUUID();
+  const VAR_FLAVOUR = createId();
+  const VAR_BRAND = createId();
 
-  const OPT_TIKKA = crypto.randomUUID();
-  const OPT_FAJITA = crypto.randomUUID();
-  const OPT_HOT_SPICY = crypto.randomUUID();
-  const OPT_CHEESE = crypto.randomUUID();
-  const OPT_VEGETABLE = crypto.randomUUID();
-  const OPT_TANDOORI = crypto.randomUUID();
+  const OPT_TIKKA = createId();
+  const OPT_FAJITA = createId();
+  const OPT_HOT_SPICY = createId();
+  const OPT_CHEESE = createId();
+  const OPT_VEGETABLE = createId();
+  const OPT_TANDOORI = createId();
 
-  const OPT_PEPSI = crypto.randomUUID();
-  const OPT_SPRITE = crypto.randomUUID();
-  const OPT_FANTA = crypto.randomUUID();
-  const OPT_COKE = crypto.randomUUID();
-  const OPT_MIRINDA = crypto.randomUUID();
-  const OPT_7UP = crypto.randomUUID();
-  const OPT_NEXT = crypto.randomUUID();
-  const OPT_FIZZUP = crypto.randomUUID();
+  const OPT_PEPSI = createId();
+  const OPT_SPRITE = createId();
+  const OPT_FANTA = createId();
+  const OPT_COKE = createId();
+  const OPT_MIRINDA = createId();
+  const OPT_7UP = createId();
+  const OPT_NEXT = createId();
+  const OPT_FIZZUP = createId();
 
   const allFlavourOpts = [OPT_TIKKA, OPT_FAJITA, OPT_HOT_SPICY, OPT_CHEESE, OPT_VEGETABLE, OPT_TANDOORI];
   const allBrandOpts = [OPT_PEPSI, OPT_SPRITE, OPT_FANTA, OPT_COKE, OPT_MIRINDA, OPT_7UP, OPT_NEXT, OPT_FIZZUP];
@@ -124,63 +125,63 @@ export async function seedZoneKitchenMenu(userId: string) {
   }
 
   // ── Burgers ──
-  const ID_ZINGER = crypto.randomUUID();
-  const ID_CRISPY = crypto.randomUUID();
-  const ID_MIGHTY = crypto.randomUUID();
-  const ID_MONSTER = crypto.randomUUID();
-  const ID_CGRILL_S = crypto.randomUUID();
-  const ID_CGRILL_D = crypto.randomUUID();
-  const ID_BEEF_S = crypto.randomUUID();
-  const ID_BEEF_D = crypto.randomUUID();
+  const ID_ZINGER = createId();
+  const ID_CRISPY = createId();
+  const ID_MIGHTY = createId();
+  const ID_MONSTER = createId();
+  const ID_CGRILL_S = createId();
+  const ID_CGRILL_D = createId();
+  const ID_BEEF_S = createId();
+  const ID_BEEF_D = createId();
 
   // ── Rolls ──
-  const ID_BEHARI_ROLL = crypto.randomUUID();
-  const ID_ARABIC_ROLL = crypto.randomUUID();
-  const ID_TWISTER_S = crypto.randomUUID();
-  const ID_TWISTER_D = crypto.randomUUID();
+  const ID_BEHARI_ROLL = createId();
+  const ID_ARABIC_ROLL = createId();
+  const ID_TWISTER_S = createId();
+  const ID_TWISTER_D = createId();
 
   // ── Pizzas (each size is a separate item, all have Flavour variant) ──
-  const ID_CROWN_R = crypto.randomUUID();
-  const ID_CROWN_L = crypto.randomUUID();
-  const ID_CROWN_P = crypto.randomUUID();
-  const ID_BEHARI_R = crypto.randomUUID();
-  const ID_BEHARI_L = crypto.randomUUID();
-  const ID_BEHARI_P = crypto.randomUUID();
-  const ID_STUFF_R = crypto.randomUUID();
-  const ID_STUFF_L = crypto.randomUUID();
-  const ID_STUFF_P = crypto.randomUUID();
-  const ID_SPAM_R = crypto.randomUUID();
-  const ID_SPAM_L = crypto.randomUUID();
-  const ID_SPAM_P = crypto.randomUUID();
-  const ID_XTREME_S = crypto.randomUUID();
-  const ID_XTREME_R = crypto.randomUUID();
-  const ID_XTREME_L = crypto.randomUUID();
-  const ID_XTREME_P = crypto.randomUUID();
-  const ID_SAND_S = crypto.randomUUID();
-  const ID_SAND_R = crypto.randomUUID();
-  const ID_SAND_L = crypto.randomUUID();
-  const ID_SAND_P = crypto.randomUUID();
+  const ID_CROWN_R = createId();
+  const ID_CROWN_L = createId();
+  const ID_CROWN_P = createId();
+  const ID_BEHARI_R = createId();
+  const ID_BEHARI_L = createId();
+  const ID_BEHARI_P = createId();
+  const ID_STUFF_R = createId();
+  const ID_STUFF_L = createId();
+  const ID_STUFF_P = createId();
+  const ID_SPAM_R = createId();
+  const ID_SPAM_L = createId();
+  const ID_SPAM_P = createId();
+  const ID_XTREME_S = createId();
+  const ID_XTREME_R = createId();
+  const ID_XTREME_L = createId();
+  const ID_XTREME_P = createId();
+  const ID_SAND_S = createId();
+  const ID_SAND_R = createId();
+  const ID_SAND_L = createId();
+  const ID_SAND_P = createId();
 
   // ── Cheesy Pasta ──
-  const ID_ALFREDO = crypto.randomUUID();
-  const ID_CRUNCHY_PASTA = crypto.randomUUID();
+  const ID_ALFREDO = createId();
+  const ID_CRUNCHY_PASTA = createId();
 
   // ── Cold Drinks (each size, each has Brand variant) ──
-  const ID_DRINK_345 = crypto.randomUUID();
-  const ID_DRINK_500 = crypto.randomUUID();
-  const ID_DRINK_1L = crypto.randomUUID();
-  const ID_DRINK_1_5L = crypto.randomUUID();
+  const ID_DRINK_345 = createId();
+  const ID_DRINK_500 = createId();
+  const ID_DRINK_1L = createId();
+  const ID_DRINK_1_5L = createId();
 
   // ── Deal-Only Components ──
-  const ID_CHICKEN_PC = crypto.randomUUID();
-  const ID_REG_FRIES = crypto.randomUUID();
-  const ID_LRG_FRIES = crypto.randomUUID();
-  const ID_DIP_SAUCE = crypto.randomUUID();
-  const ID_HOT_WING = crypto.randomUUID();
-  const ID_DEAL_PIZZA_S = crypto.randomUUID();
-  const ID_DEAL_PIZZA_R = crypto.randomUUID();
-  const ID_DEAL_PIZZA_L = crypto.randomUUID();
-  const ID_DEAL_PIZZA_P = crypto.randomUUID();
+  const ID_CHICKEN_PC = createId();
+  const ID_REG_FRIES = createId();
+  const ID_LRG_FRIES = createId();
+  const ID_DIP_SAUCE = createId();
+  const ID_HOT_WING = createId();
+  const ID_DEAL_PIZZA_S = createId();
+  const ID_DEAL_PIZZA_R = createId();
+  const ID_DEAL_PIZZA_L = createId();
+  const ID_DEAL_PIZZA_P = createId();
 
   // Collect all pizza IDs for variant linking
   const allPizzaIds = [
@@ -236,25 +237,25 @@ export async function seedZoneKitchenMenu(userId: string) {
     // ── Cheesy Pasta ──
     mi(ID_ALFREDO, 'Alfredo Pasta', PASTA, 800),
     mi(ID_CRUNCHY_PASTA, 'Crunchy Chicken Pasta', PASTA, 800),
-    mi(crypto.randomUUID(), 'Special Roasted Platter', PASTA, 950),
-    mi(crypto.randomUUID(), 'Classic Roll Platter', PASTA, 850),
-    mi(crypto.randomUUID(), 'Pizza Stacker', PASTA, 850),
-    mi(crypto.randomUUID(), 'Mexican Sandwich', PASTA, 850),
-    mi(crypto.randomUUID(), 'Calzone Chunks', PASTA, 950),
+    mi(createId(), 'Special Roasted Platter', PASTA, 950),
+    mi(createId(), 'Classic Roll Platter', PASTA, 850),
+    mi(createId(), 'Pizza Stacker', PASTA, 850),
+    mi(createId(), 'Mexican Sandwich', PASTA, 850),
+    mi(createId(), 'Calzone Chunks', PASTA, 950),
 
     // ── Wings & Sides ──
-    mi(crypto.randomUUID(), 'Oven Baked Wings (Flaming)', WINGS, 1150),
-    mi(crypto.randomUUID(), 'Oven Baked Wings', WINGS, 550),
-    mi(crypto.randomUUID(), 'Loaded Fries', WINGS, 550),
-    mi(crypto.randomUUID(), '6 Nuggets', WINGS, 400),
+    mi(createId(), 'Oven Baked Wings (Flaming)', WINGS, 1150),
+    mi(createId(), 'Oven Baked Wings', WINGS, 550),
+    mi(createId(), 'Loaded Fries', WINGS, 550),
+    mi(createId(), '6 Nuggets', WINGS, 400),
 
     // ── Cold Drinks (per size, with Brand variant) ──
     mi(ID_DRINK_345, 'Cold Drink 345ml', DRINKS, 100, { variants: true }),
     mi(ID_DRINK_500, 'Cold Drink 500ml', DRINKS, 120, { variants: true }),
     mi(ID_DRINK_1L, 'Cold Drink 1 Litre', DRINKS, 150, { variants: true }),
     mi(ID_DRINK_1_5L, 'Cold Drink 1.5 Litre', DRINKS, 200, { variants: true }),
-    mi(crypto.randomUUID(), 'Special Salad', DRINKS, 100),
-    mi(crypto.randomUUID(), 'Raita', DRINKS, 50),
+    mi(createId(), 'Special Salad', DRINKS, 100),
+    mi(createId(), 'Raita', DRINKS, 50),
 
     // ── Deal-Only Components (hidden from menu, used in deals) ──
     mi(ID_CHICKEN_PC, 'Chicken Piece', DEAL_PARTS, 0, { dealOnly: true }),
@@ -268,77 +269,77 @@ export async function seedZoneKitchenMenu(userId: string) {
     mi(ID_DEAL_PIZZA_P, 'Party Pizza', DEAL_PARTS, 0, { dealOnly: true }),
 
     // ── Special Platters ──
-    mi(crypto.randomUUID(), 'Special Platter 1', PLATTERS, 1350, { desc: '800g Rice, 2 Seekh Kabab, 1 Chicken Boti Seekh, 1 Malai Boti Seekh, 500ml Drink' }),
-    mi(crypto.randomUUID(), 'Special Platter 2', PLATTERS, 2450, { desc: '2 Chicken Tikka, 4 Seekh Kabab, 2 Malai Boti Seekh, 2 Chicken Boti Seekh, 6 Nan, 1.5L Drink' }),
-    mi(crypto.randomUUID(), 'Special Platter 3', PLATTERS, 3150, { desc: '1.5Kg Rice, 4 Seekh Kabab, 2 Chicken Boti, 2 Malai Boti Seekh, 1 Chicken Tikka, 1.5L Drink' }),
-    mi(crypto.randomUUID(), 'Special Platter 4', PLATTERS, 3850, { desc: '1.2Kg Pulao, 3 Seekh Kabab, 1 Tikka Boti, 2 Malai Boti, 1 Chicken Tikka, Half Karahi, 8 Nan, 1.5L Drink' }),
-    mi(crypto.randomUUID(), 'Special Platter 5', PLATTERS, 3990, { desc: '1.2Kg Pulao, 3 Seekh Kabab, 1 Tikka Boti, 1 Malai Boti, Half Mutton Karahi, 1 Chicken Tikka, 5 Nan, 1L Drink' }),
-    mi(crypto.randomUUID(), 'Special Platter 6', PLATTERS, 6950, { desc: '1.6Kg Pulao, 6 Seekh Kabab, 2 Tikka Boti, 2 Malai Boti, 2 Chicken Tikka, Full Mutton Karahi, 8 Nan, 1.5L Drink' }),
+    mi(createId(), 'Special Platter 1', PLATTERS, 1350, { desc: '800g Rice, 2 Seekh Kabab, 1 Chicken Boti Seekh, 1 Malai Boti Seekh, 500ml Drink' }),
+    mi(createId(), 'Special Platter 2', PLATTERS, 2450, { desc: '2 Chicken Tikka, 4 Seekh Kabab, 2 Malai Boti Seekh, 2 Chicken Boti Seekh, 6 Nan, 1.5L Drink' }),
+    mi(createId(), 'Special Platter 3', PLATTERS, 3150, { desc: '1.5Kg Rice, 4 Seekh Kabab, 2 Chicken Boti, 2 Malai Boti Seekh, 1 Chicken Tikka, 1.5L Drink' }),
+    mi(createId(), 'Special Platter 4', PLATTERS, 3850, { desc: '1.2Kg Pulao, 3 Seekh Kabab, 1 Tikka Boti, 2 Malai Boti, 1 Chicken Tikka, Half Karahi, 8 Nan, 1.5L Drink' }),
+    mi(createId(), 'Special Platter 5', PLATTERS, 3990, { desc: '1.2Kg Pulao, 3 Seekh Kabab, 1 Tikka Boti, 1 Malai Boti, Half Mutton Karahi, 1 Chicken Tikka, 5 Nan, 1L Drink' }),
+    mi(createId(), 'Special Platter 6', PLATTERS, 6950, { desc: '1.6Kg Pulao, 6 Seekh Kabab, 2 Tikka Boti, 2 Malai Boti, 2 Chicken Tikka, Full Mutton Karahi, 8 Nan, 1.5L Drink' }),
 
     // ── Chicken Pulao ──
-    mi(crypto.randomUUID(), 'Single Pulao', PULAO, 470),
-    mi(crypto.randomUUID(), 'Chicken Piece Choice', PULAO, 490),
-    mi(crypto.randomUUID(), 'Single Without Kabab', PULAO, 400),
-    mi(crypto.randomUUID(), 'Single Lunch Box', PULAO, 510),
-    mi(crypto.randomUUID(), 'Special Pulao', PULAO, 600),
-    mi(crypto.randomUUID(), 'Special Choice', PULAO, 620),
-    mi(crypto.randomUUID(), 'Special Without Kabab', PULAO, 530),
-    mi(crypto.randomUUID(), 'Special Lunch Box', PULAO, 630),
-    mi(crypto.randomUUID(), 'Pulao Kabab', PULAO, 370),
-    mi(crypto.randomUUID(), 'Pulao (Plain)', PULAO, 300),
-    mi(crypto.randomUUID(), 'Beef Shami Kabab', PULAO, 60),
+    mi(createId(), 'Single Pulao', PULAO, 470),
+    mi(createId(), 'Chicken Piece Choice', PULAO, 490),
+    mi(createId(), 'Single Without Kabab', PULAO, 400),
+    mi(createId(), 'Single Lunch Box', PULAO, 510),
+    mi(createId(), 'Special Pulao', PULAO, 600),
+    mi(createId(), 'Special Choice', PULAO, 620),
+    mi(createId(), 'Special Without Kabab', PULAO, 530),
+    mi(createId(), 'Special Lunch Box', PULAO, 630),
+    mi(createId(), 'Pulao Kabab', PULAO, 370),
+    mi(createId(), 'Pulao (Plain)', PULAO, 300),
+    mi(createId(), 'Beef Shami Kabab', PULAO, 60),
 
     // ── Handi & Karahi (Half / Full as separate items) ──
-    mi(crypto.randomUUID(), 'Chicken Karahi Half', KARAHI, 950),
-    mi(crypto.randomUUID(), 'Chicken Karahi Full', KARAHI, 1800),
-    mi(crypto.randomUUID(), 'Chicken White Karahi Half', KARAHI, 1000),
-    mi(crypto.randomUUID(), 'Chicken White Karahi Full', KARAHI, 2000),
-    mi(crypto.randomUUID(), 'Chicken Karahi with Butter Half', KARAHI, 1000),
-    mi(crypto.randomUUID(), 'Chicken Karahi with Butter Full', KARAHI, 1900),
-    mi(crypto.randomUUID(), 'Chicken Boneless Handi Half', KARAHI, 1150),
-    mi(crypto.randomUUID(), 'Chicken Boneless Handi Full', KARAHI, 2200),
-    mi(crypto.randomUUID(), 'Chicken Boneless White Handi Half', KARAHI, 1250),
-    mi(crypto.randomUUID(), 'Chicken Boneless White Handi Full', KARAHI, 2300),
-    mi(crypto.randomUUID(), 'Beef Karahi Boneless Half', KARAHI, 1500),
-    mi(crypto.randomUUID(), 'Beef Karahi Boneless Full', KARAHI, 2700),
-    mi(crypto.randomUUID(), 'Beef White Karahi Boneless Half', KARAHI, 1500),
-    mi(crypto.randomUUID(), 'Beef White Karahi Boneless Full', KARAHI, 2600),
-    mi(crypto.randomUUID(), 'Seekh Kabab Fry Half', KARAHI, 1000),
-    mi(crypto.randomUUID(), 'Seekh Kabab Fry Full', KARAHI, 2050),
-    mi(crypto.randomUUID(), 'Tikka Half', KARAHI, 1050),
-    mi(crypto.randomUUID(), 'Tikka Full', KARAHI, 2100),
-    mi(crypto.randomUUID(), 'Mutton Karahi Half', KARAHI, 2000),
-    mi(crypto.randomUUID(), 'Mutton Karahi Full', KARAHI, 3600),
-    mi(crypto.randomUUID(), 'Dumba Shinwari / Sulemani Half', KARAHI, 2350),
-    mi(crypto.randomUUID(), 'Dumba Shinwari / Sulemani Full', KARAHI, 4400),
-    mi(crypto.randomUUID(), 'Desi Chicken Karahi Full', KARAHI, 3400),
+    mi(createId(), 'Chicken Karahi Half', KARAHI, 950),
+    mi(createId(), 'Chicken Karahi Full', KARAHI, 1800),
+    mi(createId(), 'Chicken White Karahi Half', KARAHI, 1000),
+    mi(createId(), 'Chicken White Karahi Full', KARAHI, 2000),
+    mi(createId(), 'Chicken Karahi with Butter Half', KARAHI, 1000),
+    mi(createId(), 'Chicken Karahi with Butter Full', KARAHI, 1900),
+    mi(createId(), 'Chicken Boneless Handi Half', KARAHI, 1150),
+    mi(createId(), 'Chicken Boneless Handi Full', KARAHI, 2200),
+    mi(createId(), 'Chicken Boneless White Handi Half', KARAHI, 1250),
+    mi(createId(), 'Chicken Boneless White Handi Full', KARAHI, 2300),
+    mi(createId(), 'Beef Karahi Boneless Half', KARAHI, 1500),
+    mi(createId(), 'Beef Karahi Boneless Full', KARAHI, 2700),
+    mi(createId(), 'Beef White Karahi Boneless Half', KARAHI, 1500),
+    mi(createId(), 'Beef White Karahi Boneless Full', KARAHI, 2600),
+    mi(createId(), 'Seekh Kabab Fry Half', KARAHI, 1000),
+    mi(createId(), 'Seekh Kabab Fry Full', KARAHI, 2050),
+    mi(createId(), 'Tikka Half', KARAHI, 1050),
+    mi(createId(), 'Tikka Full', KARAHI, 2100),
+    mi(createId(), 'Mutton Karahi Half', KARAHI, 2000),
+    mi(createId(), 'Mutton Karahi Full', KARAHI, 3600),
+    mi(createId(), 'Dumba Shinwari / Sulemani Half', KARAHI, 2350),
+    mi(createId(), 'Dumba Shinwari / Sulemani Full', KARAHI, 4400),
+    mi(createId(), 'Desi Chicken Karahi Full', KARAHI, 3400),
 
     // ── Bar BQ ──
-    mi(crypto.randomUUID(), 'Chicken Tikka', BBQ, 400),
-    mi(crypto.randomUUID(), 'Chicken Boti', BBQ, 280),
-    mi(crypto.randomUUID(), 'Chicken Malai Boti', BBQ, 300),
-    mi(crypto.randomUUID(), 'Chicken Seekh Kabab 6', BBQ, 750),
-    mi(crypto.randomUUID(), 'Chicken Seekh Kabab 12', BBQ, 1500),
-    mi(crypto.randomUUID(), 'Chicken Seekh Kabab Fry 12', BBQ, 2100),
+    mi(createId(), 'Chicken Tikka', BBQ, 400),
+    mi(createId(), 'Chicken Boti', BBQ, 280),
+    mi(createId(), 'Chicken Malai Boti', BBQ, 300),
+    mi(createId(), 'Chicken Seekh Kabab 6', BBQ, 750),
+    mi(createId(), 'Chicken Seekh Kabab 12', BBQ, 1500),
+    mi(createId(), 'Chicken Seekh Kabab Fry 12', BBQ, 2100),
 
     // ── Vegetable & Meat ──
-    mi(crypto.randomUUID(), 'Chicken Qorma', VEG, 350),
-    mi(crypto.randomUUID(), 'Daal', VEG, 250),
-    mi(crypto.randomUUID(), 'Sabzi', VEG, 200),
+    mi(createId(), 'Chicken Qorma', VEG, 350),
+    mi(createId(), 'Daal', VEG, 250),
+    mi(createId(), 'Sabzi', VEG, 200),
 
     // ── Fish ──
-    mi(crypto.randomUUID(), 'Fried Fish / Grilled Fish', FISH, 0, { desc: 'Price varies' }),
+    mi(createId(), 'Fried Fish / Grilled Fish', FISH, 0, { desc: 'Price varies' }),
 
     // ── Tandoor ──
-    mi(crypto.randomUUID(), 'Roti', TANDOOR, 20),
-    mi(crypto.randomUUID(), 'Plain Nan', TANDOOR, 30),
-    mi(crypto.randomUUID(), 'Roghni Nan', TANDOOR, 60),
-    mi(crypto.randomUUID(), 'Garlic Nan', TANDOOR, 60),
-    mi(crypto.randomUUID(), 'Kalwanji Nan', TANDOOR, 60),
+    mi(createId(), 'Roti', TANDOOR, 20),
+    mi(createId(), 'Plain Nan', TANDOOR, 30),
+    mi(createId(), 'Roghni Nan', TANDOOR, 60),
+    mi(createId(), 'Garlic Nan', TANDOOR, 60),
+    mi(createId(), 'Kalwanji Nan', TANDOOR, 60),
 
     // ── Desi Extras ──
-    mi(crypto.randomUUID(), 'Raita', DESI_EXTRAS, 50),
-    mi(crypto.randomUUID(), 'Special Salad', DESI_EXTRAS, 100),
+    mi(createId(), 'Raita', DESI_EXTRAS, 50),
+    mi(createId(), 'Special Salad', DESI_EXTRAS, 100),
   ];
 
   // ═══════════════════════════════════════════════════════════
@@ -350,7 +351,7 @@ export async function seedZoneKitchenMenu(userId: string) {
   // All standalone pizzas → Pizza Flavour (required, single-select)
   for (const pizzaId of allPizzaIds) {
     menuItemVariants.push({
-      id: crypto.randomUUID(),
+      id: createId(),
       menuItemId: pizzaId,
       variantId: VAR_FLAVOUR,
       isRequired: true,
@@ -363,7 +364,7 @@ export async function seedZoneKitchenMenu(userId: string) {
   // All cold drinks → Drink Brand (required, single-select)
   for (const drinkId of allDrinkIds) {
     menuItemVariants.push({
-      id: crypto.randomUUID(),
+      id: createId(),
       menuItemId: drinkId,
       variantId: VAR_BRAND,
       isRequired: true,
@@ -387,7 +388,7 @@ export async function seedZoneKitchenMenu(userId: string) {
     description: string,
     items: Array<{ menuItemId: string; quantity: number; requiresVariantSelection?: boolean }>
   ) {
-    const dealId = crypto.randomUUID();
+    const dealId = createId();
     deals.push({
       id: dealId, name, description, price,
       categoryId: null, isActive: true, hasVariants: false,
@@ -395,7 +396,7 @@ export async function seedZoneKitchenMenu(userId: string) {
     });
     items.forEach((item, idx) => {
       dealItems.push({
-        id: crypto.randomUUID(),
+        id: createId(),
         dealId,
         menuItemId: item.menuItemId,
         quantity: item.quantity,

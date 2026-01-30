@@ -1,13 +1,14 @@
 import { db } from '@/db';
 import type { Customer, Order } from '@/db/types';
 import { logAudit } from '@/utils/audit';
+import { createId } from '@/utils/uuid';
 
 export async function createCustomer(
   customer: Omit<Customer, 'id' | 'createdAt' | 'updatedAt' | 'lastOrderAt' | 'totalOrders'>,
   userId: string
 ): Promise<Customer> {
   const newCustomer: Customer = {
-    id: crypto.randomUUID(),
+    id: createId(),
     ...customer,
     lastOrderAt: null,
     totalOrders: 0,

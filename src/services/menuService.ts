@@ -1,6 +1,7 @@
 import { db } from '@/db';
 import type { Category, MenuItem, Variant, VariantOption, MenuItemVariant, Deal, DealItem, DealVariant, SelectionMode } from '@/db/types';
 import { logAudit } from '@/utils/audit';
+import { createId } from '@/utils/uuid';
 
 // Categories
 export async function createCategory(
@@ -8,7 +9,7 @@ export async function createCategory(
   userId: string
 ): Promise<Category> {
   const newCategory: Category = {
-    id: crypto.randomUUID(),
+    id: createId(),
     ...category,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -100,7 +101,7 @@ export async function createMenuItem(
   userId: string
 ): Promise<MenuItem> {
   const newItem: MenuItem = {
-    id: crypto.randomUUID(),
+    id: createId(),
     ...item,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -183,7 +184,7 @@ export async function createVariant(
   userId: string
 ): Promise<Variant> {
   const newVariant: Variant = {
-    id: crypto.randomUUID(),
+    id: createId(),
     ...variant,
     createdAt: new Date(),
   };
@@ -256,7 +257,7 @@ export async function createVariantOption(
   userId: string
 ): Promise<VariantOption> {
   const newOption: VariantOption = {
-    id: crypto.randomUUID(),
+    id: createId(),
     ...option,
     createdAt: new Date(),
   };
@@ -315,7 +316,7 @@ export async function setMenuItemVariants(
   // Create new links
   for (const { variantId, isRequired, selectionMode, availableOptionIds } of variantIds) {
     const newLink: MenuItemVariant = {
-      id: crypto.randomUUID(),
+      id: createId(),
       menuItemId,
       variantId,
       isRequired,
@@ -343,7 +344,7 @@ export async function createDeal(
   userId: string
 ): Promise<Deal> {
   const newDeal: Deal = {
-    id: crypto.randomUUID(),
+    id: createId(),
     ...deal,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -354,7 +355,7 @@ export async function createDeal(
 
     for (const item of dealItems) {
       await db.dealItems.add({
-        id: crypto.randomUUID(),
+        id: createId(),
         dealId: newDeal.id,
         ...item,
         createdAt: new Date(),
@@ -443,7 +444,7 @@ export async function setDealVariants(
   // Create new links
   for (const { variantId, isRequired, selectionMode, availableOptionIds } of variantIds) {
     const newLink: DealVariant = {
-      id: crypto.randomUUID(),
+      id: createId(),
       dealId,
       variantId,
       isRequired,

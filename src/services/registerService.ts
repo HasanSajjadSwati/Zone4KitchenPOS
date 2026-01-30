@@ -1,6 +1,7 @@
 import { db } from '@/db';
 import type { RegisterSession } from '@/db/types';
 import { logAudit } from '@/utils/audit';
+import { createId } from '@/utils/uuid';
 
 export async function openRegister(
   openingCash: number,
@@ -17,7 +18,7 @@ export async function openRegister(
   }
 
   const newSession: RegisterSession = {
-    id: crypto.randomUUID(),
+    id: createId(),
     openedBy: userId,
     closedBy: null,
     openedAt: new Date(),

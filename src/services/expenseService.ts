@@ -1,6 +1,7 @@
 import { db } from '@/db';
 import type { Expense } from '@/db/types';
 import { logAudit } from '@/utils/audit';
+import { createId } from '@/utils/uuid';
 
 export interface DateRange {
   startDate: Date;
@@ -20,7 +21,7 @@ interface CreateExpenseParams {
 
 export async function createExpense(data: CreateExpenseParams, userId: string): Promise<Expense> {
   const expense: Expense = {
-    id: crypto.randomUUID(),
+    id: createId(),
     date: data.date,
     category: data.category,
     amount: data.amount,

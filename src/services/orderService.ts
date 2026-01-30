@@ -1,5 +1,6 @@
 import { db } from '@/db';
 import type {
+import { createId } from '@/utils/uuid';
   Order,
   OrderItem,
   Payment,
@@ -137,7 +138,7 @@ export async function addMenuItem(params: AddMenuItemParams): Promise<OrderItem>
   const totalPrice = unitPrice * params.quantity;
 
   const orderItem: OrderItem = {
-    id: crypto.randomUUID(),
+    id: createId(),
     orderId: params.orderId,
     itemType: 'menu_item',
     menuItemId: params.menuItemId,
@@ -184,7 +185,7 @@ export async function addDeal(params: AddDealParams): Promise<OrderItem> {
   const totalPrice = deal.price * params.quantity;
 
   const orderItem: OrderItem = {
-    id: crypto.randomUUID(),
+    id: createId(),
     orderId: params.orderId,
     itemType: 'deal',
     menuItemId: null,
@@ -417,7 +418,7 @@ export async function completeOrder(params: CompleteOrderParams): Promise<void> 
     // Record payment if paid
     if (params.isPaid && params.paymentMethod) {
       const payment: Payment = {
-        id: crypto.randomUUID(),
+        id: createId(),
         orderId: params.orderId,
         amount: params.paymentAmount || order.total,
         method: params.paymentMethod,
@@ -502,7 +503,7 @@ export async function markOrderAsPaid(params: MarkAsPaidParams): Promise<void> {
 
     // Record payment
     const payment: Payment = {
-      id: crypto.randomUUID(),
+      id: createId(),
       orderId: params.orderId,
       amount: params.paymentAmount || order.total,
       method: params.paymentMethod,
