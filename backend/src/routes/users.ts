@@ -1,0 +1,137 @@
+import express from 'express';
+import { v4 as uuidv4 } from 'uuid';
+import bcrypt from 'bcryptjs';
+import { runAsync, getAsync, allAsync } from '../db/database.js';
+
+export const userRoutes = express.Router();
+
+// Get all users
+userRoutes.get('/', async (req, res) => {
+  try {
+    const users = await allAsync(`
+      SELECT u.id, u.username, u.passwordHash, u.fullName, u.roleId, u.isActive, u.createdAt, u.updatedAt, r.name as roleName
+      FROM users u
+      JOIN roles r ON u.roleId = r.id
+      ORDER BY u.createdAt DESC
+    `);
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// Get user by ID
+userRoutes.get('/:id', async (req, res) => {
+  try {
+    const user = await getAsync(`
+      SELECT u.id, u.username, u.passwordHash, u.fullName, u.roleId, u.isActive, u.createdAt, u.updatedAt, r.name as roleName
+      FROM users u
+      JOIN roles r ON u.roleId = r.id
+      WHERE u.id = ?
+    `, [req.params.id]);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// Create user
+userRoutes.post('/', async (req, res) => {
+  try {
+    const { username, password, fullName, roleId, isActive } = req.body;
+
+    if (!username || !password || !fullName || !roleId) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const id = uuidv4();
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const now = new Date().toISOString();
+
+    await runAsync(
+      `INSERT INTO users (id, username, passwordHash, fullName, roleId, isActive, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, username, hashedPassword, fullName, roleId, isActive !== false ? 1 : 0, now, now]
+    );
+
+    const user = await getAsync('SELECT id, username, fullName, roleId, isActive, createdAt, updatedAt FROM users WHERE id = ?', [id]);
+    res.status(201).json(user);
+  } catch (error) {
+    const message = (error as Error).message;
+    if (message.includes('UNIQUE constraint failed')) {
+      return res.status(409).json({ error: 'Username already exists' });
+    }
+    res.status(500).json({ error: message });
+  }
+});
+
+// Update user
+userRoutes.put('/:id', async (req, res) => {
+  try {
+    const { fullName, roleId, isActive } = req.body;
+    const now = new Date().toISOString();
+
+    const user = await getAsync('SELECT * FROM users WHERE id = ?', [req.params.id]);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    await runAsync(
+      `UPDATE users SET fullName = ?, roleId = ?, isActive = ?, updatedAt = ? WHERE id = ?`,
+      [fullName || user.fullName, roleId || user.roleId, isActive !== undefined ? (isActive ? 1 : 0) : user.isActive, now, req.params.id]
+    );
+
+    const updated = await getAsync('SELECT id, username, fullName, roleId, isActive, createdAt, updatedAt FROM users WHERE id = ?', [req.params.id]);
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// Change password
+userRoutes.post('/:id/change-password', async (req, res) => {
+  try {
+    const { oldPassword, newPassword } = req.body;
+
+    if (!oldPassword || !newPassword) {
+      return res.status(400).json({ error: 'Missing password fields' });
+    }
+
+    const user = await getAsync('SELECT * FROM users WHERE id = ?', [req.params.id]);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const passwordMatch = await bcrypt.compare(oldPassword, user.passwordHash);
+    if (!passwordMatch) {
+      return res.status(401).json({ error: 'Invalid old password' });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const now = new Date().toISOString();
+
+    await runAsync('UPDATE users SET passwordHash = ?, updatedAt = ? WHERE id = ?', [hashedPassword, now, req.params.id]);
+    res.json({ message: 'Password changed successfully' });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// Delete user
+userRoutes.delete('/:id', async (req, res) => {
+  try {
+    const user = await getAsync('SELECT * FROM users WHERE id = ?', [req.params.id]);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    await runAsync('DELETE FROM users WHERE id = ?', [req.params.id]);
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});

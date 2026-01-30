@@ -1,0 +1,36 @@
+export const TABLES = [
+  'users', 'roles', 'categories', 'menuItems', 'variants', 'variantOptions',
+  'menuItemVariants', 'deals', 'dealItems', 'dealVariants', 'customers',
+  'waiters', 'riders', 'diningTables', 'registerSessions', 'orders',
+  'orderItems', 'payments', 'kotPrints', 'auditLogs', 'settings',
+  'uploadQueue', 'employees', 'employeeLoans', 'expenses', 'riderReceipts'
+];
+
+export const WIPE_TABLE_SEQUENCE = [
+  'orderItems',
+  'payments',
+  'kotPrints',
+  'orders',
+  'registerSessions',
+  'menuItemVariants',
+  'variantOptions',
+  'dealVariants',
+  'dealItems',
+  'menuItems',
+  'deals',
+  'categories',
+  'variants',
+  'customers',
+  'riderReceipts',
+  'waiters',
+  'riders',
+  'diningTables',
+  'uploadQueue',
+  'employeeLoans',
+  'expenses',
+  'employees',
+  'auditLogs',
+  'settings',
+  'users',
+  'roles'
+];
