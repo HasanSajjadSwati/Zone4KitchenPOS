@@ -46,6 +46,7 @@ type TabType = 'business' | 'kot' | 'users' | 'audit';
 export const Settings: React.FC = () => {
   const currentUser = useAuthStore((state) => state.currentUser);
   const currentRole = useAuthStore((state) => state.currentRole);
+  const hasPermission = useAuthStore((state) => state.hasPermission);
   const dialog = useDialog();
   const [activeTab, setActiveTab] = useState<TabType>('business');
   const [users, setUsers] = useState<User[]>([]);
@@ -75,6 +76,15 @@ export const Settings: React.FC = () => {
     loadData();
   }, [activeTab]);
 
+  useEffect(() => {
+    if (activeTab === 'users' && !canViewUsers) {
+      setActiveTab('business');
+    }
+    if (activeTab === 'audit' && !canViewAudit) {
+      setActiveTab('business');
+    }
+  }, [activeTab, canViewUsers, canViewAudit]);
+
   const loadData = async () => {
     const currentSettings = await getSettings();
     if (currentSettings) {
@@ -94,14 +104,14 @@ export const Settings: React.FC = () => {
       });
     }
 
-    if (activeTab === 'users') {
+    if (activeTab === 'users' && canViewUsers) {
       const [allUsers, allRoles] = await Promise.all([getAllUsers(), getAllRoles()]);
       setUsers(allUsers);
       setRoles(allRoles);
     }
 
-    if (activeTab === 'audit') {
-      const logs = await getAuditLogs(50);
+    if (activeTab === 'audit' && currentUser && canViewAudit) {
+      const logs = await getAuditLogs(currentUser.id, 50);
       setAuditLogs(logs);
     }
   };
@@ -142,12 +152,25 @@ export const Settings: React.FC = () => {
   };
 
   const isAdmin = currentRole?.name === 'Admin';
+  const canViewUsers = hasPermission('users', 'read');
+  const canManageUsers =
+    hasPermission('users', 'create') ||
+    hasPermission('users', 'update') ||
+    hasPermission('users', 'delete');
+  const canViewAudit = hasPermission('audit', 'read');
 
   const getRoleLabel = (roleId: string) => {
     return roles.find((role) => role.id === roleId)?.name || roleId;
   };
 
+  const adminRoleId = roles.find((role) => role.name.toLowerCase() === 'admin')?.id;
+  const isUserAdmin = (user: User) => !!adminRoleId && user.roleId === adminRoleId;
+
   const handleOpenUserModal = (user?: User) => {
+    if (!canManageUsers) {
+      void dialog.alert('You do not have permission to manage users.', 'Access denied');
+      return;
+    }
     if (user) {
       setEditingUser(user);
       userForm.reset({
@@ -172,6 +195,10 @@ export const Settings: React.FC = () => {
 
   const handleSaveUser = async (data: UserFormData) => {
     if (!currentUser) return;
+    if (!canManageUsers) {
+      await dialog.alert('You do not have permission to manage users.', 'Access denied');
+      return;
+    }
 
     setIsLoading(true);
     try {
@@ -224,6 +251,14 @@ export const Settings: React.FC = () => {
 
   const handleDeleteUser = async (userId: string, username: string) => {
     if (!currentUser) return;
+    if (!canManageUsers) {
+      await dialog.alert('You do not have permission to manage users.', 'Access denied');
+      return;
+    }
+    if (users.find((user) => user.id === userId && isUserAdmin(user))) {
+      await dialog.alert('Admin users cannot be deleted.', 'Access denied');
+      return;
+    }
 
     const confirmDelete = await dialog.confirm({
       title: 'Delete User',
@@ -250,8 +285,8 @@ export const Settings: React.FC = () => {
   const tabs = [
     { id: 'business' as TabType, name: 'Business Info', icon: BuildingStorefrontIcon },
     { id: 'kot' as TabType, name: 'KOT/Printing', icon: PrinterIcon },
-    { id: 'users' as TabType, name: 'Users', icon: UserGroupIcon },
-    { id: 'audit' as TabType, name: 'Audit Logs', icon: ClipboardDocumentListIcon },
+    ...(canViewUsers ? [{ id: 'users' as TabType, name: 'Users', icon: UserGroupIcon }] : []),
+    ...(canViewAudit ? [{ id: 'audit' as TabType, name: 'Audit Logs', icon: ClipboardDocumentListIcon }] : []),
   ];
 
   return (
@@ -392,11 +427,11 @@ export const Settings: React.FC = () => {
           </Card>
         )}
 
-        {activeTab === 'users' && (
+        {activeTab === 'users' && canViewUsers && (
           <Card padding="lg">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold text-gray-900">System Users</h2>
-              <Button onClick={() => handleOpenUserModal()} variant="primary">
+              <Button onClick={() => handleOpenUserModal()} variant="primary" disabled={!canManageUsers}>
                 Create User
               </Button>
             </div>
@@ -455,6 +490,7 @@ export const Settings: React.FC = () => {
                           onClick={() => handleOpenUserModal(user)}
                           variant="secondary"
                           size="sm"
+                          disabled={!canManageUsers}
                         >
                           Edit
                         </Button>
@@ -462,7 +498,7 @@ export const Settings: React.FC = () => {
                           onClick={() => handleDeleteUser(user.id, user.username)}
                           variant="danger"
                           size="sm"
-                          disabled={user.id === currentUser?.id}
+                          disabled={!canManageUsers || user.id === currentUser?.id || isUserAdmin(user)}
                         >
                           Delete
                         </Button>
@@ -475,7 +511,7 @@ export const Settings: React.FC = () => {
           </Card>
         )}
 
-        {activeTab === 'audit' && (
+        {activeTab === 'audit' && canViewAudit && (
           <Card padding="lg">
             <h2 className="text-xl font-semibold text-gray-900 mb-6">Audit Logs</h2>
             <div className="overflow-x-auto">

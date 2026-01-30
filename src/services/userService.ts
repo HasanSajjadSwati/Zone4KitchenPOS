@@ -34,6 +34,7 @@ export async function createUser(params: CreateUserParams): Promise<User> {
     fullName: params.fullName,
     roleId: params.roleId,
     isActive: params.isActive,
+    adminUserId: params.createdBy,
   });
 
   await logAudit({
@@ -60,7 +61,7 @@ export async function updateUser(params: UpdateUserParams): Promise<void> {
   if (params.roleId !== undefined) updates.roleId = params.roleId;
   if (params.isActive !== undefined) updates.isActive = params.isActive;
 
-  await apiClient.updateUser(params.id, updates);
+  await apiClient.updateUser(params.id, { ...updates, adminUserId: params.updatedBy });
 
   if (params.password) {
     throw new Error('Password updates require the reset password flow.');
@@ -107,7 +108,7 @@ export async function deleteUser(userId: string, deletedBy: string): Promise<voi
     throw new Error('You cannot delete your own user account');
   }
 
-  await db.users.delete(userId);
+  await apiClient.deleteUser(userId, deletedBy);
 
   await logAudit({
     userId: deletedBy,

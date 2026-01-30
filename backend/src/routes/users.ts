@@ -5,6 +5,28 @@ import { runAsync, getAsync, allAsync } from '../db/database.js';
 
 export const userRoutes = express.Router();
 
+const getAdminUser = async (adminUserId: string) => {
+  if (!adminUserId) return null;
+  return getAsync(
+    `SELECT u.id, r.name as roleName
+     FROM users u
+     JOIN roles r ON u.roleId = r.id
+     WHERE u.id = ?`,
+    [adminUserId]
+  );
+};
+
+const ensureAdmin = async (adminUserId: string) => {
+  const admin = await getAdminUser(adminUserId);
+  if (!admin) {
+    return { status: 404, error: 'Admin user not found' };
+  }
+  if (String(admin.roleName).toLowerCase() !== 'admin') {
+    return { status: 403, error: 'Only admins can manage users' };
+  }
+  return null;
+};
+
 // Get all users
 userRoutes.get('/', async (req, res) => {
   try {
@@ -42,10 +64,19 @@ userRoutes.get('/:id', async (req, res) => {
 // Create user
 userRoutes.post('/', async (req, res) => {
   try {
-    const { username, password, fullName, roleId, isActive } = req.body;
+    const { username, password, fullName, roleId, isActive, adminUserId } = req.body;
 
     if (!username || !password || !fullName || !roleId) {
       return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    if (!adminUserId) {
+      return res.status(400).json({ error: 'Admin user is required' });
+    }
+
+    const adminCheck = await ensureAdmin(adminUserId);
+    if (adminCheck) {
+      return res.status(adminCheck.status).json({ error: adminCheck.error });
     }
 
     const id = uuidv4();
@@ -72,8 +103,17 @@ userRoutes.post('/', async (req, res) => {
 // Update user
 userRoutes.put('/:id', async (req, res) => {
   try {
-    const { fullName, roleId, isActive } = req.body;
+    const { fullName, roleId, isActive, adminUserId } = req.body;
     const now = new Date().toISOString();
+
+    if (!adminUserId) {
+      return res.status(400).json({ error: 'Admin user is required' });
+    }
+
+    const adminCheck = await ensureAdmin(adminUserId);
+    if (adminCheck) {
+      return res.status(adminCheck.status).json({ error: adminCheck.error });
+    }
 
     const user = await getAsync('SELECT * FROM users WHERE id = ?', [req.params.id]);
     if (!user) {
@@ -169,9 +209,37 @@ userRoutes.post('/:id/reset-password', async (req, res) => {
 // Delete user
 userRoutes.delete('/:id', async (req, res) => {
   try {
-    const user = await getAsync('SELECT * FROM users WHERE id = ?', [req.params.id]);
+    const adminUserId =
+      (req.body?.adminUserId as string | undefined) ||
+      (req.query?.adminUserId as string | undefined) ||
+      (req.headers['x-admin-user-id'] as string | undefined);
+
+    if (!adminUserId) {
+      return res.status(400).json({ error: 'Admin user is required' });
+    }
+
+    const adminCheck = await ensureAdmin(adminUserId);
+    if (adminCheck) {
+      return res.status(adminCheck.status).json({ error: adminCheck.error });
+    }
+
+    if (adminUserId === req.params.id) {
+      return res.status(400).json({ error: 'You cannot delete your own account' });
+    }
+
+    const user = await getAsync(
+      `SELECT u.id, r.name as roleName
+       FROM users u
+       JOIN roles r ON u.roleId = r.id
+       WHERE u.id = ?`,
+      [req.params.id]
+    );
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (String(user.roleName).toLowerCase() === 'admin') {
+      return res.status(403).json({ error: 'Admin users cannot be deleted' });
     }
 
     await runAsync('DELETE FROM users WHERE id = ?', [req.params.id]);

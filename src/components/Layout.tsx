@@ -35,6 +35,8 @@ interface NavItem {
   name: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
+  resource?: string;
+  action?: string;
 }
 
 interface NavSection {
@@ -49,12 +51,15 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     orders: true,
-    menu: true,
-    people: true,
+    'menu-management': true,
+    'people-management': true,
     financial: true,
     reports: true,
   });
   const currentUser = useAuthStore((state) => state.currentUser);
+  const hasPermission = useAuthStore((state) => state.hasPermission);
+
+  const canAccess = (resource: string, action: string = 'read') => hasPermission(resource, action);
 
   const handleLogout = async () => {
     await logout();
@@ -73,52 +78,59 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       name: 'Orders',
       icon: ShoppingCartIcon,
       items: [
-        { name: 'New Order', href: '/orders/new', icon: PlusCircleIcon },
-        { name: 'Order List', href: '/orders', icon: ListBulletIcon },
+        { name: 'New Order', href: '/orders/new', icon: PlusCircleIcon, resource: 'orders', action: 'create' },
+        { name: 'Order List', href: '/orders', icon: ListBulletIcon, resource: 'orders', action: 'read' },
       ],
     },
     {
       name: 'Menu Management',
       icon: RectangleStackIcon,
       items: [
-        { name: 'Categories', href: '/menu/categories', icon: RectangleStackIcon },
-        { name: 'Items', href: '/menu/items', icon: ShoppingCartIcon },
-        { name: 'Variants', href: '/menu/variants', icon: Cog6ToothIcon },
-        { name: 'Deals', href: '/menu/deals', icon: GiftIcon },
+        { name: 'Categories', href: '/menu/categories', icon: RectangleStackIcon, resource: 'menu', action: 'read' },
+        { name: 'Items', href: '/menu/items', icon: ShoppingCartIcon, resource: 'menu', action: 'read' },
+        { name: 'Variants', href: '/menu/variants', icon: Cog6ToothIcon, resource: 'menu', action: 'read' },
+        { name: 'Deals', href: '/menu/deals', icon: GiftIcon, resource: 'menu', action: 'read' },
       ],
     },
     {
       name: 'People Management',
       icon: UserGroupIcon,
       items: [
-        { name: 'Customers', href: '/customers', icon: UsersIcon },
-        { name: 'Employees', href: '/employees', icon: UserGroupIcon },
-        { name: 'Employee Loans', href: '/employee-loans', icon: CreditCardIcon },
-        { name: 'Staff (Waiters/Riders)', href: '/staff', icon: UserGroupIcon },
+        { name: 'Customers', href: '/customers', icon: UsersIcon, resource: 'orders', action: 'read' },
+        { name: 'Employees', href: '/employees', icon: UserGroupIcon, resource: 'employees', action: 'read' },
+        { name: 'Employee Loans', href: '/employee-loans', icon: CreditCardIcon, resource: 'employee_loans', action: 'read' },
+        { name: 'Staff (Waiters/Riders)', href: '/staff', icon: UserGroupIcon, resource: 'staff', action: 'read' },
       ],
     },
     {
       name: 'Financial',
       icon: BanknotesIcon,
       items: [
-        { name: 'Register', href: '/register', icon: BanknotesIcon },
-        { name: 'Expenses', href: '/expenses', icon: CurrencyDollarIcon },
+        { name: 'Register', href: '/register', icon: BanknotesIcon, resource: 'register', action: 'read' },
+        { name: 'Expenses', href: '/expenses', icon: CurrencyDollarIcon, resource: 'expenses', action: 'read' },
       ],
     },
     {
       name: 'Reports',
       icon: ChartBarIcon,
       items: [
-        { name: 'Sales Summary', href: '/reports/sales-summary', icon: ChartBarIcon },
-        { name: 'Item Sales', href: '/reports/item-sales', icon: ChartBarIcon },
-        { name: 'Cancelled Orders', href: '/reports/cancelled-orders', icon: ClipboardDocumentListIcon },
-        { name: 'Discounts', href: '/reports/discounts', icon: ReceiptPercentIcon },
-        { name: 'Employee Loans', href: '/reports/employee-loans', icon: DocumentTextIcon },
-        { name: 'Daily Expense', href: '/reports/daily-expense', icon: DocumentTextIcon },
-        { name: 'Customer Details', href: '/reports/customer-detailed', icon: DocumentTextIcon },
+        { name: 'Sales Summary', href: '/reports/sales-summary', icon: ChartBarIcon, resource: 'reports', action: 'read' },
+        { name: 'Item Sales', href: '/reports/item-sales', icon: ChartBarIcon, resource: 'reports', action: 'read' },
+        { name: 'Cancelled Orders', href: '/reports/cancelled-orders', icon: ClipboardDocumentListIcon, resource: 'reports', action: 'read' },
+        { name: 'Discounts', href: '/reports/discounts', icon: ReceiptPercentIcon, resource: 'reports', action: 'read' },
+        { name: 'Employee Loans', href: '/reports/employee-loans', icon: DocumentTextIcon, resource: 'reports', action: 'read' },
+        { name: 'Daily Expense', href: '/reports/daily-expense', icon: DocumentTextIcon, resource: 'reports', action: 'read' },
+        { name: 'Customer Details', href: '/reports/customer-detailed', icon: DocumentTextIcon, resource: 'reports', action: 'read' },
       ],
     },
   ];
+
+  const filteredSections = navigationSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => !item.resource || canAccess(item.resource, item.action || 'read')),
+    }))
+    .filter((section) => section.items.length > 0);
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -165,7 +177,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             </Link>
 
             {/* Sections */}
-            {navigationSections.map((section) => {
+            {filteredSections.map((section) => {
               const sectionKey = section.name.toLowerCase().replace(/\s+/g, '-');
               const isExpanded = expandedSections[sectionKey];
               const isActive = section.items.some((item) => location.pathname === item.href);
@@ -213,16 +225,18 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             })}
 
             {/* Settings */}
-            <Link
-              to="/settings"
-              className={`flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors ${
-                location.pathname === '/settings' ? 'bg-blue-50 text-blue-600' : ''
-              }`}
-              onClick={() => setSidebarOpen(false)}
-            >
-              <Cog6ToothIcon className="w-5 h-5 mr-3" />
-              Settings
-            </Link>
+            {canAccess('settings', 'read') && (
+              <Link
+                to="/settings"
+                className={`flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors ${
+                  location.pathname === '/settings' ? 'bg-blue-50 text-blue-600' : ''
+                }`}
+                onClick={() => setSidebarOpen(false)}
+              >
+                <Cog6ToothIcon className="w-5 h-5 mr-3" />
+                Settings
+              </Link>
+            )}
           </nav>
 
           {/* User section */}

@@ -38,6 +38,24 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function RequirePermission({
+  children,
+  resource,
+  action = 'read',
+}: {
+  children: React.ReactNode;
+  resource: string;
+  action?: string;
+}) {
+  const hasPermission = useAuthStore((state) => state.hasPermission(resource, action));
+
+  if (!hasPermission) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <>{children}</>;
+}
+
 function App() {
   useEffect(() => {
     // Backend API is already configured via environment variables
@@ -58,26 +76,166 @@ function App() {
               <Layout>
                 <Routes>
                   <Route path="/" element={<Dashboard />} />
-                  <Route path="/menu/categories" element={<Categories />} />
-                  <Route path="/menu/items" element={<MenuItems />} />
-                  <Route path="/menu/variants" element={<Variants />} />
-                  <Route path="/menu/deals" element={<Deals />} />
-                  <Route path="/staff" element={<StaffManagement />} />
-                  <Route path="/register" element={<RegisterManagement />} />
-                  <Route path="/customers" element={<CustomerManagement />} />
-                  <Route path="/employees" element={<EmployeeManagement />} />
-                  <Route path="/employee-loans" element={<EmployeeLoanManagement />} />
-                  <Route path="/expenses" element={<ExpenseManagement />} />
-                  <Route path="/orders/new" element={<CreateOrder />} />
-                  <Route path="/orders" element={<OrderList />} />
-                  <Route path="/reports/sales-summary" element={<SalesSummary />} />
-                  <Route path="/reports/item-sales" element={<ItemSales />} />
-                  <Route path="/reports/cancelled-orders" element={<CancelledOrdersReport />} />
-                  <Route path="/reports/discounts" element={<DiscountReport />} />
-                  <Route path="/reports/employee-loans" element={<EmployeeLoanReport />} />
-                  <Route path="/reports/daily-expense" element={<DailyExpenseReport />} />
-                  <Route path="/reports/customer-detailed" element={<CustomerDetailedReport />} />
-                  <Route path="/settings" element={<Settings />} />
+                  <Route
+                    path="/menu/categories"
+                    element={
+                      <RequirePermission resource="menu">
+                        <Categories />
+                      </RequirePermission>
+                    }
+                  />
+                  <Route
+                    path="/menu/items"
+                    element={
+                      <RequirePermission resource="menu">
+                        <MenuItems />
+                      </RequirePermission>
+                    }
+                  />
+                  <Route
+                    path="/menu/variants"
+                    element={
+                      <RequirePermission resource="menu">
+                        <Variants />
+                      </RequirePermission>
+                    }
+                  />
+                  <Route
+                    path="/menu/deals"
+                    element={
+                      <RequirePermission resource="menu">
+                        <Deals />
+                      </RequirePermission>
+                    }
+                  />
+                  <Route
+                    path="/staff"
+                    element={
+                      <RequirePermission resource="staff">
+                        <StaffManagement />
+                      </RequirePermission>
+                    }
+                  />
+                  <Route
+                    path="/register"
+                    element={
+                      <RequirePermission resource="register">
+                        <RegisterManagement />
+                      </RequirePermission>
+                    }
+                  />
+                  <Route
+                    path="/customers"
+                    element={
+                      <RequirePermission resource="orders">
+                        <CustomerManagement />
+                      </RequirePermission>
+                    }
+                  />
+                  <Route
+                    path="/employees"
+                    element={
+                      <RequirePermission resource="employees">
+                        <EmployeeManagement />
+                      </RequirePermission>
+                    }
+                  />
+                  <Route
+                    path="/employee-loans"
+                    element={
+                      <RequirePermission resource="employee_loans">
+                        <EmployeeLoanManagement />
+                      </RequirePermission>
+                    }
+                  />
+                  <Route
+                    path="/expenses"
+                    element={
+                      <RequirePermission resource="expenses">
+                        <ExpenseManagement />
+                      </RequirePermission>
+                    }
+                  />
+                  <Route
+                    path="/orders/new"
+                    element={
+                      <RequirePermission resource="orders" action="create">
+                        <CreateOrder />
+                      </RequirePermission>
+                    }
+                  />
+                  <Route
+                    path="/orders"
+                    element={
+                      <RequirePermission resource="orders">
+                        <OrderList />
+                      </RequirePermission>
+                    }
+                  />
+                  <Route
+                    path="/reports/sales-summary"
+                    element={
+                      <RequirePermission resource="reports">
+                        <SalesSummary />
+                      </RequirePermission>
+                    }
+                  />
+                  <Route
+                    path="/reports/item-sales"
+                    element={
+                      <RequirePermission resource="reports">
+                        <ItemSales />
+                      </RequirePermission>
+                    }
+                  />
+                  <Route
+                    path="/reports/cancelled-orders"
+                    element={
+                      <RequirePermission resource="reports">
+                        <CancelledOrdersReport />
+                      </RequirePermission>
+                    }
+                  />
+                  <Route
+                    path="/reports/discounts"
+                    element={
+                      <RequirePermission resource="reports">
+                        <DiscountReport />
+                      </RequirePermission>
+                    }
+                  />
+                  <Route
+                    path="/reports/employee-loans"
+                    element={
+                      <RequirePermission resource="reports">
+                        <EmployeeLoanReport />
+                      </RequirePermission>
+                    }
+                  />
+                  <Route
+                    path="/reports/daily-expense"
+                    element={
+                      <RequirePermission resource="reports">
+                        <DailyExpenseReport />
+                      </RequirePermission>
+                    }
+                  />
+                  <Route
+                    path="/reports/customer-detailed"
+                    element={
+                      <RequirePermission resource="reports">
+                        <CustomerDetailedReport />
+                      </RequirePermission>
+                    }
+                  />
+                  <Route
+                    path="/settings"
+                    element={
+                      <RequirePermission resource="settings">
+                        <Settings />
+                      </RequirePermission>
+                    }
+                  />
                 </Routes>
               </Layout>
             </ProtectedRoute>

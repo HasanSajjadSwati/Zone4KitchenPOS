@@ -1,4 +1,5 @@
 import { db } from '@/db';
+import { apiClient } from '@/services/api';
 import type { Settings } from '@/db/types';
 import { logAudit } from '@/utils/audit';
 
@@ -32,15 +33,11 @@ export async function updateSettings(
 }
 
 export async function getAuditLogs(
+  userId: string,
   limit: number = 100,
   offset: number = 0
 ): Promise<any[]> {
-  return await db.auditLogs
-    .orderBy('createdAt')
-    .reverse()
-    .offset(offset)
-    .limit(limit)
-    .toArray();
+  return await apiClient.getAuditLogs(limit, offset, userId);
 }
 
 export async function getAllUsers() {

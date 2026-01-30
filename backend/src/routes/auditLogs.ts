@@ -28,6 +28,30 @@ const serializeValue = (value: any) => {
 // Get audit logs
 auditLogRoutes.get('/', async (req, res) => {
   try {
+    const adminUserId =
+      (req.query.adminUserId as string | undefined) ||
+      (req.headers['x-admin-user-id'] as string | undefined);
+
+    if (!adminUserId) {
+      return res.status(400).json({ error: 'Admin user is required' });
+    }
+
+    const admin = await getAsync(
+      `SELECT u.id, r.name as roleName
+       FROM users u
+       JOIN roles r ON u.roleId = r.id
+       WHERE u.id = ?`,
+      [adminUserId]
+    );
+
+    if (!admin) {
+      return res.status(404).json({ error: 'Admin user not found' });
+    }
+
+    if (String(admin.roleName).toLowerCase() !== 'admin') {
+      return res.status(403).json({ error: 'Only admins can view audit logs' });
+    }
+
     const limit = Math.min(Number(req.query.limit) || 100, 500);
     const offset = Math.max(Number(req.query.offset) || 0, 0);
 

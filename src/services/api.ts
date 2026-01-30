@@ -76,8 +76,9 @@ class APIClient {
     return this.put(`/users/${id}`, data);
   }
 
-  async deleteUser(id: string) {
-    return this.delete(`/users/${id}`);
+  async deleteUser(id: string, adminUserId?: string) {
+    const suffix = adminUserId ? `?adminUserId=${encodeURIComponent(adminUserId)}` : '';
+    return this.delete(`/users/${id}${suffix}`);
   }
 
   async changePassword(id: string, oldPassword: string, newPassword: string) {
@@ -89,11 +90,14 @@ class APIClient {
   }
 
   // Audit logs
-  async getAuditLogs(limit: number = 100, offset: number = 0) {
+  async getAuditLogs(limit: number = 100, offset: number = 0, adminUserId?: string) {
     const params = new URLSearchParams({
       limit: String(limit),
       offset: String(offset),
     });
+    if (adminUserId) {
+      params.set('adminUserId', adminUserId);
+    }
     return this.get(`/audit-logs?${params.toString()}`);
   }
 
