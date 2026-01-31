@@ -174,6 +174,7 @@ interface AddDealParams {
   dealId: string;
   quantity: number;
   dealBreakdown: DealItemBreakdown[];
+  selectedVariants?: VariantSelection[];
   notes?: string;
   userId: string;
 }
@@ -194,7 +195,7 @@ export async function addDeal(params: AddDealParams): Promise<OrderItem> {
     unitPrice: deal.price,
     totalPrice,
     notes: params.notes || null,
-    selectedVariants: [],
+    selectedVariants: params.selectedVariants || [],
     dealBreakdown: params.dealBreakdown,
     addedAt: new Date(),
     lastPrintedAt: null,

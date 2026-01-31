@@ -19,6 +19,7 @@ import {
   createOrder,
   addMenuItem,
   addDeal,
+  validateVariantSelections,
   updateOrderItemQuantity,
   updateOrderItemVariants,
   removeOrderItem,
@@ -122,9 +123,21 @@ export const CreateOrder: React.FC = () => {
   const [selectedVariants, setSelectedVariants] = useState<VariantSelection[]>([]);
   const [variantNotes, setVariantNotes] = useState<string>('');
 
+  // Deal Variant Selection State
+  const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
+  const [dealVariants, setDealVariants] = useState<Array<{
+    variant: Variant;
+    options: VariantOption[];
+    isRequired: boolean;
+    selectionMode: 'single' | 'multiple' | 'all';
+  }>>([]);
+  const [selectedDealVariants, setSelectedDealVariants] = useState<VariantSelection[]>([]);
+  const [dealVariantNotes, setDealVariantNotes] = useState<string>('');
+
   // Modals
   const [isOrderTypeModalOpen, setIsOrderTypeModalOpen] = useState(false);
   const [isVariantModalOpen, setIsVariantModalOpen] = useState(false);
+  const [isDealVariantModalOpen, setIsDealVariantModalOpen] = useState(false);
   const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false);
   const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
   const [isReprintKOTModalOpen, setIsReprintKOTModalOpen] = useState(false);
@@ -390,6 +403,103 @@ export const CreateOrder: React.FC = () => {
     }
   };
 
+  const loadDealVariants = async (deal: Deal) => {
+    try {
+      const dealVariantLinks = (await db.dealVariants
+        .where('dealId')
+        .equals(deal.id)
+        .toArray()) as DealVariant[];
+
+      const variantDetails = await Promise.all(
+        dealVariantLinks.map(async (dv) => {
+          const variant = await db.variants.get(dv.variantId);
+          let options = await getVariantOptions(dv.variantId);
+
+          if (!variant) return null;
+
+          options = options.filter((o) => o.isActive);
+
+          const availableOptionIds = dv.availableOptionIds || [];
+          if (availableOptionIds.length > 0) {
+            options = options.filter((o) => availableOptionIds.includes(o.id));
+          }
+
+          return {
+            variant,
+            options,
+            isRequired: dv.isRequired,
+            selectionMode: dv.selectionMode || 'single',
+          };
+        })
+      );
+
+      setDealVariants(variantDetails.filter((v) => v !== null) as typeof dealVariants);
+    } catch (error) {
+      console.error('Failed to load deal variants:', error);
+      setDealVariants([]);
+    }
+  };
+
+  const applyVariantSelection = (
+    variantId: string,
+    variantName: string,
+    optionId: string,
+    optionName: string,
+    priceModifier: number,
+    selectionMode: 'single' | 'multiple' | 'all',
+    setSelections: React.Dispatch<React.SetStateAction<VariantSelection[]>>
+  ) => {
+    setSelections(prev => {
+      if (selectionMode === 'single') {
+        const filtered = prev.filter(v => v.variantId !== variantId);
+        return [
+          ...filtered,
+          { variantId, variantName, optionId, optionName, priceModifier }
+        ];
+      }
+
+      const existing = prev.find(v => v.variantId === variantId);
+
+      if (existing) {
+        const selectedOpts = existing.selectedOptions || [];
+        const optionExists = selectedOpts.find(o => o.optionId === optionId);
+
+        if (optionExists) {
+          const newOptions = selectedOpts.filter(o => o.optionId !== optionId);
+          if (newOptions.length === 0) {
+            return prev.filter(v => v.variantId !== variantId);
+          }
+          return prev.map(v =>
+            v.variantId === variantId
+              ? { ...v, selectedOptions: newOptions }
+              : v
+          );
+        }
+
+        return prev.map(v =>
+          v.variantId === variantId
+            ? {
+                ...v,
+                selectedOptions: [...selectedOpts, { optionId, optionName, priceModifier }]
+              }
+            : v
+        );
+      }
+
+      return [
+        ...prev,
+        {
+          variantId,
+          variantName,
+          optionId: '',
+          optionName: '',
+          priceModifier: 0,
+          selectedOptions: [{ optionId, optionName, priceModifier }]
+        }
+      ];
+    });
+  };
+
   const handleVariantSelection = (
     variantId: string,
     variantName: string,
@@ -398,61 +508,34 @@ export const CreateOrder: React.FC = () => {
     priceModifier: number,
     selectionMode: 'single' | 'multiple' | 'all'
   ) => {
-    setSelectedVariants(prev => {
-      if (selectionMode === 'single') {
-        // Single select: Replace existing selection for this variant
-        const filtered = prev.filter(v => v.variantId !== variantId);
-        return [
-          ...filtered,
-          { variantId, variantName, optionId, optionName, priceModifier }
-        ];
-      } else {
-        // Multi-select or all mode: Toggle option in selectedOptions array
-        const existing = prev.find(v => v.variantId === variantId);
+    applyVariantSelection(
+      variantId,
+      variantName,
+      optionId,
+      optionName,
+      priceModifier,
+      selectionMode,
+      setSelectedVariants
+    );
+  };
 
-        if (existing) {
-          const selectedOpts = existing.selectedOptions || [];
-          const optionExists = selectedOpts.find(o => o.optionId === optionId);
-
-          if (optionExists) {
-            // Remove option
-            const newOptions = selectedOpts.filter(o => o.optionId !== optionId);
-            if (newOptions.length === 0) {
-              // Remove entire variant if no options selected
-              return prev.filter(v => v.variantId !== variantId);
-            }
-            return prev.map(v =>
-              v.variantId === variantId
-                ? { ...v, selectedOptions: newOptions }
-                : v
-            );
-          } else {
-            // Add option
-            return prev.map(v =>
-              v.variantId === variantId
-                ? {
-                    ...v,
-                    selectedOptions: [...selectedOpts, { optionId, optionName, priceModifier }]
-                  }
-                : v
-            );
-          }
-        } else {
-          // First selection for this variant
-          return [
-            ...prev,
-            {
-              variantId,
-              variantName,
-              optionId: '', // Not used for multi-select
-              optionName: '',
-              priceModifier: 0,
-              selectedOptions: [{ optionId, optionName, priceModifier }]
-            }
-          ];
-        }
-      }
-    });
+  const handleDealVariantSelection = (
+    variantId: string,
+    variantName: string,
+    optionId: string,
+    optionName: string,
+    priceModifier: number,
+    selectionMode: 'single' | 'multiple' | 'all'
+  ) => {
+    applyVariantSelection(
+      variantId,
+      variantName,
+      optionId,
+      optionName,
+      priceModifier,
+      selectionMode,
+      setSelectedDealVariants
+    );
   };
 
   // Auto-select all options for variants with 'all' selection mode
@@ -488,6 +571,38 @@ export const CreateOrder: React.FC = () => {
       }
     }
   }, [isVariantModalOpen, itemVariants]);
+
+  useEffect(() => {
+    if (isDealVariantModalOpen && dealVariants.length > 0) {
+      const autoSelections: VariantSelection[] = [];
+
+      for (const dv of dealVariants) {
+        if (dv.selectionMode === 'all') {
+          autoSelections.push({
+            variantId: dv.variant.id,
+            variantName: dv.variant.name,
+            optionId: '',
+            optionName: '',
+            priceModifier: 0,
+            selectedOptions: dv.options.map((opt) => ({
+              optionId: opt.id,
+              optionName: opt.name,
+              priceModifier: opt.priceModifier,
+            })),
+          });
+        }
+      }
+
+      if (autoSelections.length > 0) {
+        setSelectedDealVariants((prev) => {
+          const filtered = prev.filter(
+            (sv) => !autoSelections.find((as) => as.variantId === sv.variantId)
+          );
+          return [...filtered, ...autoSelections];
+        });
+      }
+    }
+  }, [isDealVariantModalOpen, dealVariants]);
 
   const handleAddItemWithVariants = async () => {
     if (!selectedMenuItem || !currentOrder || !currentUser) return;
@@ -530,6 +645,10 @@ export const CreateOrder: React.FC = () => {
     if (!selectedMenuItem) return 0;
     const variantsTotal = selectedVariants.reduce((sum, v) => sum + v.priceModifier, 0);
     return selectedMenuItem.price + variantsTotal;
+  };
+
+  const calculateDealPrice = () => {
+    return selectedDeal ? selectedDeal.price : 0;
   };
 
   const handleEditOrderItem = async (orderItem: OrderItem) => {
@@ -599,12 +718,12 @@ export const CreateOrder: React.FC = () => {
         .where('dealId')
         .equals(deal.id)
         .toArray()) as DealVariant[];
-
-      const hasRequiredVariants = dealVariants.some(dv => dv.isRequired);
-
-      if (hasRequiredVariants) {
-        // TODO: Show variant modal for required deal variants
-        await dialog.alert('This deal has required variants that need to be selected. Variant selection for deals will be implemented soon.', 'Feature Coming Soon');
+      if (dealVariants.length > 0) {
+        await loadDealVariants(deal);
+        setSelectedDeal(deal);
+        setSelectedDealVariants([]);
+        setDealVariantNotes('');
+        setIsDealVariantModalOpen(true);
         setIsLoading(false);
         return;
       }
@@ -683,10 +802,59 @@ export const CreateOrder: React.FC = () => {
         dealId: deal.id,
         quantity: 1,
         dealBreakdown,
+        selectedVariants: autoVariants,
         userId: currentUser.id,
       });
 
       await refreshOrder();
+    } catch (error) {
+      await dialog.alert(error instanceof Error ? error.message : 'Failed to add deal', 'Error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAddDealWithVariants = async () => {
+    if (!selectedDeal || !currentOrder || !currentUser) return;
+
+    const validation = validateVariantSelections(dealVariants, selectedDealVariants);
+    if (!validation.valid) {
+      await dialog.alert(validation.error || 'Please select required variants', 'Missing Required Options');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const dealItems = await getDealItems(selectedDeal.id);
+
+      const dealBreakdown = await Promise.all(
+        dealItems.map(async (item) => {
+          const menuItem = await db.menuItems.get(item.menuItemId);
+          return {
+            menuItemId: item.menuItemId,
+            menuItemName: menuItem?.name || 'Unknown',
+            quantity: item.quantity,
+            selectedVariants: selectedDealVariants,
+          };
+        })
+      );
+
+      await addDeal({
+        orderId: currentOrder.id,
+        dealId: selectedDeal.id,
+        quantity: 1,
+        dealBreakdown,
+        selectedVariants: selectedDealVariants,
+        notes: dealVariantNotes || undefined,
+        userId: currentUser.id,
+      });
+
+      await refreshOrder();
+      setIsDealVariantModalOpen(false);
+      setSelectedDeal(null);
+      setDealVariants([]);
+      setSelectedDealVariants([]);
+      setDealVariantNotes('');
     } catch (error) {
       await dialog.alert(error instanceof Error ? error.message : 'Failed to add deal', 'Error');
     } finally {
@@ -1665,6 +1833,156 @@ export const CreateOrder: React.FC = () => {
               isLoading={isLoading}
             >
               {editingOrderItem ? 'Update Item' : 'Add to Order'} - {formatCurrency(calculateItemPrice())}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Deal Variant Selection Modal */}
+      <Modal
+        isOpen={isDealVariantModalOpen}
+        onClose={() => {
+          setIsDealVariantModalOpen(false);
+          setSelectedDeal(null);
+          setDealVariants([]);
+          setSelectedDealVariants([]);
+          setDealVariantNotes('');
+        }}
+        title={`Customize Deal: ${selectedDeal?.name || ''}`}
+        size="lg"
+      >
+        <div className="space-y-6">
+          {selectedDeal && (
+            <div className="bg-gray-50 rounded-lg p-4">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="font-semibold text-gray-900">{selectedDeal.name}</p>
+                  <p className="text-sm text-gray-600">Deal Price: {formatCurrency(selectedDeal.price)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-gray-600">Total:</p>
+                  <p className="text-xl font-bold text-primary-600">
+                    {formatCurrency(calculateDealPrice())}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {dealVariants.map((dv) => (
+            <div key={dv.variant.id} className="border-b border-gray-200 pb-4">
+              <label className="block text-sm font-medium text-gray-900 mb-3">
+                {dv.variant.name}
+                {dv.isRequired && <span className="text-red-600 ml-1">*</span>}
+                <span className="text-xs text-gray-500 ml-2">
+                  {dv.selectionMode === 'single' && '(Select one)'}
+                  {dv.selectionMode === 'multiple' && '(Select multiple)'}
+                  {dv.selectionMode === 'all' && '(Pre-selected)'}
+                </span>
+              </label>
+
+              <div className="space-y-2">
+                {dv.options.map((option) => {
+                  const selection = selectedDealVariants.find(sv => sv.variantId === dv.variant.id);
+                  const isSelected = (() => {
+                    if (!selection) return false;
+                    if (dv.selectionMode === 'single') {
+                      return selection.optionId === option.id;
+                    }
+                    return selection.selectedOptions?.some(o => o.optionId === option.id) || false;
+                  })();
+
+                  return (
+                    <div
+                      key={option.id}
+                      className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${
+                        isSelected
+                          ? 'border-primary-500 bg-primary-50'
+                          : 'border-gray-200 hover:border-primary-300 hover:bg-gray-50'
+                      }`}
+                      onClick={() =>
+                        handleDealVariantSelection(
+                          dv.variant.id,
+                          dv.variant.name,
+                          option.id,
+                          option.name,
+                          option.priceModifier,
+                          dv.selectionMode
+                        )
+                      }
+                    >
+                      <div className="flex items-center space-x-3">
+                        {dv.selectionMode === 'single' ? (
+                          <div
+                            className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                              isSelected ? 'border-primary-500' : 'border-gray-300'
+                            }`}
+                          >
+                            {isSelected && (
+                              <div className="w-3 h-3 rounded-full bg-primary-500" />
+                            )}
+                          </div>
+                        ) : (
+                          <div
+                            className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                              isSelected ? 'border-primary-500 bg-primary-500' : 'border-gray-300'
+                            }`}
+                          >
+                            {isSelected && (
+                              <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 12 12">
+                                <path d="M10 3L4.5 8.5L2 6" stroke="currentColor" strokeWidth="2" fill="none"/>
+                              </svg>
+                            )}
+                          </div>
+                        )}
+                        <span className="font-medium text-gray-900">{option.name}</span>
+                      </div>
+                      {option.priceModifier !== 0 && (
+                        <span className="text-sm text-gray-600">
+                          {option.priceModifier > 0 ? '+' : ''}
+                          {formatCurrency(option.priceModifier)}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Special Instructions (Optional)
+            </label>
+            <textarea
+              className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              rows={2}
+              placeholder="e.g., Replace fries with salad..."
+              value={dealVariantNotes}
+              onChange={(e) => setDealVariantNotes(e.target.value)}
+            />
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                setIsDealVariantModalOpen(false);
+                setSelectedDeal(null);
+                setDealVariants([]);
+                setSelectedDealVariants([]);
+                setDealVariantNotes('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddDealWithVariants}
+              variant="primary"
+              isLoading={isLoading}
+            >
+              Add Deal - {formatCurrency(calculateDealPrice())}
             </Button>
           </div>
         </div>
