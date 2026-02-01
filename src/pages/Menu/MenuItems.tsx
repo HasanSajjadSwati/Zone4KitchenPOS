@@ -288,10 +288,42 @@ export const MenuItems: React.FC = () => {
     return categories.find((cat) => cat.id === categoryId)?.name || 'Unknown';
   };
 
+  const sortCategories = (a: Category, b: Category) => {
+    const orderDiff = (a.sortOrder || 0) - (b.sortOrder || 0);
+    if (orderDiff !== 0) return orderDiff;
+    return a.name.localeCompare(b.name);
+  };
+
+  const majorCategories = categories.filter((cat) => cat.type === 'major').sort(sortCategories);
+  const subCategories = categories.filter((cat) => cat.type === 'sub').sort(sortCategories);
+  const majorCategoryIds = new Set(majorCategories.map((cat) => cat.id));
+
+  const subCategoriesByParent = new Map<string, Category[]>();
+  majorCategories.forEach((major) => {
+    const subs = subCategories.filter((cat) => cat.parentId === major.id);
+    subCategoriesByParent.set(major.id, subs);
+  });
+  const orphanSubCategories = subCategories.filter(
+    (cat) => !cat.parentId || !majorCategoryIds.has(cat.parentId)
+  );
+
   const filteredItems = items.filter((item) => {
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory =
-      filterCategory === 'all' || item.categoryId === filterCategory;
+    let matchesCategory = true;
+
+    if (filterCategory !== 'all') {
+      const selectedCategory = categories.find((cat) => cat.id === filterCategory);
+      if (selectedCategory?.type === 'major') {
+        const subIds = categories
+          .filter((cat) => cat.parentId === selectedCategory.id)
+          .map((cat) => cat.id);
+        const validIds = new Set([selectedCategory.id, ...subIds]);
+        matchesCategory = validIds.has(item.categoryId);
+      } else {
+        matchesCategory = item.categoryId === filterCategory;
+      }
+    }
+
     const matchesStatus =
       filterStatus === 'all' ||
       (filterStatus === 'active' && item.isActive) ||
@@ -319,14 +351,28 @@ export const MenuItems: React.FC = () => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
-          <Select
-            value={filterCategory}
-            onChange={(e) => setFilterCategory(e.target.value)}
-            options={[
-              { value: 'all', label: 'All Categories' },
-              ...categories.map((cat) => ({ value: cat.id, label: cat.name })),
-            ]}
-          />
+            <Select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
+              <option value="all">All Categories</option>
+              {majorCategories.map((major) => (
+                <optgroup key={major.id} label={major.name}>
+                  <option value={major.id}>{major.name} (All)</option>
+                  {(subCategoriesByParent.get(major.id) || []).map((sub) => (
+                    <option key={sub.id} value={sub.id}>
+                      -- {sub.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+              {orphanSubCategories.length > 0 && (
+                <optgroup label="Other Subcategories">
+                  {orphanSubCategories.map((sub) => (
+                    <option key={sub.id} value={sub.id}>
+                      -- {sub.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </Select>
           <Select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value as any)}
@@ -422,15 +468,28 @@ export const MenuItems: React.FC = () => {
             {...register('name')}
           />
 
-          <Select
-            label="Category"
-            error={errors.categoryId?.message}
-            options={[
-              { value: '', label: 'Select category' },
-              ...categories.map((cat) => ({ value: cat.id, label: cat.name })),
-            ]}
-            {...register('categoryId')}
-          />
+            <Select label="Category" error={errors.categoryId?.message} {...register('categoryId')}>
+              <option value="">Select category</option>
+              {majorCategories.map((major) => (
+                <optgroup key={major.id} label={major.name}>
+                  <option value={major.id}>{major.name} (Major)</option>
+                  {(subCategoriesByParent.get(major.id) || []).map((sub) => (
+                    <option key={sub.id} value={sub.id}>
+                      -- {sub.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+              {orphanSubCategories.length > 0 && (
+                <optgroup label="Other Subcategories">
+                  {orphanSubCategories.map((sub) => (
+                    <option key={sub.id} value={sub.id}>
+                      -- {sub.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </Select>
 
           <Input
             label="Price (Rs)"
