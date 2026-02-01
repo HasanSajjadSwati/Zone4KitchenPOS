@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
-import { Button, Card, Modal, Input, Select, Badge } from '@/components/ui';
+import { Button, Card, Modal, Input, Select, Badge, CategoryFilter } from '@/components/ui';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -351,28 +351,11 @@ export const MenuItems: React.FC = () => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
-            <Select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
-              <option value="all">All Categories</option>
-              {majorCategories.map((major) => (
-                <optgroup key={major.id} label={major.name}>
-                  <option value={major.id}>{major.name} (All)</option>
-                  {(subCategoriesByParent.get(major.id) || []).map((sub) => (
-                    <option key={sub.id} value={sub.id}>
-                      -- {sub.name}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-              {orphanSubCategories.length > 0 && (
-                <optgroup label="Other Subcategories">
-                  {orphanSubCategories.map((sub) => (
-                    <option key={sub.id} value={sub.id}>
-                      -- {sub.name}
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-            </Select>
+            <CategoryFilter
+              categories={categories}
+              value={filterCategory === 'all' ? '' : filterCategory}
+              onChange={(value) => setFilterCategory(value || 'all')}
+            />
           <Select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value as any)}

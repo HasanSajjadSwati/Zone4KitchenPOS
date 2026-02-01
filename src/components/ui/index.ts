@@ -4,3 +4,4 @@ export { Select } from './Select';
 export { Modal } from './Modal';
 export { Card } from './Card';
 export { Badge } from './Badge';
+export { CategoryFilter } from './CategoryFilter';

@@ -11,7 +11,7 @@ import {
   XMarkIcon,
   PencilIcon,
 } from '@heroicons/react/24/outline';
-import { Button, Card, Modal, Input, Select } from '@/components/ui';
+import { Button, Card, Modal, Input, Select, CategoryFilter } from '@/components/ui';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -144,24 +144,6 @@ export const CreateOrder: React.FC = () => {
   const [isReprintKOTModalOpen, setIsReprintKOTModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [customerStatus, setCustomerStatus] = useState<'new' | 'existing' | null>(null);
-
-  const sortCategories = (a: Category, b: Category) => {
-    const orderDiff = (a.sortOrder || 0) - (b.sortOrder || 0);
-    if (orderDiff !== 0) return orderDiff;
-    return a.name.localeCompare(b.name);
-  };
-
-  const majorCategories = categories.filter((cat) => cat.type === 'major').sort(sortCategories);
-  const subCategories = categories.filter((cat) => cat.type === 'sub').sort(sortCategories);
-  const majorCategoryIds = new Set(majorCategories.map((cat) => cat.id));
-  const subCategoriesByParent = new Map<string, Category[]>();
-  majorCategories.forEach((major) => {
-    const subs = subCategories.filter((cat) => cat.parentId === major.id);
-    subCategoriesByParent.set(major.id, subs);
-  });
-  const orphanSubCategories = subCategories.filter(
-    (cat) => !cat.parentId || !majorCategoryIds.has(cat.parentId)
-  );
 
   const orderTypeForm = useForm<OrderTypeFormData>({
     resolver: zodResolver(orderTypeSchema),
@@ -1357,32 +1339,12 @@ export const CreateOrder: React.FC = () => {
 
               {menuTab === 'items' ? (
                 <>
-                    <Select
-                      label="Filter by Category"
+                    <CategoryFilter
+                      categories={categories}
                       value={selectedCategory}
-                      onChange={(e) => setSelectedCategory(e.target.value)}
-                    >
-                      <option value="">All Categories</option>
-                      {majorCategories.map((major) => (
-                        <optgroup key={major.id} label={major.name}>
-                          <option value={major.id}>{major.name} (All)</option>
-                          {(subCategoriesByParent.get(major.id) || []).map((sub) => (
-                            <option key={sub.id} value={sub.id}>
-                              -- {sub.name}
-                            </option>
-                          ))}
-                        </optgroup>
-                      ))}
-                      {orphanSubCategories.length > 0 && (
-                        <optgroup label="Other Subcategories">
-                          {orphanSubCategories.map((sub) => (
-                            <option key={sub.id} value={sub.id}>
-                              -- {sub.name}
-                            </option>
-                          ))}
-                        </optgroup>
-                      )}
-                    </Select>
+                      onChange={setSelectedCategory}
+                      label="Filter by Category"
+                    />
 
                   <div className="mt-4 space-y-2 max-h-[600px] overflow-y-auto">
                     {menuItems
