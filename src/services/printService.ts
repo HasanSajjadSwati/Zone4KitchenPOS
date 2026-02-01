@@ -922,6 +922,7 @@ async function renderReceiptTemplate(
     <tr><td>Order #:</td><td style="text-align: right; font-weight: bold;">${order.orderNumber}</td></tr>
     <tr><td>Date:</td><td style="text-align: right;">${formatDateTime(order.createdAt)}</td></tr>
     <tr><td>Type:</td><td style="text-align: right;">${order.orderType.replace('_', ' ').toUpperCase()}</td></tr>
+    <tr><td>Payment:</td><td style="text-align: right; font-weight: bold;">${order.isPaid ? 'PAID' : 'UNPAID'}</td></tr>
     ${order.tableId ? `<tr><td>Table:</td><td style="text-align: right;">${await getTableNumber(order.tableId)}</td></tr>` : ''}
     ${order.customerName ? `<tr><td>Customer:</td><td style="text-align: right;">${order.customerName}</td></tr>` : ''}
   </table>

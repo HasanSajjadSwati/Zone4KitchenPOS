@@ -1102,16 +1102,32 @@ export const CreateOrder: React.FC = () => {
         }
       }
 
-      await completeOrder({
-        orderId: currentOrder.id,
-        isPaid: data.isPaid,
-        paymentMethod: data.paymentMethod,
-        paymentAmount: data.paymentAmount,
-        paymentReference: data.paymentReference,
-        userId: currentUser.id,
-      });
+        await completeOrder({
+          orderId: currentOrder.id,
+          isPaid: data.isPaid,
+          paymentMethod: data.paymentMethod,
+          paymentAmount: data.paymentAmount,
+          paymentReference: data.paymentReference,
+          userId: currentUser.id,
+        });
 
-      await dialog.alert(`Order ${currentOrder.orderNumber} completed successfully!`, 'Success');
+        let printError: string | null = null;
+        if (data.isPaid) {
+          try {
+            await printCustomerReceipt(currentOrder.id, currentUser.id);
+          } catch (error) {
+            printError = error instanceof Error ? error.message : 'Failed to print paid receipt';
+          }
+        }
+
+        if (printError) {
+          await dialog.alert(
+            `Order ${currentOrder.orderNumber} completed, but failed to print paid receipt: ${printError}`,
+            'Warning'
+          );
+        } else {
+          await dialog.alert(`Order ${currentOrder.orderNumber} completed successfully!`, 'Success');
+        }
 
       // If editing, go back to orders list
       if (editOrderId) {
