@@ -296,6 +296,10 @@ function renderAllKOTTickets(tickets: KOTTicket[]): string {
       font-family: 'Courier New', monospace;
       font-size: 12pt;
       line-height: 1.4;
+      font-weight: 600;
+      color: #000;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
     .kot-ticket {
       margin-bottom: 20px;
@@ -313,11 +317,12 @@ function renderAllKOTTickets(tickets: KOTTicket[]): string {
     }
     .station {
       font-size: 14pt;
-      background: #000;
-      color: #fff;
-      padding: 5px;
+      padding: 4px 0;
       margin: 5px 0;
       font-weight: bold;
+      text-transform: uppercase;
+      border-top: 2px solid #000;
+      border-bottom: 2px solid #000;
     }
     .item {
       margin: 10px 0;
@@ -330,13 +335,12 @@ function renderAllKOTTickets(tickets: KOTTicket[]): string {
     .item-detail {
       margin-left: 15px;
       font-size: 11pt;
-      color: #333;
     }
     .notes {
       margin-left: 15px;
-      font-style: italic;
-      background: #f0f0f0;
-      padding: 5px;
+      font-style: normal;
+      border-left: 2px solid #000;
+      padding-left: 6px;
       margin-top: 5px;
     }
     .footer {
@@ -382,6 +386,10 @@ async function renderCombinedReceipts(kotHtml: string, customerHtml: string, cou
       font-family: 'Courier New', monospace;
       font-size: 12pt;
       line-height: 1.4;
+      font-weight: 600;
+      color: #000;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
     .kot-ticket {
       margin-bottom: 20px;
@@ -399,11 +407,12 @@ async function renderCombinedReceipts(kotHtml: string, customerHtml: string, cou
     }
     .station {
       font-size: 14pt;
-      background: #000;
-      color: #fff;
-      padding: 5px;
+      padding: 4px 0;
       margin: 5px 0;
       font-weight: bold;
+      text-transform: uppercase;
+      border-top: 2px solid #000;
+      border-bottom: 2px solid #000;
     }
     .item {
       margin: 10px 0;
@@ -416,13 +425,12 @@ async function renderCombinedReceipts(kotHtml: string, customerHtml: string, cou
     .item-detail {
       margin-left: 15px;
       font-size: 11pt;
-      color: #333;
     }
     .notes {
       margin-left: 15px;
-      font-style: italic;
-      background: #f0f0f0;
-      padding: 5px;
+      font-style: normal;
+      border-left: 2px solid #000;
+      padding-left: 6px;
       margin-top: 5px;
     }
     .footer {
@@ -438,10 +446,11 @@ async function renderCombinedReceipts(kotHtml: string, customerHtml: string, cou
     }
     .copy-type {
       font-size: 12pt;
-      background: #000;
-      color: #fff;
-      padding: 5px;
+      padding: 4px 0;
       margin: 10px 0;
+      font-weight: bold;
+      border-top: 2px solid #000;
+      border-bottom: 2px solid #000;
     }
     .divider {
       border-bottom: 1px dashed #000;
@@ -682,6 +691,10 @@ async function renderRiderReceiptTemplate(
       font-family: 'Courier New', monospace;
       font-size: 11pt;
       line-height: 1.3;
+      font-weight: 600;
+      color: #000;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
     .header {
       text-align: center;
@@ -693,7 +706,7 @@ async function renderRiderReceiptTemplate(
     .section {
       margin: 10px 0;
       padding: 8px 0;
-      border-bottom: 1px dashed #ccc;
+      border-bottom: 1px dashed #000;
     }
     .section-title {
       font-weight: bold;
@@ -743,16 +756,16 @@ async function renderRiderReceiptTemplate(
     <div class="section-title">ORDER ITEMS</div>
     <table>
       ${itemsHtml.join('')}
-      ${order.discountAmount > 0 ? `
-        <tr>
-          <td style="padding: 3px 0;">Subtotal:</td>
-          <td style="text-align: right; padding: 3px 0;">${formatCurrency(order.subtotal)}</td>
-        </tr>
-        <tr>
-          <td style="padding: 3px 0; color: #c00;">Discount:</td>
-          <td style="text-align: right; padding: 3px 0; color: #c00;">-${formatCurrency(order.discountAmount)}</td>
-        </tr>
-      ` : ''}
+        ${order.discountAmount > 0 ? `
+          <tr>
+            <td style="padding: 3px 0;">Subtotal:</td>
+            <td style="text-align: right; padding: 3px 0;">${formatCurrency(order.subtotal)}</td>
+          </tr>
+          <tr>
+            <td style="padding: 3px 0;">Discount:</td>
+            <td style="text-align: right; padding: 3px 0;">-${formatCurrency(order.discountAmount)}</td>
+          </tr>
+        ` : ''}
       <tr class="total-row">
         <td style="padding: 8px 0 3px 0; font-size: 13pt;">TOTAL:</td>
         <td style="text-align: right; padding: 8px 0 3px 0; font-size: 13pt;">${formatCurrency(order.total)}</td>
@@ -790,14 +803,14 @@ async function renderReceiptTemplate(
           ? (await db.menuItems.get(item.menuItemId!))?.name
           : (await db.deals.get(item.dealId!))?.name;
 
-      const variants =
-        item.selectedVariants.length > 0
-          ? `<div style="margin-left: 20px; font-size: 10pt; color: #666;">
-              ${item.selectedVariants.map((v) => {
-                if (v.selectedOptions && v.selectedOptions.length > 0) {
-                  // Multi-select format
-                  const optionNames = v.selectedOptions.map(o => o.optionName).join(', ');
-                  return `${v.variantName}: ${optionNames}`;
+        const variants =
+          item.selectedVariants.length > 0
+            ? `<div style="margin-left: 20px; font-size: 11pt;">
+                ${item.selectedVariants.map((v) => {
+                  if (v.selectedOptions && v.selectedOptions.length > 0) {
+                    // Multi-select format
+                    const optionNames = v.selectedOptions.map(o => o.optionName).join(', ');
+                    return `${v.variantName}: ${optionNames}`;
                 } else {
                   // Single-select format
                   return `${v.variantName}: ${v.optionName}`;
@@ -831,6 +844,10 @@ async function renderReceiptTemplate(
       font-family: 'Courier New', monospace;
       font-size: 11pt;
       line-height: 1.3;
+      font-weight: 600;
+      color: #000;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
     .header {
       text-align: center;
@@ -843,10 +860,11 @@ async function renderReceiptTemplate(
     }
     .copy-type {
       font-size: 12pt;
-      background: #000;
-      color: #fff;
-      padding: 5px;
+      padding: 4px 0;
       margin: 10px 0;
+      font-weight: bold;
+      border-top: 2px solid #000;
+      border-bottom: 2px solid #000;
     }
     .divider {
       border-bottom: 1px dashed #000;
@@ -922,7 +940,7 @@ async function renderReceiptTemplate(
     ${
       order.discountAmount > 0
         ? `
-    <div class="total-row" style="color: #c00;">
+    <div class="total-row">
       <span>Discount ${order.discountReference ? `(${order.discountReference})` : ''}:</span>
       <span>- ${formatCurrency(order.discountAmount)}</span>
     </div>

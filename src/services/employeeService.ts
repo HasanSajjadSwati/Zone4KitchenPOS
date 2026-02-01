@@ -86,12 +86,11 @@ export async function deleteEmployee(id: string, userId: string): Promise<void> 
   const employee = await db.employees.get(id);
   if (!employee) throw new Error('Employee not found');
 
-  // Check if employee has any loans
+  // Check if employee has any loan history
   const loans = await db.employeeLoans.where('employeeId').equals(id).toArray();
-  const activeLoans = loans.filter((l: EmployeeLoan) => l.status === 'active');
 
-  if (activeLoans.length > 0) {
-    throw new Error('Cannot delete employee with active loans. Please settle or cancel loans first.');
+  if (loans.length > 0) {
+    throw new Error('Cannot delete employee with existing loans. Mark the employee inactive instead.');
   }
 
   await db.employees.delete(id);

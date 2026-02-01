@@ -103,20 +103,28 @@ employeeRoutes.delete('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Employee not found' });
     }
 
-    // Check for active loans
-    const activeLoans = await allAsync(
-      'SELECT * FROM employeeLoans WHERE employeeId = ? AND status = ?',
-      [req.params.id, 'active']
+    // Prevent deletion if any loan history exists (FK constraint would fail)
+    const existingLoans = await allAsync(
+      'SELECT id, status FROM employeeLoans WHERE employeeId = ? LIMIT 1',
+      [req.params.id]
     );
 
-    if (activeLoans.length > 0) {
-      return res.status(400).json({ error: 'Cannot delete employee with active loans. Please settle or cancel loans first.' });
+    if (existingLoans.length > 0) {
+      return res.status(409).json({
+        error: 'Cannot delete employee with existing loans. Mark the employee inactive instead.',
+      });
     }
 
     await runAsync('DELETE FROM employees WHERE id = ?', [req.params.id]);
     res.json({ message: 'Employee deleted successfully' });
   } catch (error) {
-    res.status(500).json({ error: (error as Error).message });
+    const message = (error as Error).message;
+    if (message.includes('violates foreign key constraint')) {
+      return res.status(409).json({
+        error: 'Cannot delete employee with existing loans. Mark the employee inactive instead.',
+      });
+    }
+    res.status(500).json({ error: message });
   }
 });
 
