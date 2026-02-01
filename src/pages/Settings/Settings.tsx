@@ -28,6 +28,10 @@ const kotSettingsSchema = z.object({
   kotSplitByMajorCategory: z.boolean(),
   kotIncludeVariants: z.boolean(),
   kotIncludeDealBreakdown: z.boolean(),
+  printAllIncludeKOT: z.boolean(),
+  printAllIncludeCustomer: z.boolean(),
+  printAllIncludeCounter: z.boolean(),
+  printAllIncludeRider: z.boolean(),
 });
 
 const userSchema = z.object({
@@ -88,6 +92,10 @@ export const Settings: React.FC = () => {
         kotSplitByMajorCategory: currentSettings.kotSplitByMajorCategory,
         kotIncludeVariants: currentSettings.kotIncludeVariants,
         kotIncludeDealBreakdown: currentSettings.kotIncludeDealBreakdown,
+        printAllIncludeKOT: currentSettings.printAllIncludeKOT ?? true,
+        printAllIncludeCustomer: currentSettings.printAllIncludeCustomer ?? true,
+        printAllIncludeCounter: currentSettings.printAllIncludeCounter ?? false,
+        printAllIncludeRider: currentSettings.printAllIncludeRider ?? false,
       });
     }
 
@@ -415,6 +423,59 @@ export const Settings: React.FC = () => {
                   <label htmlFor="kotIncludeDealBreakdown" className="text-sm font-medium text-gray-700">
                     Show deal breakdown on KOT (individual items in combo deals)
                   </label>
+                </div>
+
+                <div className="pt-2 border-t border-gray-200">
+                  <p className="text-sm font-semibold text-gray-800 mb-2">Print All Receipts Includes</p>
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="printAllIncludeKOT"
+                        className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                        {...kotForm.register('printAllIncludeKOT')}
+                      />
+                      <label htmlFor="printAllIncludeKOT" className="text-sm font-medium text-gray-700">
+                        KOT
+                      </label>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="printAllIncludeCustomer"
+                        className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                        {...kotForm.register('printAllIncludeCustomer')}
+                      />
+                      <label htmlFor="printAllIncludeCustomer" className="text-sm font-medium text-gray-700">
+                        Customer Copy
+                      </label>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="printAllIncludeCounter"
+                        className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                        {...kotForm.register('printAllIncludeCounter')}
+                      />
+                      <label htmlFor="printAllIncludeCounter" className="text-sm font-medium text-gray-700">
+                        Counter Copy
+                      </label>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="printAllIncludeRider"
+                        className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                        {...kotForm.register('printAllIncludeRider')}
+                      />
+                      <label htmlFor="printAllIncludeRider" className="text-sm font-medium text-gray-700">
+                        Rider Copy (delivery only)
+                      </label>
+                    </div>
+                  </div>
                 </div>
               </div>
 

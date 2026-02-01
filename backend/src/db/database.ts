@@ -163,7 +163,9 @@ export function allAsync(query: string, params: any[] = []): Promise<any[]> {
 // List of fields that may be stored as integer flags and should be coerced to boolean
 const booleanFields = [
   'isActive', 'isDealOnly', 'hasVariants', 'isRequired', 'isPaid',
-  'requiresVariantSelection'
+  'requiresVariantSelection',
+  'kotSplitByMajorCategory', 'kotIncludeVariants', 'kotIncludeDealBreakdown',
+  'printAllIncludeKOT', 'printAllIncludeCustomer', 'printAllIncludeCounter', 'printAllIncludeRider'
 ];
 
 // Helper to convert integer values to proper JavaScript booleans

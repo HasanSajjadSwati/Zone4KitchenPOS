@@ -15,6 +15,16 @@ export async function initializeDatabase() {
     console.log('✓ Database schema created');
     logger.info('Database schema created successfully');
 
+    // Ensure new settings columns exist (safe for existing databases)
+    await runAsync('ALTER TABLE settings ADD COLUMN IF NOT EXISTS printAllIncludeKOT BOOLEAN DEFAULT TRUE');
+    await runAsync('ALTER TABLE settings ADD COLUMN IF NOT EXISTS printAllIncludeCustomer BOOLEAN DEFAULT TRUE');
+    await runAsync('ALTER TABLE settings ADD COLUMN IF NOT EXISTS printAllIncludeCounter BOOLEAN DEFAULT FALSE');
+    await runAsync('ALTER TABLE settings ADD COLUMN IF NOT EXISTS printAllIncludeRider BOOLEAN DEFAULT FALSE');
+    await runAsync('UPDATE settings SET printAllIncludeKOT = TRUE WHERE printAllIncludeKOT IS NULL');
+    await runAsync('UPDATE settings SET printAllIncludeCustomer = TRUE WHERE printAllIncludeCustomer IS NULL');
+    await runAsync('UPDATE settings SET printAllIncludeCounter = FALSE WHERE printAllIncludeCounter IS NULL');
+    await runAsync('UPDATE settings SET printAllIncludeRider = FALSE WHERE printAllIncludeRider IS NULL');
+
     // Check if roles exist
     const rolesCount = await allAsync('SELECT COUNT(*) as count FROM roles');
     const existingRoles = Number(rolesCount[0]?.count ?? 0);

@@ -41,6 +41,10 @@ settingsRoutes.put('/', async (req, res) => {
       restaurantPhone,
       taxRate,
       receiptFooter,
+      printAllIncludeKOT,
+      printAllIncludeCustomer,
+      printAllIncludeCounter,
+      printAllIncludeRider,
       expenseCategories,
       updatedBy
     } = req.body;
@@ -83,6 +87,22 @@ settingsRoutes.put('/', async (req, res) => {
     if (receiptFooter !== undefined) {
       updates.push('receiptFooter = ?');
       values.push(receiptFooter);
+    }
+    if (printAllIncludeKOT !== undefined) {
+      updates.push('printAllIncludeKOT = ?');
+      values.push(printAllIncludeKOT ? 1 : 0);
+    }
+    if (printAllIncludeCustomer !== undefined) {
+      updates.push('printAllIncludeCustomer = ?');
+      values.push(printAllIncludeCustomer ? 1 : 0);
+    }
+    if (printAllIncludeCounter !== undefined) {
+      updates.push('printAllIncludeCounter = ?');
+      values.push(printAllIncludeCounter ? 1 : 0);
+    }
+    if (printAllIncludeRider !== undefined) {
+      updates.push('printAllIncludeRider = ?');
+      values.push(printAllIncludeRider ? 1 : 0);
     }
     if (expenseCategories !== undefined) {
       updates.push('expenseCategories = ?');

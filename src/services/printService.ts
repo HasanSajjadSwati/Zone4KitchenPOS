@@ -359,16 +359,19 @@ function renderAllKOTTickets(tickets: KOTTicket[]): string {
   `;
 }
 
-async function renderCombinedReceipts(kotHtml: string, customerHtml: string, counterHtml: string): Promise<string> {
-  // Extract body content from each HTML
+function renderCombinedReceipts(sections: string[]): string {
   const extractBody = (html: string): string => {
     const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
     return bodyMatch ? bodyMatch[1] : html;
   };
 
-  const kotBody = extractBody(kotHtml);
-  const customerBody = extractBody(customerHtml);
-  const counterBody = extractBody(counterHtml);
+  const bodies = sections.map(extractBody).filter((body) => body && body.trim().length > 0);
+  const pageBlocks = bodies
+    .map(
+      (body, index) =>
+        `<div ${index < bodies.length - 1 ? 'class="page-break"' : ''}>${body}</div>`
+    )
+    .join('');
 
   return `
 <!DOCTYPE html>
@@ -487,21 +490,27 @@ async function renderCombinedReceipts(kotHtml: string, customerHtml: string, cou
       padding-top: 5px;
       margin-top: 5px;
     }
+    .section {
+      margin: 10px 0;
+      padding: 8px 0;
+      border-bottom: 1px dashed #000;
+    }
+    .section-title {
+      font-weight: bold;
+      margin-bottom: 5px;
+      text-decoration: underline;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
     .page-break {
       page-break-after: always;
     }
   </style>
 </head>
 <body>
-  <div class="page-break">
-    ${kotBody}
-  </div>
-  <div class="page-break">
-    ${customerBody}
-  </div>
-  <div>
-    ${counterBody}
-  </div>
+  ${pageBlocks}
 </body>
 </html>
   `;
@@ -553,37 +562,97 @@ export async function printAllReceipts(orderId: string, userId: string): Promise
   const items = await db.orderItems.where('orderId').equals(orderId).toArray();
   const settings = await db.settings.get('default');
 
-  // Generate all receipt types
-  const shouldSplit = settings?.kotSplitByMajorCategory || false;
+  const includeKOT = settings?.printAllIncludeKOT ?? true;
+  const includeCustomer = settings?.printAllIncludeCustomer ?? true;
+  const includeCounter = settings?.printAllIncludeCounter ?? false;
+  const includeRider = settings?.printAllIncludeRider ?? false;
 
-  // Get KOT tickets
-  let kotTickets: KOTTicket[] = [];
-  if (shouldSplit) {
-    const grouped = await groupItemsByMajorCategory(items);
-    for (const [categoryName, categoryItems] of Object.entries(grouped)) {
-      const ticket = await createKOTTicket(order, categoryItems, categoryName);
+  const sections: Array<{ type: string; html: string }> = [];
+
+  if (includeKOT) {
+    const shouldSplit = settings?.kotSplitByMajorCategory || false;
+    let kotTickets: KOTTicket[] = [];
+
+    if (shouldSplit) {
+      const grouped = await groupItemsByMajorCategory(items);
+      for (const [categoryName, categoryItems] of Object.entries(grouped)) {
+        const ticket = await createKOTTicket(order, categoryItems, categoryName);
+        kotTickets.push(ticket);
+      }
+    } else {
+      const ticket = await createKOTTicket(order, items, null);
       kotTickets.push(ticket);
     }
-  } else {
-    const ticket = await createKOTTicket(order, items, null);
-    kotTickets.push(ticket);
+
+    sections.push({ type: 'KOT', html: renderAllKOTTickets(kotTickets) });
   }
 
-  // Generate receipt HTMLs
-  const kotHtml = renderAllKOTTickets(kotTickets);
-  const customerReceiptHtml = await renderReceiptTemplate(order, items, settings!, 'CUSTOMER COPY');
-  const counterCopyHtml = await renderReceiptTemplate(order, items, settings!, 'COUNTER COPY');
+  if (includeCustomer) {
+    sections.push({
+      type: 'Customer Copy',
+      html: await renderReceiptTemplate(order, items, settings!, 'CUSTOMER COPY'),
+    });
+  }
 
-  // Combine all receipts with page breaks
-  const combinedHtml = await renderCombinedReceipts(kotHtml, customerReceiptHtml, counterCopyHtml);
-  await printDocument(combinedHtml);
+  if (includeCounter) {
+    sections.push({
+      type: 'Counter Copy',
+      html: await renderReceiptTemplate(order, items, settings!, 'COUNTER COPY'),
+    });
+  }
 
+  if (includeRider && order.orderType === 'delivery') {
+    let customerName = 'N/A';
+    let customerPhone = 'N/A';
+    let deliveryAddress = order.deliveryAddress || 'N/A';
+
+    if (order.customerId) {
+      const customer = await db.customers.get(order.customerId);
+      if (customer) {
+        customerName = customer.name;
+        customerPhone = customer.phone;
+        if (customer.address) deliveryAddress = customer.address;
+      }
+    }
+
+    let riderName = 'Not Assigned';
+    if (order.riderId) {
+      const rider = await db.riders.get(order.riderId);
+      if (rider) riderName = rider.name;
+    }
+
+    sections.push({
+      type: 'Rider Copy',
+      html: await renderRiderReceiptTemplate(
+        order,
+        items,
+        settings!,
+        customerName,
+        customerPhone,
+        deliveryAddress,
+        riderName
+      ),
+    });
+  }
+
+  if (sections.length === 0) {
+    throw new Error('Print All is disabled. Enable at least one receipt in Settings.');
+  }
+
+  if (sections.length === 1) {
+    await printDocument(sections[0].html);
+  } else {
+    const combinedHtml = renderCombinedReceipts(sections.map((section) => section.html));
+    await printDocument(combinedHtml);
+  }
+
+  const printedTypes = sections.map((section) => section.type).join(', ');
   await logAudit({
     userId,
     action: 'print',
     tableName: 'orders',
     recordId: orderId,
-    description: `Printed all receipts (KOT, customer receipt, counter copy) for ${order.orderNumber}`,
+    description: `Printed receipts (${printedTypes}) for ${order.orderNumber}`,
   });
 }
 

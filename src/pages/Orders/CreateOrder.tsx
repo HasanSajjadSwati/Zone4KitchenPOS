@@ -40,7 +40,7 @@ import {
 import { getAllWaiters, getAllRiders, getAllTables } from '@/services/staffService';
 import { getCustomerByPhone, createCustomer } from '@/services/customerService';
 import { getCurrentSession } from '@/services/registerService';
-import { printKOT, printCustomerReceipt, printCounterCopy, printAllReceipts, printRiderReceipt } from '@/services/printService';
+import { printKOT, printCustomerReceipt, printCounterCopy, printRiderReceipt, printAllReceipts } from '@/services/printService';
 import { useAuthStore } from '@/stores/authStore';
 import { useDialog } from '@/hooks/useDialog';
 import { formatCurrency } from '@/utils/validation';
@@ -1239,7 +1239,7 @@ export const CreateOrder: React.FC = () => {
 
     try {
       await printAllReceipts(currentOrder.id, currentUser.id);
-      await dialog.alert('All receipts printed successfully!', 'Success');
+      await dialog.alert('Print all executed successfully!', 'Success');
     } catch (error) {
       await dialog.alert(error instanceof Error ? error.message : 'Failed to print receipts', 'Error');
     }
@@ -1752,7 +1752,7 @@ export const CreateOrder: React.FC = () => {
                   leftIcon={<PrinterIcon className="w-5 h-5" />}
                   disabled={orderItems.length === 0}
                 >
-                  Print All Receipts
+                  Print All
                 </Button>
 
                 <Button

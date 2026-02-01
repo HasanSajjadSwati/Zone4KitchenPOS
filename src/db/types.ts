@@ -314,6 +314,10 @@ export interface Settings {
 
   // Printing
   receiptFooter: string | null;
+  printAllIncludeKOT?: boolean;
+  printAllIncludeCustomer?: boolean;
+  printAllIncludeCounter?: boolean;
+  printAllIncludeRider?: boolean;
 
   // Expense categories
   expenseCategories?: string[];

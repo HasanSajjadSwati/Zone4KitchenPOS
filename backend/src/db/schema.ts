@@ -304,6 +304,10 @@ CREATE TABLE IF NOT EXISTS settings (
   restaurantPhone TEXT,
   taxRate REAL DEFAULT 0,
   receiptFooter TEXT,
+  printAllIncludeKOT BOOLEAN DEFAULT 1,
+  printAllIncludeCustomer BOOLEAN DEFAULT 1,
+  printAllIncludeCounter BOOLEAN DEFAULT 0,
+  printAllIncludeRider BOOLEAN DEFAULT 0,
   expenseCategories TEXT,
   updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
   updatedBy TEXT
