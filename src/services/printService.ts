@@ -463,6 +463,15 @@ async function renderCombinedReceipts(kotHtml: string, customerHtml: string, cou
     .info-table td {
       padding: 2px 0;
     }
+    .payment-status {
+      display: inline-block;
+      padding: 2px 8px;
+      border: 2px solid #000;
+      font-weight: 700;
+      font-size: 13pt;
+      text-decoration: underline;
+      letter-spacing: 0.5px;
+    }
     .items-table {
       width: 100%;
       margin: 10px 0;
@@ -922,7 +931,7 @@ async function renderReceiptTemplate(
     <tr><td>Order #:</td><td style="text-align: right; font-weight: bold;">${order.orderNumber}</td></tr>
     <tr><td>Date:</td><td style="text-align: right;">${formatDateTime(order.createdAt)}</td></tr>
     <tr><td>Type:</td><td style="text-align: right;">${order.orderType.replace('_', ' ').toUpperCase()}</td></tr>
-    <tr><td>Payment:</td><td style="text-align: right; font-weight: bold;">${order.isPaid ? 'PAID' : 'UNPAID'}</td></tr>
+    <tr><td>Payment:</td><td style="text-align: right;"><span class="payment-status">${order.isPaid ? 'PAID' : 'UNPAID'}</span></td></tr>
     ${order.tableId ? `<tr><td>Table:</td><td style="text-align: right;">${await getTableNumber(order.tableId)}</td></tr>` : ''}
     ${order.customerName ? `<tr><td>Customer:</td><td style="text-align: right;">${order.customerName}</td></tr>` : ''}
   </table>
