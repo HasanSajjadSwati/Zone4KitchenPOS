@@ -717,12 +717,19 @@ async function renderRiderReceiptTemplate(
       width: 100%;
       border-collapse: collapse;
     }
-    .total-row {
-      font-weight: bold;
-      border-top: 2px solid #000;
-      padding-top: 5px;
-    }
-  </style>
+      .total-row {
+        font-weight: bold;
+        border-top: 2px solid #000;
+        padding-top: 5px;
+      }
+      .footer {
+        text-align: center;
+        margin-top: 15px;
+        padding-top: 10px;
+        border-top: 2px dashed #000;
+        font-size: 10pt;
+      }
+    </style>
 </head>
 <body>
   <div class="header">
@@ -771,9 +778,15 @@ async function renderRiderReceiptTemplate(
     <div style="font-size: 12pt; font-weight: bold;">
       ${order.isPaid ? '✓ PAID' : '✗ PAYMENT TO BE COLLECTED'}
     </div>
-  </div>
+    </div>
 
-</body>
+    <div class="footer">
+      <div style="font-weight: bold; margin-bottom: 5px;">Handle with care!</div>
+      <div style="font-size: 9pt;">This is a rider copy for delivery reference</div>
+      <div style="margin-top: 8px;">Powered by Zone4Kitchen POS</div>
+    </div>
+  
+  </body>
 </html>
   `;
 }
@@ -882,14 +895,19 @@ async function renderReceiptTemplate(
       justify-content: space-between;
       margin: 5px 0;
     }
-    .grand-total {
-      font-size: 14pt;
-      font-weight: bold;
-      border-top: 2px solid #000;
-      padding-top: 5px;
-      margin-top: 5px;
-    }
-  </style>
+      .grand-total {
+        font-size: 14pt;
+        font-weight: bold;
+        border-top: 2px solid #000;
+        padding-top: 5px;
+        margin-top: 5px;
+      }
+      .footer {
+        text-align: center;
+        margin-top: 20px;
+        font-size: 10pt;
+      }
+    </style>
 </head>
 <body>
   <div class="header">
@@ -920,11 +938,11 @@ async function renderReceiptTemplate(
     ${itemsHtml.join('')}
   </table>
 
-  <div class="totals">
-    <div class="total-row">
-      <span>Subtotal:</span>
-      <span>${formatCurrency(order.subtotal)}</span>
-    </div>
+    <div class="totals">
+      <div class="total-row">
+        <span>Subtotal:</span>
+        <span>${formatCurrency(order.subtotal)}</span>
+      </div>
     ${
       order.discountAmount > 0
         ? `
@@ -935,14 +953,19 @@ async function renderReceiptTemplate(
     `
         : ''
     }
-    <div class="total-row grand-total">
-      <span>TOTAL:</span>
-      <span>${formatCurrency(order.total)}</span>
+      <div class="total-row grand-total">
+        <span>TOTAL:</span>
+        <span>${formatCurrency(order.total)}</span>
+      </div>
     </div>
-  </div>
 
-</body>
-</html>
+    <div class="footer">
+      <div style="margin: 10px 0;">${settings.receiptFooter || 'Thank you for your visit!'}</div>
+      <div>Powered by Zone4Kitchen POS</div>
+    </div>
+  
+  </body>
+  </html>
   `;
 }
 
