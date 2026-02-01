@@ -722,13 +722,6 @@ async function renderRiderReceiptTemplate(
       border-top: 2px solid #000;
       padding-top: 5px;
     }
-    .footer {
-      text-align: center;
-      margin-top: 15px;
-      padding-top: 10px;
-      border-top: 2px dashed #000;
-      font-size: 10pt;
-    }
   </style>
 </head>
 <body>
@@ -780,11 +773,6 @@ async function renderRiderReceiptTemplate(
     </div>
   </div>
 
-  <div class="footer">
-    <div style="font-weight: bold; margin-bottom: 5px;">Handle with care!</div>
-    <div style="font-size: 9pt;">This is a rider copy for delivery reference</div>
-    <div style="margin-top: 8px;">Powered by Zone4Kitchen POS</div>
-  </div>
 </body>
 </html>
   `;
@@ -901,11 +889,6 @@ async function renderReceiptTemplate(
       padding-top: 5px;
       margin-top: 5px;
     }
-    .footer {
-      text-align: center;
-      margin-top: 20px;
-      font-size: 10pt;
-    }
   </style>
 </head>
 <body>
@@ -958,10 +941,6 @@ async function renderReceiptTemplate(
     </div>
   </div>
 
-  <div class="footer">
-    <div style="margin: 10px 0;">${settings.receiptFooter || 'Thank you for your visit!'}</div>
-    <div>Powered by Zone4Kitchen POS</div>
-  </div>
 </body>
 </html>
   `;
