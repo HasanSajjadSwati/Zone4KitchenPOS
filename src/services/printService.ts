@@ -463,25 +463,6 @@ async function renderCombinedReceipts(kotHtml: string, customerHtml: string, cou
     .info-table td {
       padding: 2px 0;
     }
-    .payment-stamp {
-      display: inline-block;
-      padding: 4px 12px;
-      border: 3px solid #000;
-      font-weight: 800;
-      font-size: 16pt;
-      letter-spacing: 1px;
-      text-decoration: underline;
-      transform: rotate(-12deg);
-      line-height: 1;
-    }
-    .payment-unpaid {
-      display: inline-block;
-      padding: 2px 6px;
-      border: 1px dashed #000;
-      font-weight: 700;
-      font-size: 12pt;
-      letter-spacing: 0.5px;
-    }
     .items-table {
       width: 100%;
       margin: 10px 0;
@@ -941,7 +922,11 @@ async function renderReceiptTemplate(
     <tr><td>Order #:</td><td style="text-align: right; font-weight: bold;">${order.orderNumber}</td></tr>
     <tr><td>Date:</td><td style="text-align: right;">${formatDateTime(order.createdAt)}</td></tr>
     <tr><td>Type:</td><td style="text-align: right;">${order.orderType.replace('_', ' ').toUpperCase()}</td></tr>
-    <tr><td>Payment:</td><td style="text-align: right;">${order.isPaid ? '<span class="payment-stamp">PAID</span>' : '<span class="payment-unpaid">UNPAID</span>'}</td></tr>
+    <tr><td>Payment:</td><td style="text-align: right;">${
+      order.isPaid
+        ? '<span style="display:inline-block;padding:4px 12px;border:3px solid #000;font-weight:800;font-size:16pt;letter-spacing:1px;text-decoration:underline;transform:rotate(-12deg);line-height:1;">PAID</span>'
+        : '<span style="display:inline-block;padding:2px 6px;border:1px dashed #000;font-weight:700;font-size:12pt;letter-spacing:0.5px;">UNPAID</span>'
+    }</td></tr>
     ${order.tableId ? `<tr><td>Table:</td><td style="text-align: right;">${await getTableNumber(order.tableId)}</td></tr>` : ''}
     ${order.customerName ? `<tr><td>Customer:</td><td style="text-align: right;">${order.customerName}</td></tr>` : ''}
   </table>
