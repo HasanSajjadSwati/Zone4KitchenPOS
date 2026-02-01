@@ -168,7 +168,7 @@ export const CreateOrder: React.FC = () => {
     } else {
       loadAllMenuItems();
     }
-  }, [selectedCategory]);
+  }, [selectedCategory, categories]);
 
   const loadInitialData = async () => {
     const session = await getCurrentSession();
@@ -211,6 +211,22 @@ export const CreateOrder: React.FC = () => {
   };
 
   const loadMenuItemsByCategory = async (categoryId: string) => {
+    const category = categories.find((c) => c.id === categoryId);
+
+    if (category?.type === 'major') {
+      const subCategoryIds = categories
+        .filter((c) => c.parentId === categoryId && c.isActive)
+        .map((c) => c.id);
+
+      const validCategoryIds = new Set([categoryId, ...subCategoryIds]);
+      const allItems = await getAllMenuItems();
+      const filtered = allItems.filter(
+        (i) => i.isActive && !i.isDealOnly && i.categoryId && validCategoryIds.has(i.categoryId)
+      );
+      setMenuItems(filtered);
+      return;
+    }
+
     const items = await getMenuItemsByCategory(categoryId);
     // Filter out deal-only items from regular menu
     setMenuItems(items.filter((i) => i.isActive && !i.isDealOnly));
