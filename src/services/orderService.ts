@@ -543,6 +543,33 @@ export async function getOrdersByType(orderType: string): Promise<Order[]> {
   return await db.orders.where('orderType').equals(orderType).reverse().sortBy('createdAt');
 }
 
+export async function getAllOrders(): Promise<Order[]> {
+  return await db.orders.orderBy('createdAt').reverse().toArray();
+}
+
+export async function getPastOrders(): Promise<Order[]> {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const allOrders = (await db.orders.toArray()) as Order[];
+  return allOrders
+    .filter((order: Order) => {
+      const createdAt = order.createdAt instanceof Date
+        ? order.createdAt
+        : new Date(order.createdAt as unknown as string);
+      return createdAt < today;
+    })
+    .sort((a: Order, b: Order) => {
+      const aDate = a.createdAt instanceof Date
+        ? a.createdAt
+        : new Date(a.createdAt as unknown as string);
+      const bDate = b.createdAt instanceof Date
+        ? b.createdAt
+        : new Date(b.createdAt as unknown as string);
+      return bDate.getTime() - aDate.getTime();
+    });
+}
+
 export async function getTodaysOrders(): Promise<Order[]> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);

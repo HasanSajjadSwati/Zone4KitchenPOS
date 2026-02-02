@@ -15,6 +15,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
   getTodaysOrders,
+  getAllOrders,
+  getPastOrders,
   getOrderItems,
   cancelOrder,
   markOrderAsPaid,
@@ -59,6 +61,7 @@ export const OrderList: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [filterStatus, setFilterStatus] = useState<'all' | 'open' | 'completed' | 'cancelled'>('all');
   const [filterType, setFilterType] = useState<string>('all');
+  const [filterDate, setFilterDate] = useState<'today' | 'past' | 'all'>('today');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [selectedOrderItems, setSelectedOrderItems] = useState<OrderItem[]>([]);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
@@ -79,10 +82,18 @@ export const OrderList: React.FC = () => {
 
   useEffect(() => {
     loadOrders();
-  }, [filterStatus, filterType]);
+  }, [filterStatus, filterType, filterDate]);
 
   const loadOrders = async () => {
-    let allOrders = await getTodaysOrders();
+    let allOrders: Order[] = [];
+
+    if (filterDate === 'past') {
+      allOrders = await getPastOrders();
+    } else if (filterDate === 'all') {
+      allOrders = await getAllOrders();
+    } else {
+      allOrders = await getTodaysOrders();
+    }
 
     if (filterStatus === 'open') {
       allOrders = allOrders.filter((o) => o.status === 'open');
@@ -222,7 +233,17 @@ export const OrderList: React.FC = () => {
 
       {/* Filters */}
       <Card padding="md">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Select
+            label="Date"
+            value={filterDate}
+            onChange={(e) => setFilterDate(e.target.value as any)}
+          >
+            <option value="today">Today</option>
+            <option value="past">Past Orders</option>
+            <option value="all">All Orders</option>
+          </Select>
+
           <Select
             label="Status"
             value={filterStatus}
