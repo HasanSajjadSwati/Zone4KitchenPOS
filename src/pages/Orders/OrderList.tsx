@@ -62,6 +62,7 @@ export const OrderList: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState<'all' | 'open' | 'completed' | 'cancelled'>('all');
   const [filterType, setFilterType] = useState<string>('all');
   const [filterDate, setFilterDate] = useState<'today' | 'past' | 'all'>('today');
+  const [filterPayment, setFilterPayment] = useState<'all' | 'paid' | 'unpaid'>('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [selectedOrderItems, setSelectedOrderItems] = useState<OrderItem[]>([]);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
@@ -82,7 +83,7 @@ export const OrderList: React.FC = () => {
 
   useEffect(() => {
     loadOrders();
-  }, [filterStatus, filterType, filterDate]);
+  }, [filterStatus, filterType, filterDate, filterPayment]);
 
   const loadOrders = async () => {
     let allOrders: Order[] = [];
@@ -105,6 +106,12 @@ export const OrderList: React.FC = () => {
 
     if (filterType !== 'all') {
       allOrders = allOrders.filter((o) => o.orderType === filterType);
+    }
+
+    if (filterPayment === 'paid') {
+      allOrders = allOrders.filter((o) => o.isPaid);
+    } else if (filterPayment === 'unpaid') {
+      allOrders = allOrders.filter((o) => !o.isPaid);
     }
 
     setOrders(allOrders);
@@ -233,7 +240,7 @@ export const OrderList: React.FC = () => {
 
       {/* Filters */}
       <Card padding="md">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <Select
             label="Date"
             value={filterDate}
@@ -264,6 +271,16 @@ export const OrderList: React.FC = () => {
             <option value="dine_in">Dine In</option>
             <option value="take_away">Take Away</option>
             <option value="delivery">Delivery</option>
+          </Select>
+
+          <Select
+            label="Payment"
+            value={filterPayment}
+            onChange={(e) => setFilterPayment(e.target.value as any)}
+          >
+            <option value="all">All Payments</option>
+            <option value="paid">Paid</option>
+            <option value="unpaid">Unpaid</option>
           </Select>
 
           <div className="flex items-end">
