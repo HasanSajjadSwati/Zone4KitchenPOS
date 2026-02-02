@@ -141,6 +141,7 @@ export const CreateOrder: React.FC = () => {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedDealCategory, setSelectedDealCategory] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [menuTab, setMenuTab] = useState<'items' | 'deals'>('items');
   const [waiters, setWaiters] = useState<Waiter[]>([]);
@@ -1367,6 +1368,25 @@ export const CreateOrder: React.FC = () => {
     );
   }
 
+  const filteredDeals = deals.filter((deal) => {
+    const matchesSearch = deal.name.toLowerCase().includes(searchTerm.toLowerCase());
+    if (!matchesSearch) return false;
+
+    if (!selectedDealCategory) return true;
+    if (!deal.categoryId) return false;
+
+    const selectedCategoryData = categories.find((cat) => cat.id === selectedDealCategory);
+    if (selectedCategoryData?.type === 'major') {
+      const subIds = categories
+        .filter((cat) => cat.parentId === selectedCategoryData.id)
+        .map((cat) => cat.id);
+      const validIds = new Set([selectedCategoryData.id, ...subIds]);
+      return validIds.has(deal.categoryId);
+    }
+
+    return deal.categoryId === selectedDealCategory;
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -1477,12 +1497,16 @@ export const CreateOrder: React.FC = () => {
                   </div>
                 </>
               ) : (
-                <div className="space-y-2 max-h-[680px] overflow-y-auto">
-                  {deals
-                    .filter((deal) =>
-                      deal.name.toLowerCase().includes(searchTerm.toLowerCase())
-                    )
-                    .map((deal) => (
+                <>
+                  <CategoryFilter
+                    categories={categories}
+                    value={selectedDealCategory}
+                    onChange={setSelectedDealCategory}
+                    label="Filter by Category"
+                  />
+
+                  <div className="mt-4 space-y-2 max-h-[600px] overflow-y-auto">
+                    {filteredDeals.map((deal) => (
                     <div
                       key={deal.id}
                       className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg hover:from-green-100 hover:to-blue-100 cursor-pointer border border-green-200"
@@ -1504,17 +1528,16 @@ export const CreateOrder: React.FC = () => {
                       </div>
                       <PlusIcon className="w-6 h-6 text-primary-600" />
                     </div>
-                  ))}
-                  {deals.filter((deal) =>
-                    deal.name.toLowerCase().includes(searchTerm.toLowerCase())
-                  ).length === 0 && (
-                    <div className="text-center py-12 text-gray-500">
-                      <p className="text-sm">
-                        {searchTerm ? 'No deals match your search.' : 'No active deals available.'}
-                      </p>
-                    </div>
-                  )}
-                </div>
+                    ))}
+                    {filteredDeals.length === 0 && (
+                      <div className="text-center py-12 text-gray-500">
+                        <p className="text-sm">
+                          {searchTerm || selectedDealCategory ? 'No deals match your filters.' : 'No active deals available.'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
             </Card>
           </div>

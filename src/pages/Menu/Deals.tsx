@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { PlusIcon, PencilIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import { Button, Card, Modal, Input, Select } from '@/components/ui';
+import { Button, Card, Modal, Input, Select, CategoryFilter } from '@/components/ui';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -121,6 +121,7 @@ export const Deals: React.FC = () => {
   } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
+  const [filterCategory, setFilterCategory] = useState<string>('all');
 
   const {
     register,
@@ -400,10 +401,30 @@ export const Deals: React.FC = () => {
   };
 
   const filteredDeals = deals.filter((deal) => {
-    if (filterStatus === 'all') return true;
-    if (filterStatus === 'active') return deal.isActive;
-    if (filterStatus === 'inactive') return !deal.isActive;
-    return true;
+    const matchesStatus =
+      filterStatus === 'all' ||
+      (filterStatus === 'active' && deal.isActive) ||
+      (filterStatus === 'inactive' && !deal.isActive);
+
+    let matchesCategory = true;
+    if (filterCategory !== 'all') {
+      if (!deal.categoryId) {
+        matchesCategory = false;
+      } else {
+        const selectedCategory = categories.find((cat) => cat.id === filterCategory);
+        if (selectedCategory?.type === 'major') {
+          const subIds = categories
+            .filter((cat) => cat.parentId === selectedCategory.id)
+            .map((cat) => cat.id);
+          const validIds = new Set([selectedCategory.id, ...subIds]);
+          matchesCategory = validIds.has(deal.categoryId);
+        } else {
+          matchesCategory = deal.categoryId === filterCategory;
+        }
+      }
+    }
+
+    return matchesStatus && matchesCategory;
   });
 
   return (
@@ -420,7 +441,12 @@ export const Deals: React.FC = () => {
 
       {/* Filter */}
       <Card padding="md">
-        <div className="max-w-xs">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <CategoryFilter
+            categories={categories}
+            value={filterCategory === 'all' ? '' : filterCategory}
+            onChange={(value) => setFilterCategory(value || 'all')}
+          />
           <Select
             label="Filter by Status"
             value={filterStatus}

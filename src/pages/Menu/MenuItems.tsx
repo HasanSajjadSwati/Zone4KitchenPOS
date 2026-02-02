@@ -347,6 +347,7 @@ export const MenuItems: React.FC = () => {
       <Card padding="md">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Input
+            label="Search"
             placeholder="Search menu items..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -357,6 +358,7 @@ export const MenuItems: React.FC = () => {
               onChange={(value) => setFilterCategory(value || 'all')}
             />
           <Select
+            label="Filter by Status"
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value as any)}
           >

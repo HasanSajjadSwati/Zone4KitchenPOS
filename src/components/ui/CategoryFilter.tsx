@@ -97,7 +97,7 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
   return (
     <div className={clsx('w-full', className)} ref={dropdownRef}>
       {label && (
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
           {label}
         </label>
       )}
@@ -109,8 +109,8 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
           onClick={() => setIsOpen(!isOpen)}
           onKeyDown={handleKeyDown}
           className={clsx(
-            'w-full flex items-center justify-between px-4 py-2.5 text-left',
-            'bg-white border border-gray-300 rounded-lg shadow-sm',
+            'w-full flex items-center justify-between px-4 py-2 text-left',
+            'bg-white border border-gray-300 rounded-lg',
             'hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500',
             'transition-all duration-150',
             isOpen && 'ring-2 ring-primary-500 border-primary-500'
