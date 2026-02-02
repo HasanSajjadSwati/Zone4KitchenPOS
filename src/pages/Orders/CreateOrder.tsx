@@ -92,6 +92,24 @@ const orderTypeSchema = z
     }
   });
 
+const customerEditSchema = z
+  .object({
+    customerName: z.string().optional(),
+    customerPhone: z.string().optional(),
+    customerId: z.string().optional(),
+    deliveryAddress: z.string().optional(),
+    orderType: z.enum(['dine_in', 'take_away', 'delivery']),
+  })
+  .superRefine((data, ctx) => {
+    if (data.orderType === 'delivery' && !data.customerPhone?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['customerPhone'],
+        message: 'Customer phone is required for delivery orders',
+      });
+    }
+  });
+
 const discountSchema = z.object({
   discountType: z.enum(['percentage', 'fixed']),
   discountValue: z.number().min(0, 'Discount must be positive'),
@@ -106,6 +124,7 @@ const completeOrderSchema = z.object({
 });
 
 type OrderTypeFormData = z.infer<typeof orderTypeSchema>;
+type CustomerEditFormData = z.infer<typeof customerEditSchema>;
 type DiscountFormData = z.infer<typeof discountSchema>;
 type CompleteOrderFormData = z.infer<typeof completeOrderSchema>;
 
@@ -152,11 +171,18 @@ export const CreateOrder: React.FC = () => {
   const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false);
   const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
   const [isReprintKOTModalOpen, setIsReprintKOTModalOpen] = useState(false);
+  const [isCustomerEditModalOpen, setIsCustomerEditModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [customerStatus, setCustomerStatus] = useState<'new' | 'existing' | null>(null);
+  const [editCustomerStatus, setEditCustomerStatus] = useState<'new' | 'existing' | null>(null);
 
   const orderTypeForm = useForm<OrderTypeFormData>({
     resolver: zodResolver(orderTypeSchema),
+  });
+
+  const customerEditForm = useForm<CustomerEditFormData>({
+    resolver: zodResolver(customerEditSchema),
+    defaultValues: { orderType: 'delivery' },
   });
 
   const discountForm = useForm<DiscountFormData>({
@@ -1252,7 +1278,9 @@ export const CreateOrder: React.FC = () => {
         // Existing customer found - populate form
         orderTypeForm.setValue('customerName', customer.name);
         orderTypeForm.setValue('customerId', customer.id);
-        orderTypeForm.setValue('deliveryAddress', customer.address || '');
+        if (orderTypeForm.getValues('orderType') === 'delivery') {
+          orderTypeForm.setValue('deliveryAddress', customer.address || '');
+        }
         setCustomerStatus('existing');
       } else {
         // New customer - clear customer ID and mark as new
@@ -1262,6 +1290,62 @@ export const CreateOrder: React.FC = () => {
     } else {
       // Reset status if phone is incomplete
       setCustomerStatus(null);
+    }
+  };
+
+  const openCustomerEditModal = () => {
+    if (!currentOrder) return;
+    customerEditForm.reset({
+      customerName: currentOrder.customerName || '',
+      customerPhone: currentOrder.customerPhone || '',
+      customerId: currentOrder.customerId || '',
+      deliveryAddress: currentOrder.deliveryAddress || '',
+      orderType: currentOrder.orderType,
+    });
+    setEditCustomerStatus(null);
+    setIsCustomerEditModalOpen(true);
+  };
+
+  const handleEditCustomerPhoneChange = async (phone: string) => {
+    if (phone.length === 11) {
+      const customer = await getCustomerByPhone(phone);
+      if (customer) {
+        customerEditForm.setValue('customerName', customer.name);
+        customerEditForm.setValue('customerId', customer.id);
+        if (currentOrder?.orderType === 'delivery') {
+          customerEditForm.setValue('deliveryAddress', customer.address || '');
+        }
+        setEditCustomerStatus('existing');
+      } else {
+        customerEditForm.setValue('customerId', '');
+        setEditCustomerStatus('new');
+      }
+    } else {
+      setEditCustomerStatus(null);
+    }
+  };
+
+  const handleUpdateCustomerDetails = async (data: CustomerEditFormData) => {
+    if (!currentOrder || !currentUser) return;
+
+    setIsLoading(true);
+    try {
+      await db.orders.update(currentOrder.id, {
+        customerName: data.customerName?.trim() || null,
+        customerPhone: data.customerPhone?.trim() || null,
+        customerId: data.customerId?.trim() || null,
+        deliveryAddress:
+          currentOrder.orderType === 'delivery'
+            ? data.deliveryAddress?.trim() || null
+            : null,
+      });
+      await refreshOrder();
+      setIsCustomerEditModalOpen(false);
+      setEditCustomerStatus(null);
+    } catch (error) {
+      await dialog.alert(error instanceof Error ? error.message : 'Failed to update customer details', 'Error');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -1610,12 +1694,32 @@ export const CreateOrder: React.FC = () => {
                   </div>
                 )}
 
-                {currentOrder.customerName && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Customer:</span>
-                    <span className="font-semibold text-gray-900">
-                      {currentOrder.customerName}
-                    </span>
+                {(currentOrder.orderType === 'delivery' ||
+                  currentOrder.customerName ||
+                  currentOrder.customerPhone) && (
+                  <div className="rounded-lg border border-gray-200 p-3 text-sm">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-semibold text-gray-900">Customer Details</span>
+                      <Button size="sm" variant="secondary" onClick={openCustomerEditModal}>
+                        Edit
+                      </Button>
+                    </div>
+                    <div className="space-y-1 text-gray-600">
+                      <div>
+                        <span className="text-gray-500">Name:</span>{' '}
+                        {currentOrder.customerName || 'N/A'}
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Phone:</span>{' '}
+                        {currentOrder.customerPhone || 'N/A'}
+                      </div>
+                      {currentOrder.orderType === 'delivery' && (
+                        <div>
+                          <span className="text-gray-500">Address:</span>{' '}
+                          {currentOrder.deliveryAddress || 'N/A'}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -1855,10 +1959,22 @@ export const CreateOrder: React.FC = () => {
           )}
 
           {orderTypeForm.watch('orderType') === 'take_away' && (
-            <Input
-              label="Customer Name (Optional)"
-              {...orderTypeForm.register('customerName')}
-            />
+            <>
+              <Input
+                label="Customer Phone (Optional)"
+                placeholder="03001234567"
+                error={orderTypeForm.formState.errors.customerPhone?.message}
+                {...orderTypeForm.register('customerPhone')}
+                onChange={(e) => {
+                  orderTypeForm.register('customerPhone').onChange(e);
+                  handleCustomerPhoneChange(e.target.value);
+                }}
+              />
+              <Input
+                label="Customer Name (Optional)"
+                {...orderTypeForm.register('customerName')}
+              />
+            </>
           )}
 
           <div>
@@ -1882,6 +1998,86 @@ export const CreateOrder: React.FC = () => {
             </Button>
             <Button type="submit" variant="primary" isLoading={isLoading}>
               Create Order
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Customer Edit Modal */}
+      <Modal
+        isOpen={isCustomerEditModalOpen}
+        onClose={() => {
+          setIsCustomerEditModalOpen(false);
+          customerEditForm.reset();
+          setEditCustomerStatus(null);
+        }}
+        title="Edit Customer Details"
+        size="lg"
+      >
+        <form
+          onSubmit={customerEditForm.handleSubmit(handleUpdateCustomerDetails)}
+          className="space-y-4"
+        >
+          <input type="hidden" {...customerEditForm.register('orderType')} />
+          <input type="hidden" {...customerEditForm.register('customerId')} />
+
+          <div>
+            <Input
+              label="Customer Phone"
+              placeholder="03001234567"
+              error={customerEditForm.formState.errors.customerPhone?.message}
+              {...customerEditForm.register('customerPhone')}
+              onChange={(e) => {
+                customerEditForm.register('customerPhone').onChange(e);
+                handleEditCustomerPhoneChange(e.target.value);
+              }}
+            />
+            {editCustomerStatus === 'existing' && (
+              <div className="mt-1 flex items-center text-sm text-green-600">
+                <CheckCircleIcon className="w-4 h-4 mr-1" />
+                Existing customer - details loaded
+              </div>
+            )}
+            {editCustomerStatus === 'new' && (
+              <div className="mt-1 flex items-center text-sm text-blue-600">
+                <PlusIcon className="w-4 h-4 mr-1" />
+                New customer - will be saved automatically
+              </div>
+            )}
+          </div>
+
+          <Input
+            label="Customer Name"
+            {...customerEditForm.register('customerName')}
+          />
+
+          {currentOrder?.orderType === 'delivery' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Delivery Address
+              </label>
+              <textarea
+                className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                rows={3}
+                {...customerEditForm.register('deliveryAddress')}
+              />
+            </div>
+          )}
+
+          <div className="flex justify-end space-x-3 pt-4">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                setIsCustomerEditModalOpen(false);
+                customerEditForm.reset();
+                setEditCustomerStatus(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" isLoading={isLoading}>
+              Save Changes
             </Button>
           </div>
         </form>
