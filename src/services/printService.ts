@@ -555,6 +555,30 @@ export async function printCounterCopy(orderId: string, userId: string): Promise
   });
 }
 
+async function resolveDeliveryCustomerInfo(order: Order): Promise<{
+  customerName: string;
+  customerPhone: string;
+  deliveryAddress: string;
+}> {
+  let customerName = order.customerName?.trim() || '';
+  let customerPhone = (order.customerPhone || '').trim();
+  let deliveryAddress = order.deliveryAddress?.trim() || '';
+
+  if (order.customerId) {
+    const customer = await db.customers.get(order.customerId);
+    if (customer) {
+      if (!customerName && customer.name) customerName = customer.name;
+      if (!customerPhone && customer.phone) customerPhone = customer.phone;
+      if (!deliveryAddress && customer.address) deliveryAddress = customer.address;
+    }
+  }
+
+  if (!customerName) customerName = 'N/A';
+  if (!deliveryAddress) deliveryAddress = 'N/A';
+
+  return { customerName, customerPhone, deliveryAddress };
+}
+
 export async function printAllReceipts(orderId: string, userId: string): Promise<void> {
   const order = await db.orders.get(orderId);
   if (!order) throw new Error('Order not found');
@@ -602,18 +626,7 @@ export async function printAllReceipts(orderId: string, userId: string): Promise
   }
 
   if (includeRider && order.orderType === 'delivery') {
-    let customerName = 'N/A';
-    let customerPhone = 'N/A';
-    let deliveryAddress = order.deliveryAddress || 'N/A';
-
-    if (order.customerId) {
-      const customer = await db.customers.get(order.customerId);
-      if (customer) {
-        customerName = customer.name;
-        customerPhone = customer.phone;
-        if (customer.address) deliveryAddress = customer.address;
-      }
-    }
+    const { customerName, customerPhone, deliveryAddress } = await resolveDeliveryCustomerInfo(order);
 
     let riderName = 'Not Assigned';
     if (order.riderId) {
@@ -670,18 +683,7 @@ export async function printRiderReceipt(orderId: string, userId: string): Promis
   const settings = await db.settings.get('default');
 
   // Get customer info
-  let customerName = 'N/A';
-  let customerPhone = 'N/A';
-  let deliveryAddress = order.deliveryAddress || 'N/A';
-
-  if (order.customerId) {
-    const customer = await db.customers.get(order.customerId);
-    if (customer) {
-      customerName = customer.name;
-      customerPhone = customer.phone;
-      if (customer.address) deliveryAddress = customer.address;
-    }
-  }
+  const { customerName, customerPhone, deliveryAddress } = await resolveDeliveryCustomerInfo(order);
 
   // Get rider name
   let riderName = 'Not Assigned';
@@ -817,7 +819,7 @@ async function renderRiderReceiptTemplate(
   <div class="section">
     <div class="section-title">DELIVERY INFORMATION</div>
     <div><strong>Customer:</strong> ${customerName}</div>
-    <div><strong>Phone:</strong> ${customerPhone}</div>
+    ${customerPhone ? `<div><strong>Phone:</strong> ${customerPhone}</div>` : ''}
     <div><strong>Address:</strong> ${deliveryAddress}</div>
   </div>
 
@@ -898,6 +900,15 @@ async function renderReceiptTemplate(
       `;
     })
   );
+
+  let customerPhone = '';
+  if (copyType === 'CUSTOMER COPY') {
+    customerPhone = (order.customerPhone || '').trim();
+    if (!customerPhone && order.customerId) {
+      const customer = await db.customers.get(order.customerId);
+      if (customer?.phone) customerPhone = customer.phone;
+    }
+  }
 
   return `
 <!DOCTYPE html>
@@ -999,6 +1010,7 @@ async function renderReceiptTemplate(
     }</td></tr>
     ${order.tableId ? `<tr><td>Table:</td><td style="text-align: right;">${await getTableNumber(order.tableId)}</td></tr>` : ''}
     ${order.customerName ? `<tr><td>Customer:</td><td style="text-align: right;">${order.customerName}</td></tr>` : ''}
+    ${copyType === 'CUSTOMER COPY' && customerPhone ? `<tr><td>Phone:</td><td style="text-align: right;">${customerPhone}</td></tr>` : ''}
   </table>
 
   <div class="divider"></div>

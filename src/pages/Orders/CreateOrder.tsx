@@ -70,17 +70,27 @@ type VariantConfig = {
   selectionMode: 'single' | 'multiple' | 'all';
 };
 
-const orderTypeSchema = z.object({
-  orderType: z.enum(['dine_in', 'take_away', 'delivery']),
-  tableId: z.string().optional(),
-  waiterId: z.string().optional(),
-  customerName: z.string().optional(),
-  customerPhone: z.string().optional(),
-  customerId: z.string().optional(),
-  riderId: z.string().optional(),
-  deliveryAddress: z.string().optional(),
-  notes: z.string().optional(),
-});
+const orderTypeSchema = z
+  .object({
+    orderType: z.enum(['dine_in', 'take_away', 'delivery']),
+    tableId: z.string().optional(),
+    waiterId: z.string().optional(),
+    customerName: z.string().optional(),
+    customerPhone: z.string().optional(),
+    customerId: z.string().optional(),
+    riderId: z.string().optional(),
+    deliveryAddress: z.string().optional(),
+    notes: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.orderType === 'delivery' && !data.customerPhone?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['customerPhone'],
+        message: 'Customer phone is required for delivery orders',
+      });
+    }
+  });
 
 const discountSchema = z.object({
   discountType: z.enum(['percentage', 'fixed']),
@@ -1792,15 +1802,16 @@ export const CreateOrder: React.FC = () => {
 
           {orderTypeForm.watch('orderType') === 'delivery' && (
             <>
-              <div>
-                <Input
-                  label="Customer Phone"
-                  placeholder="03001234567"
-                  {...orderTypeForm.register('customerPhone')}
-                  onChange={(e) => {
-                    orderTypeForm.register('customerPhone').onChange(e);
-                    handleCustomerPhoneChange(e.target.value);
-                  }}
+                <div>
+                  <Input
+                    label="Customer Phone"
+                    placeholder="03001234567"
+                    error={orderTypeForm.formState.errors.customerPhone?.message}
+                    {...orderTypeForm.register('customerPhone')}
+                    onChange={(e) => {
+                      orderTypeForm.register('customerPhone').onChange(e);
+                      handleCustomerPhoneChange(e.target.value);
+                    }}
                 />
                 {customerStatus === 'existing' && (
                   <div className="mt-1 flex items-center text-sm text-green-600">

@@ -112,6 +112,10 @@ orderRoutes.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields: registerSessionId, orderType, createdBy' });
     }
 
+    if (orderType === 'delivery' && (!customerPhone || String(customerPhone).trim().length === 0)) {
+      return res.status(400).json({ error: 'Customer phone is required for delivery orders' });
+    }
+
     if (!(await recordExists('registerSessions', registerSessionId))) {
       return res.status(400).json({ error: 'Register session not found' });
     }
@@ -181,6 +185,10 @@ orderRoutes.put('/:id', async (req, res) => {
     const order = await getAsync('SELECT * FROM orders WHERE id = ?', [req.params.id]);
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
+    }
+
+    if (order.orderType === 'delivery' && customerPhone !== undefined && String(customerPhone).trim().length === 0) {
+      return res.status(400).json({ error: 'Customer phone is required for delivery orders' });
     }
 
     const updates: string[] = [];
