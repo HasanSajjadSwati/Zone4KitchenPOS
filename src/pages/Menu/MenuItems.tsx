@@ -158,11 +158,10 @@ export const MenuItems: React.FC = () => {
         itemId = newItem.id;
       }
 
-      // Save variant assignments if hasVariants is enabled
-      if (data.hasVariants && selectedVariants.length > 0) {
+      // Always sync variant assignments so removed variants are cleared
+      if (data.hasVariants) {
         await setMenuItemVariants(itemId, selectedVariants, currentUser.id);
-      } else if (!data.hasVariants) {
-        // Clear variants if hasVariants is disabled
+      } else {
         await setMenuItemVariants(itemId, [], currentUser.id);
       }
 
