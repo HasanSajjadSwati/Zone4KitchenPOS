@@ -439,6 +439,9 @@ export const db = {
     add: async (option: any) => {
       return apiClient.createVariantOption(option.variantId, option);
     },
+    update: async (variantId: string, optionId: string, changes: any) => {
+      return apiClient.updateVariantOption(variantId, optionId, changes);
+    },
     delete: async (variantId: string, optionId: string) => {
       return apiClient.deleteVariantOption(variantId, optionId);
     },

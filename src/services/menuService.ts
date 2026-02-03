@@ -300,6 +300,38 @@ export async function deleteVariantOption(id: string, userId: string): Promise<v
   });
 }
 
+export async function updateVariantOption(
+  id: string,
+  updates: Partial<VariantOption>,
+  userId: string
+): Promise<void> {
+  const before = await db.variantOptions.get(id);
+  if (!before) {
+    throw new Error('Variant option not found');
+  }
+
+  const payload = {
+    name: updates.name ?? before.name,
+    priceModifier: updates.priceModifier ?? before.priceModifier,
+    sortOrder: updates.sortOrder ?? before.sortOrder,
+    isActive: updates.isActive ?? before.isActive,
+  };
+
+  await db.variantOptions.update(before.variantId, id, payload);
+
+  const after = await db.variantOptions.get(id);
+
+  await logAudit({
+    userId,
+    action: 'update',
+    tableName: 'variantOptions',
+    recordId: id,
+    description: `Updated variant option: ${after?.name || before.name}`,
+    before,
+    after,
+  });
+}
+
 // Menu Item Variants (linking variants to menu items)
 export async function getMenuItemVariants(menuItemId: string): Promise<MenuItemVariant[]> {
   return await db.menuItemVariants.where('menuItemId').equals(menuItemId).toArray();

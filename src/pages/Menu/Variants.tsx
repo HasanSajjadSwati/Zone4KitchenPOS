@@ -10,6 +10,7 @@ import {
   deleteVariant,
   getAllVariants,
   createVariantOption,
+  updateVariantOption,
   getVariantOptions,
   deleteVariantOption,
 } from '@/services/menuService';
@@ -45,6 +46,7 @@ export const Variants: React.FC = () => {
   const [isVariantModalOpen, setIsVariantModalOpen] = useState(false);
   const [isOptionModalOpen, setIsOptionModalOpen] = useState(false);
   const [editingVariant, setEditingVariant] = useState<Variant | null>(null);
+  const [editingOption, setEditingOption] = useState<VariantOption | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
 
@@ -111,18 +113,24 @@ export const Variants: React.FC = () => {
   };
 
   const onSubmitOption = async (data: OptionFormData) => {
-    if (!currentUser || !selectedVariant) return;
+    if (!currentUser) return;
 
     setIsLoading(true);
     try {
-      await createVariantOption(
-        {
-          variantId: selectedVariant.id,
-          ...data,
-        },
-        currentUser.id
-      );
-      await loadOptions(selectedVariant.id);
+      if (editingOption) {
+        await updateVariantOption(editingOption.id, data, currentUser.id);
+        await loadOptions(editingOption.variantId);
+      } else {
+        if (!selectedVariant) return;
+        await createVariantOption(
+          {
+            variantId: selectedVariant.id,
+            ...data,
+          },
+          currentUser.id
+        );
+        await loadOptions(selectedVariant.id);
+      }
       closeOptionModal();
     } catch (error) {
       await dialog.alert(error instanceof Error ? error.message : 'Failed to save option', 'Error');
@@ -187,6 +195,28 @@ export const Variants: React.FC = () => {
     }
   };
 
+  const handleEditOption = (option: VariantOption) => {
+    setEditingOption(option);
+    optionForm.reset({
+      name: option.name,
+      priceModifier: option.priceModifier,
+      sortOrder: option.sortOrder,
+      isActive: option.isActive,
+    });
+    setIsOptionModalOpen(true);
+  };
+
+  const openAddOption = () => {
+    setEditingOption(null);
+    optionForm.reset({
+      name: '',
+      priceModifier: 0,
+      sortOrder: 0,
+      isActive: true,
+    });
+    setIsOptionModalOpen(true);
+  };
+
   const closeVariantModal = () => {
     setIsVariantModalOpen(false);
     setEditingVariant(null);
@@ -200,6 +230,7 @@ export const Variants: React.FC = () => {
 
   const closeOptionModal = () => {
     setIsOptionModalOpen(false);
+    setEditingOption(null);
     optionForm.reset({
       name: '',
       priceModifier: 0,
@@ -324,7 +355,7 @@ export const Variants: React.FC = () => {
                 </div>
                 <Button
                   size="sm"
-                  onClick={() => setIsOptionModalOpen(true)}
+                  onClick={openAddOption}
                   leftIcon={<PlusIcon className="w-5 h-5" />}
                 >
                   Add Option
@@ -369,14 +400,22 @@ export const Variants: React.FC = () => {
                           <span>Sort: {option.sortOrder}</span>
                         </div>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        onClick={() => handleDeleteOption(option.id)}
-                        leftIcon={<TrashIcon className="w-4 h-4" />}
-                      >
-                        Delete
-                      </Button>
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleEditOption(option)}
+                        >
+                          <PencilIcon className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onClick={() => handleDeleteOption(option.id)}
+                        >
+                          <TrashIcon className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
 
@@ -461,7 +500,7 @@ export const Variants: React.FC = () => {
       <Modal
         isOpen={isOptionModalOpen}
         onClose={closeOptionModal}
-        title="Add Option"
+        title={editingOption ? 'Edit Option' : 'Add Option'}
         size="md"
       >
         <form onSubmit={optionForm.handleSubmit(onSubmitOption)} className="space-y-4">
@@ -505,7 +544,7 @@ export const Variants: React.FC = () => {
               Cancel
             </Button>
             <Button type="submit" isLoading={isLoading}>
-              Create
+              {editingOption ? 'Update' : 'Create'}
             </Button>
           </div>
         </form>
