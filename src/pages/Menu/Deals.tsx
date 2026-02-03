@@ -127,6 +127,8 @@ export const Deals: React.FC = () => {
     register,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<DealFormData>({
     resolver: zodResolver(dealSchema),
@@ -138,6 +140,8 @@ export const Deals: React.FC = () => {
       isActive: true,
     },
   });
+
+  const selectedCategoryId = watch('categoryId');
 
   useEffect(() => {
     loadData();
@@ -560,17 +564,16 @@ export const Deals: React.FC = () => {
             {...register('price', { valueAsNumber: true })}
           />
 
-          <Select
+          <input type="hidden" {...register('categoryId')} />
+          <CategoryFilter
+            categories={categories}
+            value={selectedCategoryId || ''}
+            onChange={(value) => {
+              setValue('categoryId', value || null, { shouldDirty: true });
+            }}
             label="Category (Optional)"
-            {...register('categoryId')}
-          >
-            <option value="">No Category</option>
-            {categories.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
-              </option>
-            ))}
-          </Select>
+            placeholder="No Category"
+          />
 
           <div className="flex items-center space-x-2">
             <input
@@ -809,3 +812,4 @@ export const Deals: React.FC = () => {
     </div>
   );
 };
+

@@ -113,6 +113,7 @@ export const MenuItems: React.FC = () => {
     handleSubmit,
     reset,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<MenuItemFormData>({
     resolver: zodResolver(menuItemSchema),
@@ -288,24 +289,7 @@ export const MenuItems: React.FC = () => {
     return categories.find((cat) => cat.id === categoryId)?.name || 'Unknown';
   };
 
-  const sortCategories = (a: Category, b: Category) => {
-    const orderDiff = (a.sortOrder || 0) - (b.sortOrder || 0);
-    if (orderDiff !== 0) return orderDiff;
-    return a.name.localeCompare(b.name);
-  };
-
-  const majorCategories = categories.filter((cat) => cat.type === 'major').sort(sortCategories);
-  const subCategories = categories.filter((cat) => cat.type === 'sub').sort(sortCategories);
-  const majorCategoryIds = new Set(majorCategories.map((cat) => cat.id));
-
-  const subCategoriesByParent = new Map<string, Category[]>();
-  majorCategories.forEach((major) => {
-    const subs = subCategories.filter((cat) => cat.parentId === major.id);
-    subCategoriesByParent.set(major.id, subs);
-  });
-  const orphanSubCategories = subCategories.filter(
-    (cat) => !cat.parentId || !majorCategoryIds.has(cat.parentId)
-  );
+  const selectedCategoryId = watch('categoryId');
 
   const filteredItems = items.filter((item) => {
     const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -453,28 +437,19 @@ export const MenuItems: React.FC = () => {
             {...register('name')}
           />
 
-            <Select label="Category" error={errors.categoryId?.message} {...register('categoryId')}>
-              <option value="">Select category</option>
-              {majorCategories.map((major) => (
-                <optgroup key={major.id} label={major.name}>
-                  <option value={major.id}>{major.name} (Major)</option>
-                  {(subCategoriesByParent.get(major.id) || []).map((sub) => (
-                    <option key={sub.id} value={sub.id}>
-                      -- {sub.name}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-              {orphanSubCategories.length > 0 && (
-                <optgroup label="Other Subcategories">
-                  {orphanSubCategories.map((sub) => (
-                    <option key={sub.id} value={sub.id}>
-                      -- {sub.name}
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-            </Select>
+          <input type="hidden" {...register('categoryId')} />
+          <CategoryFilter
+            categories={categories}
+            value={selectedCategoryId || ''}
+            onChange={(value) => {
+              setValue('categoryId', value, { shouldValidate: true, shouldDirty: true });
+            }}
+            label="Category"
+            placeholder="Select category"
+          />
+          {errors.categoryId && (
+            <p className="mt-1 text-sm text-danger-600">{errors.categoryId.message}</p>
+          )}
 
           <Input
             label="Price (Rs)"

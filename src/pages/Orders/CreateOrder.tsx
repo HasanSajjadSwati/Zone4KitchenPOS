@@ -97,6 +97,8 @@ const customerEditSchema = z
     customerName: z.string().optional(),
     customerPhone: z.string().optional(),
     customerId: z.string().optional(),
+    waiterId: z.string().optional(),
+    riderId: z.string().optional(),
     deliveryAddress: z.string().optional(),
     orderType: z.enum(['dine_in', 'take_away', 'delivery']),
   })
@@ -1300,6 +1302,8 @@ export const CreateOrder: React.FC = () => {
       customerName: currentOrder.customerName || '',
       customerPhone: currentOrder.customerPhone || '',
       customerId: currentOrder.customerId || '',
+      waiterId: currentOrder.waiterId || '',
+      riderId: currentOrder.riderId || '',
       deliveryAddress: currentOrder.deliveryAddress || '',
       orderType: currentOrder.orderType,
     });
@@ -1331,7 +1335,7 @@ export const CreateOrder: React.FC = () => {
 
     setIsLoading(true);
     try {
-      await db.orders.update(currentOrder.id, {
+      const updates: Record<string, any> = {
         customerName: data.customerName?.trim() || null,
         customerPhone: data.customerPhone?.trim() || null,
         customerId: data.customerId?.trim() || null,
@@ -1339,7 +1343,15 @@ export const CreateOrder: React.FC = () => {
           currentOrder.orderType === 'delivery'
             ? data.deliveryAddress?.trim() || null
             : null,
-      });
+      };
+
+      if (currentOrder.orderType === 'delivery') {
+        updates.riderId = data.riderId?.trim() || null;
+      } else {
+        updates.waiterId = data.waiterId?.trim() || null;
+      }
+
+      await db.orders.update(currentOrder.id, updates);
       await refreshOrder();
       setIsCustomerEditModalOpen(false);
       setEditCustomerStatus(null);
@@ -1386,6 +1398,15 @@ export const CreateOrder: React.FC = () => {
 
     return deal.categoryId === selectedDealCategory;
   });
+
+  const selectedOrderType = orderTypeForm.watch('orderType');
+  const editOrderType = customerEditForm.watch('orderType');
+  const assignedWaiterName = currentOrder?.waiterId
+    ? waiters.find((w) => w.id === currentOrder.waiterId)?.name || 'Unknown'
+    : 'Unassigned';
+  const assignedRiderName = currentOrder?.riderId
+    ? riders.find((r) => r.id === currentOrder.riderId)?.name || 'Unknown'
+    : 'Unassigned';
 
   return (
     <div className="space-y-6">
@@ -1717,34 +1738,46 @@ export const CreateOrder: React.FC = () => {
                   </div>
                 )}
 
-                {(currentOrder.orderType === 'delivery' ||
-                  currentOrder.customerName ||
-                  currentOrder.customerPhone) && (
-                  <div className="rounded-lg border border-gray-200 p-3 text-sm">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-semibold text-gray-900">Customer Details</span>
-                      <Button size="sm" variant="secondary" onClick={openCustomerEditModal}>
-                        Edit
-                      </Button>
-                    </div>
-                    <div className="space-y-1 text-gray-600">
-                      <div>
-                        <span className="text-gray-500">Name:</span>{' '}
-                        {currentOrder.customerName || 'N/A'}
-                      </div>
-                      <div>
-                        <span className="text-gray-500">Phone:</span>{' '}
-                        {currentOrder.customerPhone || 'N/A'}
-                      </div>
-                      {currentOrder.orderType === 'delivery' && (
-                        <div>
-                          <span className="text-gray-500">Address:</span>{' '}
-                          {currentOrder.deliveryAddress || 'N/A'}
-                        </div>
-                      )}
-                    </div>
+                <div className="rounded-lg border border-gray-200 p-3 text-sm">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-semibold text-gray-900">Order Details</span>
+                    <Button size="sm" variant="secondary" onClick={openCustomerEditModal}>
+                      Edit
+                    </Button>
                   </div>
-                )}
+                  <div className="space-y-1 text-gray-600">
+                    {(currentOrder.orderType === 'delivery' || currentOrder.orderType === 'take_away') && (
+                      <>
+                        <div>
+                          <span className="text-gray-500">Name:</span>{' '}
+                          {currentOrder.customerName || 'N/A'}
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Phone:</span>{' '}
+                          {currentOrder.customerPhone || 'N/A'}
+                        </div>
+                      </>
+                    )}
+                    {currentOrder.orderType === 'delivery' && (
+                      <div>
+                        <span className="text-gray-500">Address:</span>{' '}
+                        {currentOrder.deliveryAddress || 'N/A'}
+                      </div>
+                    )}
+                    {(currentOrder.orderType === 'dine_in' || currentOrder.orderType === 'take_away') && (
+                      <div>
+                        <span className="text-gray-500">Waiter:</span>{' '}
+                        {assignedWaiterName}
+                      </div>
+                    )}
+                    {currentOrder.orderType === 'delivery' && (
+                      <div>
+                        <span className="text-gray-500">Rider:</span>{' '}
+                        {assignedRiderName}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
               <div className="border-t border-gray-200 pt-4 mb-4 space-y-2">
@@ -1905,29 +1938,29 @@ export const CreateOrder: React.FC = () => {
             <option value="delivery">Delivery</option>
           </Select>
 
-          {orderTypeForm.watch('orderType') === 'dine_in' && (
-            <>
-              <Select label="Table" {...orderTypeForm.register('tableId')}>
-                <option value="">Select table</option>
-                {tables.map((table) => (
-                  <option key={table.id} value={table.id}>
-                    {table.tableNumber}
-                  </option>
-                ))}
-              </Select>
-
-              <Select label="Waiter" {...orderTypeForm.register('waiterId')}>
-                <option value="">Select waiter</option>
-                {waiters.map((waiter) => (
-                  <option key={waiter.id} value={waiter.id}>
-                    {waiter.name}
-                  </option>
-                ))}
-              </Select>
-            </>
+          {selectedOrderType === 'dine_in' && (
+            <Select label="Table" {...orderTypeForm.register('tableId')}>
+              <option value="">Select table</option>
+              {tables.map((table) => (
+                <option key={table.id} value={table.id}>
+                  {table.tableNumber}
+                </option>
+              ))}
+            </Select>
           )}
 
-          {orderTypeForm.watch('orderType') === 'delivery' && (
+          {(selectedOrderType === 'dine_in' || selectedOrderType === 'take_away') && (
+            <Select label="Waiter" {...orderTypeForm.register('waiterId')}>
+              <option value="">Select waiter</option>
+              {waiters.map((waiter) => (
+                <option key={waiter.id} value={waiter.id}>
+                  {waiter.name}
+                </option>
+              ))}
+            </Select>
+          )}
+
+          {selectedOrderType === 'delivery' && (
             <>
                 <div>
                   <Input
@@ -1981,7 +2014,7 @@ export const CreateOrder: React.FC = () => {
             </>
           )}
 
-          {orderTypeForm.watch('orderType') === 'take_away' && (
+          {selectedOrderType === 'take_away' && (
             <>
               <Input
                 label="Customer Phone (Optional)"
@@ -2026,7 +2059,7 @@ export const CreateOrder: React.FC = () => {
         </form>
       </Modal>
 
-      {/* Customer Edit Modal */}
+      {/* Order Details Edit Modal */}
       <Modal
         isOpen={isCustomerEditModalOpen}
         onClose={() => {
@@ -2034,7 +2067,7 @@ export const CreateOrder: React.FC = () => {
           customerEditForm.reset();
           setEditCustomerStatus(null);
         }}
-        title="Edit Customer Details"
+        title="Edit Order Details"
         size="lg"
       >
         <form
@@ -2044,37 +2077,41 @@ export const CreateOrder: React.FC = () => {
           <input type="hidden" {...customerEditForm.register('orderType')} />
           <input type="hidden" {...customerEditForm.register('customerId')} />
 
-          <div>
-            <Input
-              label="Customer Phone"
-              placeholder="03001234567"
-              error={customerEditForm.formState.errors.customerPhone?.message}
-              {...customerEditForm.register('customerPhone')}
-              onChange={(e) => {
-                customerEditForm.register('customerPhone').onChange(e);
-                handleEditCustomerPhoneChange(e.target.value);
-              }}
-            />
-            {editCustomerStatus === 'existing' && (
-              <div className="mt-1 flex items-center text-sm text-green-600">
-                <CheckCircleIcon className="w-4 h-4 mr-1" />
-                Existing customer - details loaded
+          {(editOrderType === 'delivery' || editOrderType === 'take_away') && (
+            <>
+              <div>
+                <Input
+                  label={editOrderType === 'delivery' ? 'Customer Phone' : 'Customer Phone (Optional)'}
+                  placeholder="03001234567"
+                  error={customerEditForm.formState.errors.customerPhone?.message}
+                  {...customerEditForm.register('customerPhone')}
+                  onChange={(e) => {
+                    customerEditForm.register('customerPhone').onChange(e);
+                    handleEditCustomerPhoneChange(e.target.value);
+                  }}
+                />
+                {editCustomerStatus === 'existing' && (
+                  <div className="mt-1 flex items-center text-sm text-green-600">
+                    <CheckCircleIcon className="w-4 h-4 mr-1" />
+                    Existing customer - details loaded
+                  </div>
+                )}
+                {editCustomerStatus === 'new' && (
+                  <div className="mt-1 flex items-center text-sm text-blue-600">
+                    <PlusIcon className="w-4 h-4 mr-1" />
+                    New customer - will be saved automatically
+                  </div>
+                )}
               </div>
-            )}
-            {editCustomerStatus === 'new' && (
-              <div className="mt-1 flex items-center text-sm text-blue-600">
-                <PlusIcon className="w-4 h-4 mr-1" />
-                New customer - will be saved automatically
-              </div>
-            )}
-          </div>
 
-          <Input
-            label="Customer Name"
-            {...customerEditForm.register('customerName')}
-          />
+              <Input
+                label={editOrderType === 'delivery' ? 'Customer Name' : 'Customer Name (Optional)'}
+                {...customerEditForm.register('customerName')}
+              />
+            </>
+          )}
 
-          {currentOrder?.orderType === 'delivery' && (
+          {editOrderType === 'delivery' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Delivery Address
@@ -2085,6 +2122,28 @@ export const CreateOrder: React.FC = () => {
                 {...customerEditForm.register('deliveryAddress')}
               />
             </div>
+          )}
+
+          {(editOrderType === 'dine_in' || editOrderType === 'take_away') && (
+            <Select label="Waiter" {...customerEditForm.register('waiterId')}>
+              <option value="">Select waiter</option>
+              {waiters.map((waiter) => (
+                <option key={waiter.id} value={waiter.id}>
+                  {waiter.name}
+                </option>
+              ))}
+            </Select>
+          )}
+
+          {editOrderType === 'delivery' && (
+            <Select label="Rider" {...customerEditForm.register('riderId')}>
+              <option value="">Select rider</option>
+              {riders.map((rider) => (
+                <option key={rider.id} value={rider.id}>
+                  {rider.name}
+                </option>
+              ))}
+            </Select>
           )}
 
           <div className="flex justify-end space-x-3 pt-4">

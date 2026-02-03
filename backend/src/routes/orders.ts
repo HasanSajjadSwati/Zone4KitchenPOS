@@ -178,7 +178,7 @@ orderRoutes.put('/:id', async (req, res) => {
     const {
       customerName, customerPhone, customerId, notes,
       status, deliveryStatus, isPaid, subtotal, discountType, discountValue, discountAmount, total,
-      completedBy, cancellationReason, riderId, deliveryAddress
+      completedBy, cancellationReason, waiterId, riderId, deliveryAddress
     } = req.body;
     const now = new Date().toISOString();
 
@@ -189,6 +189,14 @@ orderRoutes.put('/:id', async (req, res) => {
 
     if (order.orderType === 'delivery' && customerPhone !== undefined && String(customerPhone).trim().length === 0) {
       return res.status(400).json({ error: 'Customer phone is required for delivery orders' });
+    }
+
+    if (waiterId && !(await recordExists('waiters', waiterId))) {
+      return res.status(400).json({ error: 'Waiter not found' });
+    }
+
+    if (riderId && !(await recordExists('riders', riderId))) {
+      return res.status(400).json({ error: 'Rider not found' });
     }
 
     const updates: string[] = [];
@@ -253,6 +261,10 @@ orderRoutes.put('/:id', async (req, res) => {
     if (deliveryStatus !== undefined) {
       updates.push('deliveryStatus = ?');
       values.push(deliveryStatus);
+    }
+    if (waiterId !== undefined) {
+      updates.push('waiterId = ?');
+      values.push(waiterId);
     }
     if (riderId !== undefined) {
       updates.push('riderId = ?');
