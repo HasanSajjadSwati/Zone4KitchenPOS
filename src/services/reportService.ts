@@ -180,6 +180,24 @@ const chunkArray = <T,>(items: T[], size: number): T[][] => {
   return chunks;
 };
 
+const resolveOrderDate = (order: Order): Date | null => {
+  const raw = (order as any).completedAt || order.createdAt;
+  if (!raw) return null;
+  const date = new Date(raw);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const filterOrdersInRange = (orders: Order[], range: DateRange): Order[] => {
+  const startTime = range.startDate.getTime();
+  const endTime = range.endDate.getTime();
+  return orders.filter((order) => {
+    const date = resolveOrderDate(order);
+    if (!date) return false;
+    const time = date.getTime();
+    return time >= startTime && time <= endTime;
+  });
+};
+
 async function fetchPaymentsByOrderIds(orderIds: string[]): Promise<Payment[]> {
   if (orderIds.length === 0) return [];
   const chunks = chunkArray(orderIds, 200);
@@ -246,7 +264,10 @@ export async function getSalesSummary(range: DateRange): Promise<SalesSummary> {
     console.warn('Sales summary report endpoint failed, falling back to client aggregation:', error);
   }
 
-  const orders = await apiClient.getOrders({ ...rangeFilters, status: 'completed' });
+  const orders = filterOrdersInRange(
+    await apiClient.getOrders({ ...rangeFilters, status: 'completed' }),
+    range
+  );
 
   const payments = await fetchPaymentsByOrderIds(orders.map((order: Order) => order.id));
 
@@ -306,7 +327,10 @@ export async function getSalesSummary(range: DateRange): Promise<SalesSummary> {
     .reduce((sum: number, p: Payment) => sum + p.amount, 0);
 
   // Count total items
-  const orderItems = await apiClient.getOrderItemsBulk({ ...rangeFilters, status: 'completed' });
+  const orderIdsForItems = orders.map((order: Order) => order.id);
+  const orderItems = orderIdsForItems.length > 0
+    ? await apiClient.getOrderItemsBulk({ orderIds: orderIdsForItems.join(',') })
+    : [];
   const totalItems = orderItems.reduce((sum: number, item: OrderItem) => sum + item.quantity, 0);
 
   return {
@@ -346,7 +370,14 @@ export async function getCategorySales(range: DateRange): Promise<CategorySales[
     console.warn('Category sales report endpoint failed, falling back to client aggregation:', error);
   }
 
-  const allItems = await apiClient.getOrderItemsBulk({ ...rangeFilters, status: 'completed' }) as OrderItem[];
+  const orders = filterOrdersInRange(
+    await apiClient.getOrders({ ...rangeFilters, status: 'completed' }),
+    range
+  );
+  const orderIds = orders.map((order: Order) => order.id);
+  const allItems = orderIds.length > 0
+    ? await apiClient.getOrderItemsBulk({ orderIds: orderIds.join(',') }) as OrderItem[]
+    : [];
   const orderItems = allItems.filter((item: OrderItem) => item.itemType === 'menu_item');
 
   const categories = await db.categories.toArray();
@@ -414,7 +445,14 @@ export async function getItemSales(range: DateRange): Promise<ItemSales[]> {
     console.warn('Item sales report endpoint failed, falling back to client aggregation:', error);
   }
 
-  const allItems = await apiClient.getOrderItemsBulk({ ...rangeFilters, status: 'completed' }) as OrderItem[];
+  const orders = filterOrdersInRange(
+    await apiClient.getOrders({ ...rangeFilters, status: 'completed' }),
+    range
+  );
+  const orderIds = orders.map((order: Order) => order.id);
+  const allItems = orderIds.length > 0
+    ? await apiClient.getOrderItemsBulk({ orderIds: orderIds.join(',') }) as OrderItem[]
+    : [];
   const orderItems = allItems.filter((item: OrderItem) => item.itemType === 'menu_item');
 
   const menuItems = await db.menuItems.toArray();
@@ -482,7 +520,14 @@ export async function getDealSales(range: DateRange): Promise<DealSales[]> {
     console.warn('Deal sales report endpoint failed, falling back to client aggregation:', error);
   }
 
-  const allItems = await apiClient.getOrderItemsBulk({ ...rangeFilters, status: 'completed' }) as OrderItem[];
+  const orders = filterOrdersInRange(
+    await apiClient.getOrders({ ...rangeFilters, status: 'completed' }),
+    range
+  );
+  const orderIds = orders.map((order: Order) => order.id);
+  const allItems = orderIds.length > 0
+    ? await apiClient.getOrderItemsBulk({ orderIds: orderIds.join(',') }) as OrderItem[]
+    : [];
   const orderItems = allItems.filter((item: OrderItem) => item.itemType === 'deal');
 
   const deals = await db.deals.toArray();
@@ -724,7 +769,10 @@ export async function getDailySales(range: DateRange): Promise<DailySales[]> {
     console.warn('Daily sales report endpoint failed, falling back to client aggregation:', error);
   }
 
-  const orders = await apiClient.getOrders({ ...rangeFilters, status: 'completed' });
+  const orders = filterOrdersInRange(
+    await apiClient.getOrders({ ...rangeFilters, status: 'completed' }),
+    range
+  );
 
   // Group by date
   const dailyMap = new Map<string, {
@@ -733,7 +781,8 @@ export async function getDailySales(range: DateRange): Promise<DailySales[]> {
   }>();
 
   for (const order of orders) {
-    const d = new Date(order.completedAt || order.createdAt);
+    const d = resolveOrderDate(order);
+    if (!d) continue;
     const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
     if (!dailyMap.has(date)) {
