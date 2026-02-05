@@ -8,7 +8,7 @@ import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
 type DateRangePreset = 'today' | 'yesterday' | 'this_week' | 'this_month' | 'custom';
 
 export const DailyExpenseReport: React.FC = () => {
-  const [datePreset, setDatePreset] = useState<DateRangePreset>('this_month');
+  const [datePreset, setDatePreset] = useState<DateRangePreset>('today');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [reportData, setReportData] = useState<DailyExpenseReportType[]>([]);

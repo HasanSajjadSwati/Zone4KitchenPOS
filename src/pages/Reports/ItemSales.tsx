@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Card, Input } from '@/components/ui';
-import { ArrowDownTrayIcon, ChartBarIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { Button, Card } from '@/components/ui';
+import { ArrowDownTrayIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import {
   getItemSales,
   getDealSales,
@@ -13,33 +13,57 @@ import {
 } from '@/services/reportService';
 import { useDialog } from '@/hooks/useDialog';
 import { formatCurrency } from '@/utils/validation';
+import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays } from 'date-fns';
 
 type TabType = 'items' | 'deals' | 'categories';
+type DateRangePreset = 'today' | 'yesterday' | 'this_week' | 'this_month' | 'custom';
 
 export const ItemSales: React.FC = () => {
   const dialog = useDialog();
   const [tab, setTab] = useState<TabType>('items');
-  const [dateRange, setDateRange] = useState<DateRange>({
-    startDate: new Date(new Date().setHours(0, 0, 0, 0)),
-    endDate: new Date(new Date().setHours(23, 59, 59, 999)),
-  });
+  const [datePreset, setDatePreset] = useState<DateRangePreset>('today');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
   const [itemSales, setItemSales] = useState<ItemSalesType[]>([]);
   const [dealSales, setDealSales] = useState<DealSales[]>([]);
   const [categorySales, setCategorySales] = useState<CategorySales[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  const getDateRange = (): DateRange => {
+    const now = new Date();
+    switch (datePreset) {
+      case 'today':
+        return { startDate: startOfDay(now), endDate: endOfDay(now) };
+      case 'yesterday':
+        const yesterday = subDays(now, 1);
+        return { startDate: startOfDay(yesterday), endDate: endOfDay(yesterday) };
+      case 'this_week':
+        return { startDate: startOfWeek(now, { weekStartsOn: 1 }), endDate: endOfWeek(now, { weekStartsOn: 1 }) };
+      case 'this_month':
+        return { startDate: startOfMonth(now), endDate: endOfMonth(now) };
+      case 'custom':
+        return {
+          startDate: customStartDate ? startOfDay(new Date(customStartDate)) : startOfDay(now),
+          endDate: customEndDate ? endOfDay(new Date(customEndDate)) : endOfDay(now),
+        };
+      default:
+        return { startDate: startOfDay(now), endDate: endOfDay(now) };
+    }
+  };
+
   useEffect(() => {
     loadReportData();
-  }, []);
+  }, [datePreset, customStartDate, customEndDate]);
 
   const loadReportData = async () => {
     setIsLoading(true);
     try {
+      const range = getDateRange();
       const [items, deals, categories] = await Promise.all([
-        getItemSales(dateRange),
-        getDealSales(dateRange),
-        getCategorySales(dateRange),
+        getItemSales(range),
+        getDealSales(range),
+        getCategorySales(range),
       ]);
       setItemSales(items);
       setDealSales(deals);
@@ -52,37 +76,8 @@ export const ItemSales: React.FC = () => {
     }
   };
 
-  const handleDateChange = (type: 'start' | 'end', value: string) => {
-    const date = new Date(value);
-    if (type === 'start') {
-      date.setHours(0, 0, 0, 0);
-      setDateRange({ ...dateRange, startDate: date });
-    } else {
-      date.setHours(23, 59, 59, 999);
-      setDateRange({ ...dateRange, endDate: date });
-    }
-  };
-
-  const setToday = () => {
-    const today = new Date();
-    setDateRange({
-      startDate: new Date(today.setHours(0, 0, 0, 0)),
-      endDate: new Date(today.setHours(23, 59, 59, 999)),
-    });
-  };
-
-  const setThisMonth = () => {
-    const today = new Date();
-    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-    const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-    setDateRange({
-      startDate: new Date(firstDay.setHours(0, 0, 0, 0)),
-      endDate: new Date(lastDay.setHours(23, 59, 59, 999)),
-    });
-  };
-
   const handleExport = () => {
-    const filename = `${tab}-sales-${dateRange.startDate.toISOString().split('T')[0]}-to-${dateRange.endDate.toISOString().split('T')[0]}.csv`;
+    const filename = `${tab}-sales-${datePreset}-${new Date().toISOString().split('T')[0]}.csv`;
 
     switch (tab) {
       case 'items': {
@@ -120,10 +115,6 @@ export const ItemSales: React.FC = () => {
         break;
       }
     }
-  };
-
-  const formatDate = (date: Date) => {
-    return date.toISOString().split('T')[0];
   };
 
   const getFilteredItems = () => {
@@ -164,37 +155,48 @@ export const ItemSales: React.FC = () => {
       <Card padding="md">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Date Range</h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <Input
-            label="Start Date"
-            type="date"
-            value={formatDate(dateRange.startDate)}
-            onChange={(e) => handleDateChange('start', e.target.value)}
-          />
-          <Input
-            label="End Date"
-            type="date"
-            value={formatDate(dateRange.endDate)}
-            onChange={(e) => handleDateChange('end', e.target.value)}
-          />
-        </div>
-
         <div className="flex flex-wrap gap-2 mb-4">
-          <Button size="sm" variant="secondary" onClick={setToday}>
-            Today
-          </Button>
-          <Button size="sm" variant="secondary" onClick={setThisMonth}>
-            This Month
-          </Button>
+          {(['today', 'yesterday', 'this_week', 'this_month', 'custom'] as DateRangePreset[]).map((preset) => (
+            <button
+              key={preset}
+              onClick={() => setDatePreset(preset)}
+              className={`px-3 py-1.5 rounded text-sm font-medium ${
+                datePreset === preset
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              {preset.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+            </button>
+          ))}
         </div>
 
-        <Button
-          onClick={loadReportData}
-          isLoading={isLoading}
-          leftIcon={<ChartBarIcon className="w-5 h-5" />}
-        >
-          Generate Report
-        </Button>
+        {datePreset === 'custom' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">Start Date</label>
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">End Date</label>
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+          </div>
+        )}
+
+        {isLoading && (
+          <p className="text-sm text-gray-500">Loading report data...</p>
+        )}
       </Card>
 
       {/* Tabs */}

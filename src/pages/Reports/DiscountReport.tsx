@@ -9,7 +9,7 @@ type DateRangePreset = 'today' | 'yesterday' | 'this_week' | 'this_month' | 'cus
 type DiscountTypeFilter = 'all' | 'percentage' | 'fixed';
 
 export const DiscountReport: React.FC = () => {
-  const [datePreset, setDatePreset] = useState<DateRangePreset>('this_month');
+  const [datePreset, setDatePreset] = useState<DateRangePreset>('today');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [reportData, setReportData] = useState<DiscountReportItem[]>([]);
