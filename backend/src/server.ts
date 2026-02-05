@@ -21,6 +21,7 @@ import { orderItemRoutes } from './routes/orderItems.js';
 import { settingsRoutes } from './routes/settings.js';
 import { registerSessionRoutes } from './routes/registerSessions.js';
 import { paymentRoutes } from './routes/payments.js';
+import { reportRoutes } from './routes/reports.js';
 import { maintenanceRoutes } from './routes/maintenance.js';
 import { auditLogRoutes } from './routes/auditLogs.js';
 import { initializeDatabase } from './db/migrate.js';
@@ -71,6 +72,7 @@ app.use('/api/order-items', orderItemRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/register-sessions', registerSessionRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/reports', reportRoutes);
 app.use('/api/maintenance', maintenanceRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
 

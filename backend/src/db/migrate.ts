@@ -28,6 +28,7 @@ export async function initializeDatabase() {
     await runAsync('UPDATE settings SET printAllIncludeRider = FALSE WHERE printAllIncludeRider IS NULL');
     await runAsync('UPDATE settings SET deliveryCharge = 0 WHERE deliveryCharge IS NULL');
     await runAsync('UPDATE orders SET deliveryCharge = 0 WHERE deliveryCharge IS NULL');
+    await runAsync("UPDATE orders SET completedAt = createdAt WHERE completedAt IS NULL AND status = 'completed'");
 
     // Check if roles exist
     const rolesCount = await allAsync('SELECT COUNT(*) as count FROM roles');

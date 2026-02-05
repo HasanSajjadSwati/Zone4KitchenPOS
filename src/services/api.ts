@@ -499,6 +499,52 @@ class APIClient {
     return this.delete(`/payments/${id}`);
   }
 
+  // Reports (server-side aggregation)
+  async getSalesSummaryReport(filters?: Record<string, string>) {
+    let endpoint = '/reports/sales-summary';
+    if (filters) {
+      const params = new URLSearchParams(filters);
+      endpoint += `?${params.toString()}`;
+    }
+    return this.get(endpoint);
+  }
+
+  async getDailySalesReport(filters?: Record<string, string>) {
+    let endpoint = '/reports/daily-sales';
+    if (filters) {
+      const params = new URLSearchParams(filters);
+      endpoint += `?${params.toString()}`;
+    }
+    return this.get(endpoint);
+  }
+
+  async getItemSalesReport(filters?: Record<string, string>) {
+    let endpoint = '/reports/item-sales';
+    if (filters) {
+      const params = new URLSearchParams(filters);
+      endpoint += `?${params.toString()}`;
+    }
+    return this.get(endpoint);
+  }
+
+  async getDealSalesReport(filters?: Record<string, string>) {
+    let endpoint = '/reports/deal-sales';
+    if (filters) {
+      const params = new URLSearchParams(filters);
+      endpoint += `?${params.toString()}`;
+    }
+    return this.get(endpoint);
+  }
+
+  async getCategorySalesReport(filters?: Record<string, string>) {
+    let endpoint = '/reports/category-sales';
+    if (filters) {
+      const params = new URLSearchParams(filters);
+      endpoint += `?${params.toString()}`;
+    }
+    return this.get(endpoint);
+  }
+
   // Waiters
   async getWaiters() {
     return this.get('/staff/waiters');

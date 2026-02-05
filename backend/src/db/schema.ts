@@ -409,6 +409,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_registerSessionId ON orders(registerSessio
 CREATE INDEX IF NOT EXISTS idx_orders_customerId ON orders(customerId);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_createdAt ON orders(createdAt);
+CREATE INDEX IF NOT EXISTS idx_orders_completedAt ON orders(completedAt);
 CREATE INDEX IF NOT EXISTS idx_orderItems_orderId ON orderItems(orderId);
 CREATE INDEX IF NOT EXISTS idx_payments_orderId ON payments(orderId);
 CREATE INDEX IF NOT EXISTS idx_kotPrints_orderId ON kotPrints(orderId);
