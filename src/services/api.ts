@@ -20,12 +20,38 @@ class APIClient {
         },
       });
 
+      const contentType = response.headers.get('content-type') || '';
+      const isJson = contentType.includes('application/json');
+      const raw = await response.text();
+
       if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: response.statusText }));
-        throw new Error(error.error || error.message || response.statusText);
+        let message = response.statusText;
+        if (isJson && raw) {
+          try {
+            const error = JSON.parse(raw);
+            message = error.error || error.message || message;
+          } catch {
+            message = raw;
+          }
+        } else if (raw) {
+          message = raw;
+        }
+        throw new Error(message);
       }
 
-      return response.json();
+      if (!raw) {
+        return null;
+      }
+
+      if (!isJson) {
+        throw new Error(`Unexpected response format from ${url} (expected JSON).`);
+      }
+
+      try {
+        return JSON.parse(raw);
+      } catch {
+        throw new Error(`Invalid JSON response from ${url}.`);
+      }
     } catch (error) {
       console.error(`API Error [${options.method || 'GET'} ${endpoint}]:`, error);
       throw error;
@@ -343,7 +369,53 @@ class APIClient {
       const params = new URLSearchParams(filters);
       endpoint += `?${params.toString()}`;
     }
-    return this.get(endpoint);
+    try {
+      return await this.get(endpoint);
+    } catch (error) {
+      // Fallback for older backends that don't support /order-items
+      const orderIds: string[] = [];
+      const orderIdsParam = filters?.orderIds;
+
+      if (orderIdsParam) {
+        orderIds.push(
+          ...orderIdsParam
+            .split(',')
+            .map((id) => id.trim())
+            .filter(Boolean)
+        );
+      } else {
+        const orderFilters: Record<string, string> = {};
+        const allowedOrderFilters = [
+          'startDate',
+          'endDate',
+          'status',
+          'orderType',
+          'registerSessionId',
+          'customerId',
+        ];
+        for (const key of allowedOrderFilters) {
+          const value = filters?.[key];
+          if (value) {
+            orderFilters[key] = value;
+          }
+        }
+
+        const orders = await this.getOrders(
+          Object.keys(orderFilters).length > 0 ? orderFilters : undefined
+        );
+        for (const order of orders) {
+          if (order?.id) orderIds.push(order.id);
+        }
+      }
+
+      const allItems: any[] = [];
+      for (const id of orderIds) {
+        const items = await this.getOrderItems(id);
+        allItems.push(...items);
+      }
+
+      return allItems;
+    }
   }
 
   async updateOrderItem(orderId: string, itemId: string, data: any) {
