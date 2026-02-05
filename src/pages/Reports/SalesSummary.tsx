@@ -64,6 +64,7 @@ export const SalesSummary: React.FC = () => {
         setSummary(summaryResult.value);
       } else {
         console.error('Failed to load summary:', summaryResult.reason);
+        setSummary(null);
       }
 
       if (dailyResult.status === 'fulfilled') {

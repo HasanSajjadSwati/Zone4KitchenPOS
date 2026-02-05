@@ -326,12 +326,17 @@ export async function getSalesSummary(range: DateRange): Promise<SalesSummary> {
     .filter((p: Payment) => p.method === 'other')
     .reduce((sum: number, p: Payment) => sum + p.amount, 0);
 
-  // Count total items
-  const orderIdsForItems = orders.map((order: Order) => order.id);
-  const orderItems = orderIdsForItems.length > 0
-    ? await apiClient.getOrderItemsBulk({ orderIds: orderIdsForItems.join(',') })
-    : [];
-  const totalItems = orderItems.reduce((sum: number, item: OrderItem) => sum + item.quantity, 0);
+  // Count total items (non-critical — don't let this fail the entire summary)
+  let totalItems = 0;
+  try {
+    const orderIdsForItems = orders.map((order: Order) => order.id);
+    const orderItems = orderIdsForItems.length > 0
+      ? await apiClient.getOrderItemsBulk({ orderIds: orderIdsForItems.join(',') })
+      : [];
+    totalItems = orderItems.reduce((sum: number, item: OrderItem) => sum + item.quantity, 0);
+  } catch (error) {
+    console.warn('Failed to fetch order items for total count, defaulting to 0:', error);
+  }
 
   return {
     totalSales,

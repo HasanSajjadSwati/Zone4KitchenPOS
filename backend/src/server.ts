@@ -85,6 +85,12 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// API 404 handler — must come after all API routes but before the SPA catch-all
+// so unmatched /api/* requests return JSON instead of index.html
+app.all('/api/*', (req, res) => {
+  res.status(404).json({ error: 'API endpoint not found' });
+});
+
 // Serve frontend (production)
 const frontendPath = path.resolve(__dirname, '../../dist');
 const shouldServeFrontend = NODE_ENV === 'production' || process.env.SERVE_FRONTEND === 'true';
