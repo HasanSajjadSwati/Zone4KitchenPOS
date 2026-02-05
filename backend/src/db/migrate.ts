@@ -30,6 +30,15 @@ export async function initializeDatabase() {
     await runAsync('UPDATE orders SET deliveryCharge = 0 WHERE deliveryCharge IS NULL');
     await runAsync("UPDATE orders SET completedAt = createdAt WHERE completedAt IS NULL AND status = 'completed'");
 
+    // Create composite indexes for report performance (safe to run on existing databases)
+    await runAsync('CREATE INDEX IF NOT EXISTS idx_orders_status_completedAt ON orders(status, completedAt)');
+    await runAsync('CREATE INDEX IF NOT EXISTS idx_orders_status_createdAt ON orders(status, createdAt)');
+    await runAsync('CREATE INDEX IF NOT EXISTS idx_orderItems_orderId_itemType ON orderItems(orderId, itemType)');
+    await runAsync('CREATE INDEX IF NOT EXISTS idx_orderItems_menuItemId ON orderItems(menuItemId)');
+    await runAsync('CREATE INDEX IF NOT EXISTS idx_orderItems_dealId ON orderItems(dealId)');
+    await runAsync('CREATE INDEX IF NOT EXISTS idx_payments_orderId_method ON payments(orderId, method)');
+    logger.info('Report performance indexes created/verified');
+
     // Check if roles exist
     const rolesCount = await allAsync('SELECT COUNT(*) as count FROM roles');
     const existingRoles = Number(rolesCount[0]?.count ?? 0);

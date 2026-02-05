@@ -421,4 +421,12 @@ CREATE INDEX IF NOT EXISTS idx_employeeLoans_employeeId ON employeeLoans(employe
 CREATE INDEX IF NOT EXISTS idx_employeeLoans_status ON employeeLoans(status);
 CREATE INDEX IF NOT EXISTS idx_expenses_registerSessionId ON expenses(registerSessionId);
 CREATE INDEX IF NOT EXISTS idx_riderReceipts_orderId ON riderReceipts(orderId);
+
+-- Composite indexes for report queries performance
+CREATE INDEX IF NOT EXISTS idx_orders_status_completedAt ON orders(status, completedAt);
+CREATE INDEX IF NOT EXISTS idx_orders_status_createdAt ON orders(status, createdAt);
+CREATE INDEX IF NOT EXISTS idx_orderItems_orderId_itemType ON orderItems(orderId, itemType);
+CREATE INDEX IF NOT EXISTS idx_orderItems_menuItemId ON orderItems(menuItemId);
+CREATE INDEX IF NOT EXISTS idx_orderItems_dealId ON orderItems(dealId);
+CREATE INDEX IF NOT EXISTS idx_payments_orderId_method ON payments(orderId, method);
 `;

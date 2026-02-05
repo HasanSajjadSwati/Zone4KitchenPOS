@@ -1,5 +1,6 @@
 import express from 'express';
 import { allAsync, getAsync } from '../db/database.js';
+import { logger } from '../utils/logger.js';
 
 export const reportRoutes = express.Router();
 
@@ -66,6 +67,9 @@ reportRoutes.get('/sales-summary', async (req, res) => {
     const baseConditions = [`o.status = 'completed'`, ...conditions];
     const whereClause = baseConditions.length > 0 ? `WHERE ${baseConditions.join(' AND ')}` : '';
 
+    logger.debug('Sales summary query', { whereClause, params });
+
+    // Use SUM(CASE WHEN...) for better compatibility instead of FILTER
     const summary = await getAsync(
       `
         SELECT
@@ -76,13 +80,13 @@ reportRoutes.get('/sales-summary', async (req, res) => {
           COALESCE(SUM(CASE WHEN o.orderType = 'dine_in' THEN o.total ELSE 0 END), 0) AS "dineInSales",
           COALESCE(SUM(CASE WHEN o.orderType = 'take_away' THEN o.total ELSE 0 END), 0) AS "takeAwaySales",
           COALESCE(SUM(CASE WHEN o.orderType = 'delivery' THEN o.total ELSE 0 END), 0) AS "deliverySales",
-          COALESCE(COUNT(*) FILTER (WHERE o.orderType = 'dine_in'), 0) AS "dineInOrders",
-          COALESCE(COUNT(*) FILTER (WHERE o.orderType = 'take_away'), 0) AS "takeAwayOrders",
-          COALESCE(COUNT(*) FILTER (WHERE o.orderType = 'delivery'), 0) AS "deliveryOrders",
-          COALESCE(COUNT(*) FILTER (WHERE o.isPaid = TRUE), 0) AS "paidOrders",
-          COALESCE(COUNT(*) FILTER (WHERE o.isPaid = FALSE), 0) AS "unpaidOrders",
-          COALESCE(SUM(CASE WHEN o.isPaid THEN o.total ELSE 0 END), 0) AS "paidAmount",
-          COALESCE(SUM(CASE WHEN o.isPaid THEN 0 ELSE o.total END), 0) AS "unpaidAmount"
+          SUM(CASE WHEN o.orderType = 'dine_in' THEN 1 ELSE 0 END) AS "dineInOrders",
+          SUM(CASE WHEN o.orderType = 'take_away' THEN 1 ELSE 0 END) AS "takeAwayOrders",
+          SUM(CASE WHEN o.orderType = 'delivery' THEN 1 ELSE 0 END) AS "deliveryOrders",
+          SUM(CASE WHEN o.isPaid = true THEN 1 ELSE 0 END) AS "paidOrders",
+          SUM(CASE WHEN o.isPaid = false OR o.isPaid IS NULL THEN 1 ELSE 0 END) AS "unpaidOrders",
+          COALESCE(SUM(CASE WHEN o.isPaid = true THEN o.total ELSE 0 END), 0) AS "paidAmount",
+          COALESCE(SUM(CASE WHEN o.isPaid = false OR o.isPaid IS NULL THEN o.total ELSE 0 END), 0) AS "unpaidAmount"
         FROM orders o
         ${whereClause}
       `,
@@ -147,6 +151,7 @@ reportRoutes.get('/sales-summary', async (req, res) => {
       unpaidAmount: toNumber(summary?.unpaidAmount),
     });
   } catch (error) {
+    logger.error('Sales summary report error', error);
     res.status(500).json({ error: (error as Error).message });
   }
 });
@@ -159,6 +164,8 @@ reportRoutes.get('/daily-sales', async (req, res) => {
 
     const baseConditions = [`o.status = 'completed'`, ...conditions];
     const whereClause = baseConditions.length > 0 ? `WHERE ${baseConditions.join(' AND ')}` : '';
+
+    logger.debug('Daily sales query', { whereClause, params });
 
     const rows = await allAsync(
       `
@@ -187,6 +194,7 @@ reportRoutes.get('/daily-sales', async (req, res) => {
 
     res.json(result);
   } catch (error) {
+    logger.error('Daily sales report error', error);
     res.status(500).json({ error: (error as Error).message });
   }
 });
@@ -198,6 +206,8 @@ reportRoutes.get('/item-sales', async (req, res) => {
     const { conditions, params } = buildDateFilters(dateExpr, req.query.startDate, req.query.endDate);
     const baseConditions = [`o.status = 'completed'`, `oi.itemType = 'menu_item'`, ...conditions];
     const whereClause = baseConditions.length > 0 ? `WHERE ${baseConditions.join(' AND ')}` : '';
+
+    logger.debug('Item sales query', { whereClause, params });
 
     const rows = await allAsync(
       `
@@ -238,6 +248,7 @@ reportRoutes.get('/item-sales', async (req, res) => {
 
     res.json(result);
   } catch (error) {
+    logger.error('Item sales report error', error);
     res.status(500).json({ error: (error as Error).message });
   }
 });
@@ -249,6 +260,8 @@ reportRoutes.get('/deal-sales', async (req, res) => {
     const { conditions, params } = buildDateFilters(dateExpr, req.query.startDate, req.query.endDate);
     const baseConditions = [`o.status = 'completed'`, `oi.itemType = 'deal'`, ...conditions];
     const whereClause = baseConditions.length > 0 ? `WHERE ${baseConditions.join(' AND ')}` : '';
+
+    logger.debug('Deal sales query', { whereClause, params });
 
     const rows = await allAsync(
       `
@@ -284,6 +297,7 @@ reportRoutes.get('/deal-sales', async (req, res) => {
 
     res.json(result);
   } catch (error) {
+    logger.error('Deal sales report error', error);
     res.status(500).json({ error: (error as Error).message });
   }
 });
@@ -295,6 +309,8 @@ reportRoutes.get('/category-sales', async (req, res) => {
     const { conditions, params } = buildDateFilters(dateExpr, req.query.startDate, req.query.endDate);
     const baseConditions = [`o.status = 'completed'`, `oi.itemType = 'menu_item'`, ...conditions];
     const whereClause = baseConditions.length > 0 ? `WHERE ${baseConditions.join(' AND ')}` : '';
+
+    logger.debug('Category sales query', { whereClause, params });
 
     const rows = await allAsync(
       `
@@ -331,6 +347,7 @@ reportRoutes.get('/category-sales', async (req, res) => {
 
     res.json(result);
   } catch (error) {
+    logger.error('Category sales report error', error);
     res.status(500).json({ error: (error as Error).message });
   }
 });
