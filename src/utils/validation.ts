@@ -37,8 +37,9 @@ export async function initializeOrderCounter(db: any) {
 }
 
 // Currency formatting
-export function formatCurrency(amount: number): string {
-  return `Rs ${amount.toLocaleString('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+export function formatCurrency(amount?: number | null): string {
+  const safeAmount = typeof amount === 'number' && !Number.isNaN(amount) ? amount : 0;
+  return `Rs ${safeAmount.toLocaleString('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 }
 
 // Date formatting
