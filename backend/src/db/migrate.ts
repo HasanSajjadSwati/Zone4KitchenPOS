@@ -20,10 +20,14 @@ export async function initializeDatabase() {
     await runAsync('ALTER TABLE settings ADD COLUMN IF NOT EXISTS printAllIncludeCustomer BOOLEAN DEFAULT TRUE');
     await runAsync('ALTER TABLE settings ADD COLUMN IF NOT EXISTS printAllIncludeCounter BOOLEAN DEFAULT FALSE');
     await runAsync('ALTER TABLE settings ADD COLUMN IF NOT EXISTS printAllIncludeRider BOOLEAN DEFAULT FALSE');
+    await runAsync('ALTER TABLE settings ADD COLUMN IF NOT EXISTS deliveryCharge REAL DEFAULT 0');
+    await runAsync('ALTER TABLE orders ADD COLUMN IF NOT EXISTS deliveryCharge REAL DEFAULT 0');
     await runAsync('UPDATE settings SET printAllIncludeKOT = TRUE WHERE printAllIncludeKOT IS NULL');
     await runAsync('UPDATE settings SET printAllIncludeCustomer = TRUE WHERE printAllIncludeCustomer IS NULL');
     await runAsync('UPDATE settings SET printAllIncludeCounter = FALSE WHERE printAllIncludeCounter IS NULL');
     await runAsync('UPDATE settings SET printAllIncludeRider = FALSE WHERE printAllIncludeRider IS NULL');
+    await runAsync('UPDATE settings SET deliveryCharge = 0 WHERE deliveryCharge IS NULL');
+    await runAsync('UPDATE orders SET deliveryCharge = 0 WHERE deliveryCharge IS NULL');
 
     // Check if roles exist
     const rolesCount = await allAsync('SELECT COUNT(*) as count FROM roles');

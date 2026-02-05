@@ -208,6 +208,7 @@ export interface Order {
   customerId: string | null;
   riderId: string | null;
   deliveryAddress: string | null;
+  deliveryCharge: number;
 
   // Order details
   subtotal: number;

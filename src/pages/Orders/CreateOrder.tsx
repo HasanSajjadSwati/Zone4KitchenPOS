@@ -80,6 +80,11 @@ const orderTypeSchema = z
     customerId: z.string().optional(),
     riderId: z.string().optional(),
     deliveryAddress: z.string().optional(),
+    includeDeliveryCharge: z.boolean().optional(),
+    deliveryCharge: z.preprocess(
+      (value) => (value === '' || value === null || value === undefined || Number.isNaN(value) ? 0 : value),
+      z.number().min(0, 'Delivery charges must be positive')
+    ),
     notes: z.string().optional(),
   })
   .superRefine((data, ctx) => {
@@ -100,6 +105,11 @@ const customerEditSchema = z
     waiterId: z.string().optional(),
     riderId: z.string().optional(),
     deliveryAddress: z.string().optional(),
+    includeDeliveryCharge: z.boolean().optional(),
+    deliveryCharge: z.preprocess(
+      (value) => (value === '' || value === null || value === undefined || Number.isNaN(value) ? 0 : value),
+      z.number().min(0, 'Delivery charges must be positive')
+    ),
     orderType: z.enum(['dine_in', 'take_away', 'delivery']),
   })
   .superRefine((data, ctx) => {
@@ -181,11 +191,16 @@ export const CreateOrder: React.FC = () => {
 
   const orderTypeForm = useForm<OrderTypeFormData>({
     resolver: zodResolver(orderTypeSchema),
+    defaultValues: {
+      includeDeliveryCharge: false,
+      deliveryCharge: 0,
+    },
   });
+  const selectedOrderType = orderTypeForm.watch('orderType');
 
   const customerEditForm = useForm<CustomerEditFormData>({
     resolver: zodResolver(customerEditSchema),
-    defaultValues: { orderType: 'delivery' },
+    defaultValues: { orderType: 'delivery', includeDeliveryCharge: false, deliveryCharge: 0 },
   });
 
   const discountForm = useForm<DiscountFormData>({
@@ -208,6 +223,13 @@ export const CreateOrder: React.FC = () => {
       loadAllMenuItems();
     }
   }, [selectedCategory, categories]);
+
+  useEffect(() => {
+    if (selectedOrderType !== 'delivery') {
+      orderTypeForm.setValue('includeDeliveryCharge', false);
+      orderTypeForm.setValue('deliveryCharge', 0);
+    }
+  }, [selectedOrderType, orderTypeForm]);
 
   const loadInitialData = async () => {
     const session = await getCurrentSession();
@@ -314,6 +336,10 @@ export const CreateOrder: React.FC = () => {
 
     setIsLoading(true);
     try {
+      const normalizedDeliveryCharge = data.orderType === 'delivery' && data.includeDeliveryCharge
+        ? Math.max(0, Number.isFinite(data.deliveryCharge) ? data.deliveryCharge : 0)
+        : 0;
+
       const newOrder = await createOrder({
         orderType: data.orderType,
         registerSessionId: registerSession.id,
@@ -324,6 +350,7 @@ export const CreateOrder: React.FC = () => {
         customerId: data.customerId,
         riderId: data.riderId,
         deliveryAddress: data.deliveryAddress,
+        deliveryCharge: normalizedDeliveryCharge,
         notes: data.notes,
         userId: currentUser.id,
       });
@@ -1305,6 +1332,8 @@ export const CreateOrder: React.FC = () => {
       waiterId: currentOrder.waiterId || '',
       riderId: currentOrder.riderId || '',
       deliveryAddress: currentOrder.deliveryAddress || '',
+      includeDeliveryCharge: (currentOrder.deliveryCharge || 0) > 0,
+      deliveryCharge: currentOrder.deliveryCharge || 0,
       orderType: currentOrder.orderType,
     });
     setEditCustomerStatus(null);
@@ -1346,9 +1375,18 @@ export const CreateOrder: React.FC = () => {
       };
 
       if (currentOrder.orderType === 'delivery') {
+        const normalizedDeliveryCharge = data.includeDeliveryCharge
+          ? Math.max(0, Number.isFinite(data.deliveryCharge) ? data.deliveryCharge : 0)
+          : 0;
         updates.riderId = data.riderId?.trim() || null;
+        updates.deliveryCharge = normalizedDeliveryCharge;
+        const baseTotal = Math.max(0, currentOrder.subtotal - currentOrder.discountAmount);
+        updates.total = Math.max(0, baseTotal + normalizedDeliveryCharge);
       } else {
         updates.waiterId = data.waiterId?.trim() || null;
+        updates.deliveryCharge = 0;
+        const baseTotal = Math.max(0, currentOrder.subtotal - currentOrder.discountAmount);
+        updates.total = baseTotal;
       }
 
       await db.orders.update(currentOrder.id, updates);
@@ -1399,7 +1437,6 @@ export const CreateOrder: React.FC = () => {
     return deal.categoryId === selectedDealCategory;
   });
 
-  const selectedOrderType = orderTypeForm.watch('orderType');
   const editOrderType = customerEditForm.watch('orderType');
   const assignedWaiterName = currentOrder?.waiterId
     ? waiters.find((w) => w.id === currentOrder.waiterId)?.name || 'Unknown'
@@ -1407,6 +1444,9 @@ export const CreateOrder: React.FC = () => {
   const assignedRiderName = currentOrder?.riderId
     ? riders.find((r) => r.id === currentOrder.riderId)?.name || 'Unknown'
     : 'Unassigned';
+  const appliedDeliveryCharge = currentOrder?.orderType === 'delivery'
+    ? Math.max(0, currentOrder.deliveryCharge || 0)
+    : 0;
 
   return (
     <div className="space-y-6">
@@ -1812,6 +1852,15 @@ export const CreateOrder: React.FC = () => {
                   </div>
                 )}
 
+                {currentOrder.orderType === 'delivery' && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Delivery Charges:</span>
+                    <span className="font-semibold text-gray-900">
+                      {formatCurrency(appliedDeliveryCharge)}
+                    </span>
+                  </div>
+                )}
+
                 <div className="flex justify-between text-lg font-bold border-t border-gray-300 pt-2">
                   <span>Total:</span>
                   <span className="text-primary-600">{formatCurrency(currentOrder.total)}</span>
@@ -2011,6 +2060,28 @@ export const CreateOrder: React.FC = () => {
                   </option>
                 ))}
               </Select>
+
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="includeDeliveryCharge"
+                  className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                  {...orderTypeForm.register('includeDeliveryCharge')}
+                />
+                <label htmlFor="includeDeliveryCharge" className="text-sm font-medium text-gray-700">
+                  Add Delivery Charges
+                </label>
+              </div>
+
+              {orderTypeForm.watch('includeDeliveryCharge') && (
+                <Input
+                  label="Delivery Charges"
+                  type="number"
+                  step="0.01"
+                  error={orderTypeForm.formState.errors.deliveryCharge?.message}
+                  {...orderTypeForm.register('deliveryCharge', { valueAsNumber: true })}
+                />
+              )}
             </>
           )}
 
@@ -2136,14 +2207,38 @@ export const CreateOrder: React.FC = () => {
           )}
 
           {editOrderType === 'delivery' && (
-            <Select label="Rider" {...customerEditForm.register('riderId')}>
-              <option value="">Select rider</option>
-              {riders.map((rider) => (
-                <option key={rider.id} value={rider.id}>
-                  {rider.name}
-                </option>
-              ))}
-            </Select>
+            <>
+              <Select label="Rider" {...customerEditForm.register('riderId')}>
+                <option value="">Select rider</option>
+                {riders.map((rider) => (
+                  <option key={rider.id} value={rider.id}>
+                    {rider.name}
+                  </option>
+                ))}
+              </Select>
+
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="editIncludeDeliveryCharge"
+                  className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                  {...customerEditForm.register('includeDeliveryCharge')}
+                />
+                <label htmlFor="editIncludeDeliveryCharge" className="text-sm font-medium text-gray-700">
+                  Add Delivery Charges
+                </label>
+              </div>
+
+              {customerEditForm.watch('includeDeliveryCharge') && (
+                <Input
+                  label="Delivery Charges"
+                  type="number"
+                  step="0.01"
+                  error={customerEditForm.formState.errors.deliveryCharge?.message}
+                  {...customerEditForm.register('deliveryCharge', { valueAsNumber: true })}
+                />
+              )}
+            </>
           )}
 
           <div className="flex justify-end space-x-3 pt-4">

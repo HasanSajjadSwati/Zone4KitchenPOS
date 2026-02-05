@@ -69,12 +69,16 @@ interface CreateOrderParams {
   customerId?: string;
   riderId?: string;
   deliveryAddress?: string;
+  deliveryCharge?: number;
   notes?: string;
   userId: string;
 }
 
 export async function createOrder(params: CreateOrderParams): Promise<Order> {
   // Note: orderNumber is generated on the backend to ensure uniqueness and avoid duplicates on app restart
+  const normalizedDeliveryCharge = params.orderType === 'delivery'
+    ? Math.max(0, params.deliveryCharge ?? 0)
+    : 0;
   const orderData = {
     registerSessionId: params.registerSessionId,
     orderType: params.orderType,
@@ -85,6 +89,7 @@ export async function createOrder(params: CreateOrderParams): Promise<Order> {
     customerId: params.customerId || null,
     riderId: params.riderId || null,
     deliveryAddress: params.deliveryAddress || null,
+    deliveryCharge: normalizedDeliveryCharge,
     subtotal: 0,
     discountType: null,
     discountValue: 0,
@@ -105,6 +110,9 @@ export async function createOrder(params: CreateOrderParams): Promise<Order> {
     description: `Created ${params.orderType} order ${newOrder.orderNumber}`,
     after: newOrder,
   });
+
+  // Ensure totals reflect delivery charges (if applicable) even before items are added
+  await recalculateOrderTotal(newOrder.id);
 
   return newOrder;
 }
@@ -348,7 +356,10 @@ export async function applyDiscount(params: ApplyDiscountParams): Promise<void> 
     discountAmount = params.discountValue;
   }
 
-  const newTotal = Math.max(0, order.subtotal - discountAmount);
+  const deliveryCharge = order.orderType === 'delivery'
+    ? Math.max(0, order.deliveryCharge || 0)
+    : 0;
+  const newTotal = Math.max(0, order.subtotal - discountAmount + deliveryCharge);
 
   await db.orders.update(params.orderId, {
     discountType: params.discountType,
@@ -374,12 +385,16 @@ export async function removeDiscount(orderId: string, userId: string): Promise<v
   const order = await db.orders.get(orderId);
   if (!order) throw new Error('Order not found');
 
+  const deliveryCharge = order.orderType === 'delivery'
+    ? Math.max(0, order.deliveryCharge || 0)
+    : 0;
+
   await db.orders.update(orderId, {
     discountType: null,
     discountValue: 0,
     discountReference: null,
     discountAmount: 0,
-    total: order.subtotal,
+    total: order.subtotal + deliveryCharge,
     updatedAt: new Date(),
   });
 
@@ -614,6 +629,10 @@ async function recalculateOrderTotal(orderId: string): Promise<void> {
   const order = await db.orders.get(orderId);
   if (!order) return;
 
+  const deliveryCharge = order.orderType === 'delivery'
+    ? Math.max(0, order.deliveryCharge || 0)
+    : 0;
+
   const items = await db.orderItems.where('orderId').equals(orderId).toArray();
   const subtotal = items.reduce((sum: number, item: OrderItem) => sum + item.totalPrice, 0);
 
@@ -624,7 +643,8 @@ async function recalculateOrderTotal(orderId: string): Promise<void> {
     discountAmount = order.discountValue;
   }
 
-  const total = Math.max(0, subtotal - discountAmount);
+  const totalBeforeCharges = Math.max(0, subtotal - discountAmount);
+  const total = Math.max(0, totalBeforeCharges + deliveryCharge);
 
   await db.orders.update(orderId, {
     subtotal,

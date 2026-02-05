@@ -746,6 +746,9 @@ async function renderRiderReceiptTemplate(
       `;
     })
   );
+  const deliveryCharge = order.orderType === 'delivery'
+    ? Math.max(0, order.deliveryCharge || 0)
+    : 0;
 
   return `
 <!DOCTYPE html>
@@ -837,6 +840,12 @@ async function renderRiderReceiptTemplate(
             <td style="text-align: right; padding: 3px 0;">-${formatCurrency(order.discountAmount)}</td>
           </tr>
         ` : ''}
+        ${deliveryCharge > 0 ? `
+          <tr>
+            <td style="padding: 3px 0;">Delivery Charges:</td>
+            <td style="text-align: right; padding: 3px 0;">${formatCurrency(deliveryCharge)}</td>
+          </tr>
+        ` : ''}
       <tr class="total-row">
         <td style="padding: 8px 0 3px 0; font-size: 13pt;">TOTAL:</td>
         <td style="text-align: right; padding: 8px 0 3px 0; font-size: 13pt;">${formatCurrency(order.total)}</td>
@@ -868,6 +877,9 @@ async function renderReceiptTemplate(
   settings: Settings,
   copyType: string
 ): Promise<string> {
+  const deliveryCharge = order.orderType === 'delivery'
+    ? Math.max(0, order.deliveryCharge || 0)
+    : 0;
   const itemsHtml = await Promise.all(
     items.map(async (item) => {
       const name =
@@ -1030,6 +1042,16 @@ async function renderReceiptTemplate(
     <div class="total-row">
       <span>Discount ${order.discountReference ? `(${order.discountReference})` : ''}:</span>
       <span>- ${formatCurrency(order.discountAmount)}</span>
+    </div>
+    `
+        : ''
+    }
+    ${
+      deliveryCharge > 0
+        ? `
+    <div class="total-row">
+      <span>Delivery Charges:</span>
+      <span>${formatCurrency(deliveryCharge)}</span>
     </div>
     `
         : ''

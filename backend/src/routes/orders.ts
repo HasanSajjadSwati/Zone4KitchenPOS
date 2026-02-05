@@ -98,6 +98,7 @@ orderRoutes.post('/', async (req, res) => {
       customerId,
       riderId,
       deliveryAddress,
+      deliveryCharge,
       subtotal,
       discountType,
       discountValue,
@@ -140,6 +141,11 @@ orderRoutes.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Rider not found' });
     }
 
+    const parsedDeliveryCharge = Number(deliveryCharge);
+    const normalizedDeliveryCharge = orderType === 'delivery' && Number.isFinite(parsedDeliveryCharge)
+      ? Math.max(0, parsedDeliveryCharge)
+      : 0;
+
     // Generate order number on the backend (ensures uniqueness)
     const orderNumber = await generateNextOrderNumber();
 
@@ -152,13 +158,13 @@ orderRoutes.post('/', async (req, res) => {
     await runAsync(
       `INSERT INTO orders (
         id, orderNumber, registerSessionId, orderType, tableId, waiterId,
-        customerName, customerPhone, customerId, riderId, deliveryAddress,
+        customerName, customerPhone, customerId, riderId, deliveryAddress, deliveryCharge,
         subtotal, discountType, discountValue, discountAmount, total,
         status, deliveryStatus, isPaid, createdBy, createdAt, updatedAt, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id, orderNumber, registerSessionId, orderType, tableId || null, waiterId || null,
-        customerName || null, customerPhone || null, customerId || null, riderId || null, deliveryAddress || null,
+        customerName || null, customerPhone || null, customerId || null, riderId || null, deliveryAddress || null, normalizedDeliveryCharge,
         subtotal, discountType || null, discountValue || 0, discountAmount || 0, total,
         'open', initialDeliveryStatus, 0, createdBy, now, now, notes || null
       ]
@@ -178,7 +184,7 @@ orderRoutes.put('/:id', async (req, res) => {
     const {
       customerName, customerPhone, customerId, notes,
       status, deliveryStatus, isPaid, subtotal, discountType, discountValue, discountAmount, total,
-      completedBy, cancellationReason, waiterId, riderId, deliveryAddress
+      completedBy, cancellationReason, waiterId, riderId, deliveryAddress, deliveryCharge
     } = req.body;
     const now = new Date().toISOString();
 
@@ -261,6 +267,13 @@ orderRoutes.put('/:id', async (req, res) => {
     if (deliveryStatus !== undefined) {
       updates.push('deliveryStatus = ?');
       values.push(deliveryStatus);
+    }
+    if (deliveryCharge !== undefined) {
+      const normalizedDeliveryCharge = order.orderType === 'delivery'
+        ? Math.max(0, Number(deliveryCharge) || 0)
+        : 0;
+      updates.push('deliveryCharge = ?');
+      values.push(normalizedDeliveryCharge);
     }
     if (waiterId !== undefined) {
       updates.push('waiterId = ?');

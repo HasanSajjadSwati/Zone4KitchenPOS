@@ -564,6 +564,15 @@ export const OrderList: React.FC = () => {
                 </div>
               )}
 
+              {selectedOrder.orderType === 'delivery' && (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Delivery Charges:</span>
+                  <span className="font-semibold">
+                    {formatCurrency(selectedOrder.deliveryCharge)}
+                  </span>
+                </div>
+              )}
+
               <div className="flex justify-between text-lg font-bold border-t border-gray-300 pt-2">
                 <span>Total:</span>
                 <span className="text-primary-600">{formatCurrency(selectedOrder.total)}</span>

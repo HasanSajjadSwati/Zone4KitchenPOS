@@ -40,6 +40,7 @@ settingsRoutes.put('/', async (req, res) => {
       restaurantAddress,
       restaurantPhone,
       taxRate,
+      deliveryCharge,
       receiptFooter,
       printAllIncludeKOT,
       printAllIncludeCustomer,
@@ -83,6 +84,10 @@ settingsRoutes.put('/', async (req, res) => {
     if (taxRate !== undefined) {
       updates.push('taxRate = ?');
       values.push(taxRate);
+    }
+    if (deliveryCharge !== undefined) {
+      updates.push('deliveryCharge = ?');
+      values.push(deliveryCharge);
     }
     if (receiptFooter !== undefined) {
       updates.push('receiptFooter = ?');
