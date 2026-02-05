@@ -337,6 +337,15 @@ class APIClient {
     return this.get(`/orders/${orderId}/items`);
   }
 
+  async getOrderItemsBulk(filters?: Record<string, string>) {
+    let endpoint = '/order-items';
+    if (filters) {
+      const params = new URLSearchParams(filters);
+      endpoint += `?${params.toString()}`;
+    }
+    return this.get(endpoint);
+  }
+
   async updateOrderItem(orderId: string, itemId: string, data: any) {
     return this.put(`/orders/${orderId}/items/${itemId}`, data);
   }
@@ -389,8 +398,13 @@ class APIClient {
   }
 
   // Payments
-  async getPayments() {
-    return this.get('/payments');
+  async getPayments(filters?: Record<string, string>) {
+    let endpoint = '/payments';
+    if (filters) {
+      const params = new URLSearchParams(filters);
+      endpoint += `?${params.toString()}`;
+    }
+    return this.get(endpoint);
   }
 
   async getPayment(id: string) {

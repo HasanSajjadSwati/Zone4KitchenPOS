@@ -1,4 +1,5 @@
 import { db } from '@/db';
+import { apiClient } from '@/services/api';
 import type { Order, OrderItem, Payment, RegisterSession, User, Customer, Expense, Waiter, Rider, MenuItem, Category, Deal } from '@/db/types';
 
 // Report Types
@@ -166,27 +167,79 @@ export interface CustomerOrderDetail {
   status: string;
 }
 
-// Helper function to filter orders by date range
-function getOrdersInRange(orders: Order[], range: DateRange): Order[] {
-  return orders.filter(order => {
-    const orderDate = new Date(order.createdAt);
-    return orderDate >= range.startDate && orderDate <= range.endDate;
-  });
+const buildRangeFilters = (range: DateRange): Record<string, string> => ({
+  startDate: range.startDate.toISOString(),
+  endDate: range.endDate.toISOString(),
+});
+
+const chunkArray = <T,>(items: T[], size: number): T[][] => {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+};
+
+async function fetchPaymentsByOrderIds(orderIds: string[]): Promise<Payment[]> {
+  if (orderIds.length === 0) return [];
+  const chunks = chunkArray(orderIds, 200);
+  const results = await Promise.all(
+    chunks.map((ids) => apiClient.getPayments({ orderIds: ids.join(',') }))
+  );
+  return results.flat();
+}
+
+function buildCustomerReport(customer: Customer, orders: Order[]): CustomerDetailedReport {
+  const totalOrders = orders.length;
+  const paidOrders = orders.filter((o: Order) => o.isPaid).length;
+  const unpaidOrders = totalOrders - paidOrders;
+
+  const totalAmount = orders.reduce((sum: number, o: Order) => sum + o.total, 0);
+  const paidAmount = orders
+    .filter((o: Order) => o.isPaid)
+    .reduce((sum: number, o: Order) => sum + o.total, 0);
+  const unpaidAmount = totalAmount - paidAmount;
+
+  const lastOrderDate = orders.length > 0
+    ? orders.reduce((latest: Date, o: Order) => o.createdAt > latest ? o.createdAt : latest, orders[0].createdAt)
+    : null;
+
+  const orderHistory: CustomerOrderDetail[] = orders
+    .map((order: Order) => ({
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      orderDate: order.createdAt,
+      orderType: order.orderType,
+      total: order.total,
+      isPaid: order.isPaid,
+      status: order.status,
+    }))
+    .sort((a, b) => b.orderDate.getTime() - a.orderDate.getTime());
+
+  return {
+    customerId: customer.id,
+    customerName: customer.name,
+    customerPhone: customer.phone,
+    customerAddress: customer.address,
+    totalOrders,
+    paidOrders,
+    unpaidOrders,
+    totalAmount,
+    paidAmount,
+    unpaidAmount,
+    lastOrderDate,
+    orderHistory,
+  };
 }
 
 /**
  * Get sales summary for a date range
  */
 export async function getSalesSummary(range: DateRange): Promise<SalesSummary> {
-  const allOrders = await db.orders.toArray();
-  const orders = getOrdersInRange(allOrders, range).filter((o: Order) => o.status === 'completed');
+  const rangeFilters = buildRangeFilters(range);
+  const orders = await apiClient.getOrders({ ...rangeFilters, status: 'completed' });
 
-  const payments = await db.payments
-    .filter((p: Payment) => {
-      const paymentDate = new Date(p.createdAt);
-      return paymentDate >= range.startDate && paymentDate <= range.endDate;
-    })
-    .toArray();
+  const payments = await fetchPaymentsByOrderIds(orders.map((order: Order) => order.id));
 
   let totalSales = 0;
   let totalDiscounts = 0;
@@ -244,10 +297,7 @@ export async function getSalesSummary(range: DateRange): Promise<SalesSummary> {
     .reduce((sum: number, p: Payment) => sum + p.amount, 0);
 
   // Count total items
-  const orderIds = orders.map((o: Order) => o.id);
-  const orderItems = await db.orderItems
-    .filter((item: OrderItem) => orderIds.includes(item.orderId))
-    .toArray();
+  const orderItems = await apiClient.getOrderItemsBulk({ ...rangeFilters, status: 'completed' });
   const totalItems = orderItems.reduce((sum: number, item: OrderItem) => sum + item.quantity, 0);
 
   return {
@@ -277,13 +327,9 @@ export async function getSalesSummary(range: DateRange): Promise<SalesSummary> {
  * Get sales by category
  */
 export async function getCategorySales(range: DateRange): Promise<CategorySales[]> {
-  const allOrders = await db.orders.toArray();
-  const orders = getOrdersInRange(allOrders, range).filter((o: Order) => o.status === 'completed');
-  const orderIds = orders.map(o => o.id);
-
-  const orderItems = await db.orderItems
-    .filter((item: OrderItem) => orderIds.includes(item.orderId) && item.itemType === 'menu_item')
-    .toArray() as OrderItem[];
+  const rangeFilters = buildRangeFilters(range);
+  const allItems = await apiClient.getOrderItemsBulk({ ...rangeFilters, status: 'completed' }) as OrderItem[];
+  const orderItems = allItems.filter((item: OrderItem) => item.itemType === 'menu_item');
 
   const categories = await db.categories.toArray();
   const menuItems = await db.menuItems.toArray();
@@ -340,13 +386,9 @@ export async function getCategorySales(range: DateRange): Promise<CategorySales[
  * Get sales by menu item
  */
 export async function getItemSales(range: DateRange): Promise<ItemSales[]> {
-  const allOrders = await db.orders.toArray();
-  const orders = getOrdersInRange(allOrders, range).filter((o: Order) => o.status === 'completed');
-  const orderIds = orders.map((o: Order) => o.id);
-
-  const orderItems = await db.orderItems
-    .filter((item: OrderItem) => orderIds.includes(item.orderId) && item.itemType === 'menu_item')
-    .toArray();
+  const rangeFilters = buildRangeFilters(range);
+  const allItems = await apiClient.getOrderItemsBulk({ ...rangeFilters, status: 'completed' }) as OrderItem[];
+  const orderItems = allItems.filter((item: OrderItem) => item.itemType === 'menu_item');
 
   const menuItems = await db.menuItems.toArray();
   const categories = await db.categories.toArray();
@@ -403,13 +445,9 @@ export async function getItemSales(range: DateRange): Promise<ItemSales[]> {
  * Get sales by deal
  */
 export async function getDealSales(range: DateRange): Promise<DealSales[]> {
-  const allOrders = await db.orders.toArray();
-  const orders = getOrdersInRange(allOrders, range).filter((o: Order) => o.status === 'completed');
-  const orderIds = orders.map((o: Order) => o.id);
-
-  const orderItems = await db.orderItems
-    .filter((item: OrderItem) => orderIds.includes(item.orderId) && item.itemType === 'deal')
-    .toArray();
+  const rangeFilters = buildRangeFilters(range);
+  const allItems = await apiClient.getOrderItemsBulk({ ...rangeFilters, status: 'completed' }) as OrderItem[];
+  const orderItems = allItems.filter((item: OrderItem) => item.itemType === 'deal');
 
   const deals = await db.deals.toArray();
 
@@ -459,9 +497,9 @@ export async function getDealSales(range: DateRange): Promise<DealSales[]> {
  * Get waiter performance
  */
 export async function getWaiterPerformance(range: DateRange): Promise<WaiterPerformance[]> {
-  const allOrders = await db.orders.toArray();
-  const orders = getOrdersInRange(allOrders, range)
-    .filter((o: Order) => o.status === 'completed' && o.orderType === 'dine_in' && o.waiterId);
+  const rangeFilters = buildRangeFilters(range);
+  const orders = await apiClient.getOrders({ ...rangeFilters, status: 'completed', orderType: 'dine_in' });
+  const dineInOrders = orders.filter((o: Order) => o.waiterId);
 
   const waiters = await db.waiters.toArray();
 
@@ -472,7 +510,7 @@ export async function getWaiterPerformance(range: DateRange): Promise<WaiterPerf
     tables: Set<string>;
   }>();
 
-  for (const order of orders) {
+  for (const order of dineInOrders) {
     if (!order.waiterId) continue;
 
     if (!waiterMap.has(order.waiterId)) {
@@ -513,9 +551,9 @@ export async function getWaiterPerformance(range: DateRange): Promise<WaiterPerf
  * Get rider performance
  */
 export async function getRiderPerformance(range: DateRange): Promise<RiderPerformance[]> {
-  const allOrders = await db.orders.toArray();
-  const orders = getOrdersInRange(allOrders, range)
-    .filter((o: Order) => o.status === 'completed' && o.orderType === 'delivery' && o.riderId);
+  const rangeFilters = buildRangeFilters(range);
+  const orders = await apiClient.getOrders({ ...rangeFilters, status: 'completed', orderType: 'delivery' });
+  const deliveryOrders = orders.filter((o: Order) => o.riderId);
 
   const riders = await db.riders.toArray();
 
@@ -525,7 +563,7 @@ export async function getRiderPerformance(range: DateRange): Promise<RiderPerfor
     orderCount: number;
   }>();
 
-  for (const order of orders) {
+  for (const order of deliveryOrders) {
     if (!order.riderId) continue;
 
     if (!riderMap.has(order.riderId)) {
@@ -571,31 +609,46 @@ export async function getRegisterSessions(range: DateRange): Promise<RegisterSes
 
   const result: RegisterSessionSummary[] = [];
 
-  for (const session of sessions) {
-    const orders = await db.orders
-      .where('registerSessionId')
-      .equals(session.id)
-      .and((o: Order) => o.status === 'completed')
-      .toArray();
+  const sessionIds = sessions.map((session: RegisterSession) => session.id);
+  const orders = sessionIds.length > 0
+    ? await apiClient.getOrders({ registerSessionIds: sessionIds.join(','), status: 'completed' })
+    : [];
 
-    const payments = await db.payments
-      .filter((p: Payment) => orders.some(o => o.id === p.orderId))
-      .toArray();
+  const ordersBySession = new Map<string, Order[]>();
+  for (const order of orders) {
+    if (!ordersBySession.has(order.registerSessionId)) {
+      ordersBySession.set(order.registerSessionId, []);
+    }
+    ordersBySession.get(order.registerSessionId)!.push(order);
+  }
+
+  const payments = await fetchPaymentsByOrderIds(orders.map((order: Order) => order.id));
+  const paymentsByOrder = new Map<string, Payment[]>();
+  for (const payment of payments) {
+    if (!paymentsByOrder.has(payment.orderId)) {
+      paymentsByOrder.set(payment.orderId, []);
+    }
+    paymentsByOrder.get(payment.orderId)!.push(payment);
+  }
+
+  for (const session of sessions) {
+    const sessionOrders = ordersBySession.get(session.id) || [];
+    const sessionPayments = sessionOrders.flatMap((order) => paymentsByOrder.get(order.id) || []);
 
     const openedByUser = users.find((u: User) => u.id === session.openedBy);
     const closedByUser = session.closedBy ? users.find((u: User) => u.id === session.closedBy) : null;
 
-    const totalSales = orders.reduce((sum: number, o: Order) => sum + o.total, 0);
-    const cashPayments = payments
+    const totalSales = sessionOrders.reduce((sum: number, o: Order) => sum + o.total, 0);
+    const cashPayments = sessionPayments
       .filter((p: Payment) => p.method === 'cash')
       .reduce((sum: number, p: Payment) => sum + p.amount, 0);
-    const cardPayments = payments
+    const cardPayments = sessionPayments
       .filter((p: Payment) => p.method === 'card')
       .reduce((sum: number, p: Payment) => sum + p.amount, 0);
-    const onlinePayments = payments
+    const onlinePayments = sessionPayments
       .filter((p: Payment) => p.method === 'online')
       .reduce((sum: number, p: Payment) => sum + p.amount, 0);
-    const otherPayments = payments
+    const otherPayments = sessionPayments
       .filter((p: Payment) => p.method === 'other')
       .reduce((sum: number, p: Payment) => sum + p.amount, 0);
 
@@ -610,7 +663,7 @@ export async function getRegisterSessions(range: DateRange): Promise<RegisterSes
       actualCash: session.closingCash,
       difference: session.cashDifference,
       totalSales,
-      totalOrders: orders.length,
+      totalOrders: sessionOrders.length,
       cashPayments,
       cardPayments,
       onlinePayments,
@@ -625,8 +678,8 @@ export async function getRegisterSessions(range: DateRange): Promise<RegisterSes
  * Get daily sales breakdown
  */
 export async function getDailySales(range: DateRange): Promise<DailySales[]> {
-  const allOrders = await db.orders.toArray();
-  const orders = getOrdersInRange(allOrders, range).filter((o: Order) => o.status === 'completed');
+  const rangeFilters = buildRangeFilters(range);
+  const orders = await apiClient.getOrders({ ...rangeFilters, status: 'completed' });
 
   // Group by date
   const dailyMap = new Map<string, {
@@ -670,13 +723,11 @@ export async function getHourlySales(): Promise<HourlySales[]> {
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
-
-  const orders = await db.orders
-    .filter((o: Order) => {
-      const orderDate = new Date(o.createdAt);
-      return orderDate >= today && orderDate < tomorrow && o.status === 'completed';
-    })
-    .toArray();
+  const orders = await apiClient.getOrders({
+    startDate: today.toISOString(),
+    endDate: tomorrow.toISOString(),
+    status: 'completed',
+  });
 
   // Group by hour
   const hourlyMap = new Map<number, {
@@ -717,8 +768,8 @@ export async function getHourlySales(): Promise<HourlySales[]> {
  * Get cancelled orders report for a date range
  */
 export async function getCancelledOrders(range: DateRange): Promise<CancelledOrder[]> {
-  const allOrders = await db.orders.toArray();
-  const cancelledOrders = getOrdersInRange(allOrders, range).filter((o: Order) => o.status === 'cancelled');
+  const rangeFilters = buildRangeFilters(range);
+  const cancelledOrders = await apiClient.getOrders({ ...rangeFilters, status: 'cancelled' });
 
   const users = (await db.users.toArray()) as User[];
   const userMap = new Map<string, string>(users.map((u: User) => [u.id, u.fullName]));
@@ -732,15 +783,15 @@ export async function getCancelledOrders(range: DateRange): Promise<CancelledOrd
     cancelledBy: order.completedBy || order.createdBy,
     cancelledByName: userMap.get(order.completedBy || order.createdBy) || 'Unknown',
     total: order.total,
-  })).sort((a, b) => b.orderDate.getTime() - a.orderDate.getTime());
+  })).sort((a: CancelledOrder, b: CancelledOrder) => b.orderDate.getTime() - a.orderDate.getTime());
 }
 
 /**
  * Get daily expense report with sales - expenses = net profit
  */
 export async function getDailyExpenseReport(range: DateRange): Promise<DailyExpenseReport[]> {
-  const allOrders = await db.orders.toArray();
-  const completedOrders = getOrdersInRange(allOrders, range).filter((o: Order) => o.status === 'completed');
+  const rangeFilters = buildRangeFilters(range);
+  const completedOrders = await apiClient.getOrders({ ...rangeFilters, status: 'completed' });
 
   const allExpenses = await db.expenses.toArray();
   const expenses = allExpenses.filter((expense: Expense) => {
@@ -793,10 +844,9 @@ export async function getDailyExpenseReport(range: DateRange): Promise<DailyExpe
  * Get discounted orders report
  */
 export async function getDiscountedOrders(range: DateRange): Promise<DiscountReportItem[]> {
-  const allOrders = await db.orders.toArray();
-  const orders = getOrdersInRange(allOrders, range).filter(
-    (o: Order) => o.status === 'completed' && o.discountAmount > 0
-  );
+  const rangeFilters = buildRangeFilters(range);
+  const orders = (await apiClient.getOrders({ ...rangeFilters, status: 'completed' }))
+    .filter((o: Order) => o.discountAmount > 0);
 
   return orders.map((order: Order) => ({
     orderId: order.id,
@@ -808,7 +858,7 @@ export async function getDiscountedOrders(range: DateRange): Promise<DiscountRep
     discountReference: order.discountReference,
     orderTotal: order.total,
     subtotal: order.subtotal,
-  })).sort((a, b) => b.orderDate.getTime() - a.orderDate.getTime());
+  })).sort((a: DiscountReportItem, b: DiscountReportItem) => b.orderDate.getTime() - a.orderDate.getTime());
 }
 
 /**
@@ -818,48 +868,9 @@ export async function getCustomerDetailedReport(customerId: string): Promise<Cus
   const customer = await db.customers.get(customerId);
   if (!customer) return null;
 
-  const allOrders = (await db.orders.where('customerId').equals(customerId).toArray()) as Order[];
+  const allOrders = (await apiClient.getOrders({ customerId })) as Order[];
 
-  const totalOrders = allOrders.length;
-  const paidOrders = allOrders.filter((o: Order) => o.isPaid).length;
-  const unpaidOrders = totalOrders - paidOrders;
-
-  const totalAmount = allOrders.reduce((sum: number, o: Order) => sum + o.total, 0);
-  const paidAmount = allOrders
-    .filter((o: Order) => o.isPaid)
-    .reduce((sum: number, o: Order) => sum + o.total, 0);
-  const unpaidAmount = totalAmount - paidAmount;
-
-  const lastOrderDate = allOrders.length > 0
-    ? allOrders.reduce((latest: Date, o: Order) => o.createdAt > latest ? o.createdAt : latest, allOrders[0].createdAt)
-    : null;
-
-  const orderHistory: CustomerOrderDetail[] = allOrders
-    .map((order: Order) => ({
-      orderId: order.id,
-      orderNumber: order.orderNumber,
-      orderDate: order.createdAt,
-      orderType: order.orderType,
-      total: order.total,
-      isPaid: order.isPaid,
-      status: order.status,
-    }))
-    .sort((a, b) => b.orderDate.getTime() - a.orderDate.getTime());
-
-  return {
-    customerId: customer.id,
-    customerName: customer.name,
-    customerPhone: customer.phone,
-    customerAddress: customer.address,
-    totalOrders,
-    paidOrders,
-    unpaidOrders,
-    totalAmount,
-    paidAmount,
-    unpaidAmount,
-    lastOrderDate,
-    orderHistory,
-  };
+  return buildCustomerReport(customer, allOrders);
 }
 
 /**
@@ -875,11 +886,26 @@ export async function searchCustomerReports(query: string): Promise<CustomerDeta
       customer.phone.includes(query)
   );
 
-  const reports: CustomerDetailedReport[] = [];
-  for (const customer of matchingCustomers) {
-    const report = await getCustomerDetailedReport(customer.id);
-    if (report) reports.push(report);
+  if (matchingCustomers.length === 0) {
+    return [];
   }
+
+  const customerIds = matchingCustomers.map((customer) => customer.id);
+  const orders = (await apiClient.getOrders({ customerIds: customerIds.join(',') })) as Order[];
+
+  const ordersByCustomer = new Map<string, Order[]>();
+  for (const order of orders) {
+    if (!order.customerId) continue;
+    if (!ordersByCustomer.has(order.customerId)) {
+      ordersByCustomer.set(order.customerId, []);
+    }
+    ordersByCustomer.get(order.customerId)!.push(order);
+  }
+
+  const reports = matchingCustomers.map((customer) => {
+    const customerOrders = ordersByCustomer.get(customer.id) || [];
+    return buildCustomerReport(customer, customerOrders);
+  });
 
   return reports.sort((a, b) => b.totalAmount - a.totalAmount);
 }

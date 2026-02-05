@@ -1079,24 +1079,11 @@ export const db = {
   // Order Items proxy
   orderItems: {
     toArray: async () => {
-      // Get all orders and collect items
-      const orders = await apiClient.getOrders();
-      const allItems: any[] = [];
-      for (const order of orders) {
-        const items = await apiClient.getOrderItems(order.id);
-        allItems.push(...items);
-      }
-      return allItems;
+      return apiClient.getOrderItemsBulk();
     },
     get: async (id: string) => {
-      // Get all orders and find the item
-      const orders = await apiClient.getOrders();
-      for (const order of orders) {
-        const items = await apiClient.getOrderItems(order.id);
-        const item = items.find((i: any) => i.id === id);
-        if (item) return item;
-      }
-      return null;
+      const items = await apiClient.getOrderItemsBulk();
+      return items.find((i: any) => i.id === id) || null;
     },
     add: async (item: any) => {
       return apiClient.addOrderItem(item.orderId, item);
@@ -1128,30 +1115,15 @@ export const db = {
     clear: async () => {},
     filter: (filterFn: (item: any) => boolean) => ({
       toArray: async () => {
-        const orders = await apiClient.getOrders();
-        const allItems: any[] = [];
-        for (const order of orders) {
-          const items = await apiClient.getOrderItems(order.id);
-          allItems.push(...items);
-        }
+        const allItems = await apiClient.getOrderItemsBulk();
         return allItems.filter(filterFn);
       },
       count: async () => {
-        const orders = await apiClient.getOrders();
-        const allItems: any[] = [];
-        for (const order of orders) {
-          const items = await apiClient.getOrderItems(order.id);
-          allItems.push(...items);
-        }
+        const allItems = await apiClient.getOrderItemsBulk();
         return allItems.filter(filterFn).length;
       },
       first: async () => {
-        const orders = await apiClient.getOrders();
-        const allItems: any[] = [];
-        for (const order of orders) {
-          const items = await apiClient.getOrderItems(order.id);
-          allItems.push(...items);
-        }
+        const allItems = await apiClient.getOrderItemsBulk();
         return allItems.find(filterFn) || null;
       },
     }),

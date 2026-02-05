@@ -39,7 +39,16 @@ async function generateNextOrderNumber(): Promise<string> {
 // Get all orders
 orderRoutes.get('/', async (req, res) => {
   try {
-    const { status, registerSessionId } = req.query;
+    const {
+      status,
+      registerSessionId,
+      registerSessionIds,
+      customerId,
+      customerIds,
+      orderType,
+      startDate,
+      endDate,
+    } = req.query;
     let query = 'SELECT * FROM orders WHERE 1=1';
     const params: any[] = [];
 
@@ -47,9 +56,45 @@ orderRoutes.get('/', async (req, res) => {
       query += ' AND status = ?';
       params.push(status);
     }
+    if (orderType) {
+      query += ' AND orderType = ?';
+      params.push(orderType);
+    }
+    if (customerId) {
+      query += ' AND customerId = ?';
+      params.push(customerId);
+    }
+    if (customerIds) {
+      const ids = String(customerIds)
+        .split(',')
+        .map((id) => id.trim())
+        .filter(Boolean);
+      if (ids.length > 0) {
+        query += ` AND customerId IN (${ids.map(() => '?').join(',')})`;
+        params.push(...ids);
+      }
+    }
     if (registerSessionId) {
       query += ' AND registerSessionId = ?';
       params.push(registerSessionId);
+    }
+    if (registerSessionIds) {
+      const ids = String(registerSessionIds)
+        .split(',')
+        .map((id) => id.trim())
+        .filter(Boolean);
+      if (ids.length > 0) {
+        query += ` AND registerSessionId IN (${ids.map(() => '?').join(',')})`;
+        params.push(...ids);
+      }
+    }
+    if (startDate) {
+      query += ' AND createdAt >= ?';
+      params.push(startDate);
+    }
+    if (endDate) {
+      query += ' AND createdAt <= ?';
+      params.push(endDate);
     }
 
     query += ' ORDER BY createdAt DESC';

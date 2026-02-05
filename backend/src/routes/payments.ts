@@ -7,7 +7,40 @@ export const paymentRoutes = express.Router();
 // Get all payments
 paymentRoutes.get('/', async (req, res) => {
   try {
-    const payments = await allAsync('SELECT * FROM payments ORDER BY paidAt DESC');
+    const { startDate, endDate, orderId, orderIds, method } = req.query;
+    let query = 'SELECT * FROM payments WHERE 1=1';
+    const params: any[] = [];
+
+    if (orderId) {
+      query += ' AND orderId = ?';
+      params.push(orderId);
+    }
+    if (orderIds) {
+      const ids = String(orderIds)
+        .split(',')
+        .map((id) => id.trim())
+        .filter(Boolean);
+      if (ids.length > 0) {
+        query += ` AND orderId IN (${ids.map(() => '?').join(',')})`;
+        params.push(...ids);
+      }
+    }
+    if (method) {
+      query += ' AND method = ?';
+      params.push(method);
+    }
+    if (startDate) {
+      query += ' AND paidAt >= ?';
+      params.push(startDate);
+    }
+    if (endDate) {
+      query += ' AND paidAt <= ?';
+      params.push(endDate);
+    }
+
+    query += ' ORDER BY paidAt DESC';
+
+    const payments = await allAsync(query, params);
     res.json(payments);
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
