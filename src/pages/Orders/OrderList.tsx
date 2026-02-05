@@ -26,7 +26,8 @@ import { printKOT, printCustomerReceipt } from '@/services/printService';
 import { useAuthStore } from '@/stores/authStore';
 import { useDialog } from '@/hooks/useDialog';
 import { formatCurrency, formatDateTime } from '@/utils/validation';
-import type { Order, OrderItem } from '@/db/types';
+import type { Order, OrderItem, MenuItem, Deal } from '@/db/types';
+import { db } from '@/db';
 
 const paymentSchema = z.object({
   paymentMethod: z.enum(['cash', 'card', 'online', 'other']),
@@ -70,6 +71,8 @@ export const OrderList: React.FC = () => {
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [isDeliveryStatusModalOpen, setIsDeliveryStatusModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [menuItemNameById, setMenuItemNameById] = useState<Record<string, string>>({});
+  const [dealNameById, setDealNameById] = useState<Record<string, string>>({});
 
   const paymentForm = useForm<PaymentFormData>({
     resolver: zodResolver(paymentSchema),
@@ -84,6 +87,41 @@ export const OrderList: React.FC = () => {
   useEffect(() => {
     loadOrders();
   }, [filterStatus, filterType, filterDate, filterPayment]);
+
+  useEffect(() => {
+    const loadItemLookups = async () => {
+      try {
+        const [menuItems, deals] = await Promise.all([
+          db.menuItems.toArray(),
+          db.deals.toArray(),
+        ]);
+        const menuItemNames: Record<string, string> = {};
+        const dealNames: Record<string, string> = {};
+
+        (menuItems as MenuItem[]).forEach((item) => {
+          menuItemNames[item.id] = item.name;
+        });
+
+        (deals as Deal[]).forEach((deal) => {
+          dealNames[deal.id] = deal.name;
+        });
+
+        setMenuItemNameById(menuItemNames);
+        setDealNameById(dealNames);
+      } catch (error) {
+        console.warn('Failed to load item names for order details:', error);
+      }
+    };
+
+    loadItemLookups();
+  }, []);
+
+  const getItemDisplayName = (item: OrderItem) => {
+    if (item.itemType === 'menu_item') {
+      return item.menuItemId ? menuItemNameById[item.menuItemId] || 'Unknown Item' : 'Unknown Item';
+    }
+    return item.dealId ? dealNameById[item.dealId] || 'Unknown Deal' : 'Unknown Deal';
+  };
 
   const loadOrders = async () => {
     let allOrders: Order[] = [];
@@ -518,12 +556,18 @@ export const OrderList: React.FC = () => {
                     <div className="flex-1">
                       <p className="font-semibold text-gray-900">
                         {item.quantity}x{' '}
-                        {item.itemType === 'menu_item' ? 'Menu Item' : 'Deal'}
+                        {getItemDisplayName(item)}
                       </p>
                       {item.selectedVariants.length > 0 && (
                         <p className="text-sm text-gray-600">
                           {item.selectedVariants
-                            .map((v) => `${v.variantName}: ${v.optionName}`)
+                            .map((v) => {
+                              if (v.selectedOptions && v.selectedOptions.length > 0) {
+                                const optionNames = v.selectedOptions.map((o) => o.optionName).join(', ');
+                                return `${v.variantName}: ${optionNames}`;
+                              }
+                              return `${v.variantName}: ${v.optionName}`;
+                            })
                             .join(', ')}
                         </p>
                       )}
