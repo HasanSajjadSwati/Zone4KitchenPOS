@@ -54,12 +54,28 @@ export const SalesSummary: React.FC = () => {
     setIsLoading(true);
     try {
       const range = getDateRange();
-      const [summaryData, dailyData] = await Promise.all([
+      // Use allSettled so one failure doesn't block the other
+      const [summaryResult, dailyResult] = await Promise.allSettled([
         getSalesSummary(range),
         getDailySales(range),
       ]);
-      setSummary(summaryData);
-      setDailySales(dailyData);
+
+      if (summaryResult.status === 'fulfilled') {
+        setSummary(summaryResult.value);
+      } else {
+        console.error('Failed to load summary:', summaryResult.reason);
+      }
+
+      if (dailyResult.status === 'fulfilled') {
+        setDailySales(dailyResult.value);
+      } else {
+        console.error('Failed to load daily sales:', dailyResult.reason);
+        setDailySales([]);
+      }
+
+      if (summaryResult.status === 'rejected' && dailyResult.status === 'rejected') {
+        await dialog.alert('Failed to load report data', 'Error');
+      }
     } catch (error) {
       console.error('Failed to load report data:', error);
       await dialog.alert('Failed to load report data', 'Error');
@@ -206,7 +222,7 @@ export const SalesSummary: React.FC = () => {
         )}
 
         {isLoading && (
-          <p className="text-sm text-gray-500">Loading report data...</p>
+          <p className="text-sm text-gray-500">{summary ? 'Refreshing report data...' : 'Loading report data...'}</p>
         )}
       </Card>
 
@@ -231,6 +247,78 @@ export const SalesSummary: React.FC = () => {
               <p className="text-2xl font-bold text-gray-900">{summary.totalItems}</p>
             </Card>
           </div>
+
+          {/* Daily Sales Breakdown - shown prominently after summary */}
+          <Card padding="md">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Daily Sales Breakdown</h2>
+            {dailySales.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead>
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Date
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Orders
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Total Sales
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Avg Order Value
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {dailySales.map((day) => {
+                      const [year, month, dayNum] = day.date.split('-').map(Number);
+                      const dateObj = new Date(year, month - 1, dayNum);
+                      return (
+                        <tr key={day.date} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 text-sm text-gray-900">
+                            {dateObj.toLocaleDateString('en-PK', {
+                              weekday: 'short',
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                            })}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-right text-gray-900">
+                            {day.totalOrders}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-right font-semibold text-primary-600">
+                            {formatCurrency(day.totalSales)}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-right text-gray-900">
+                            {formatCurrency(day.averageOrderValue)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot className="bg-gray-50">
+                    <tr className="font-semibold">
+                      <td className="px-4 py-3 text-sm text-gray-900">Total</td>
+                      <td className="px-4 py-3 text-sm text-right text-gray-900">
+                        {dailySales.reduce((sum, day) => sum + day.totalOrders, 0)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-right text-primary-600">
+                        {formatCurrency(dailySales.reduce((sum, day) => sum + day.totalSales, 0))}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-right text-gray-900">
+                        {formatCurrency(summary.averageOrderValue)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            ) : (
+              <p className="text-center text-gray-500 py-4">
+                {isLoading ? 'Loading daily sales data...' : 'No daily sales data for the selected period.'}
+              </p>
+            )}
+          </Card>
 
           {/* Sales by Order Type */}
           <Card padding="md">
@@ -301,70 +389,6 @@ export const SalesSummary: React.FC = () => {
               <div className="bg-orange-50 rounded-lg p-4">
                 <p className="text-sm text-gray-600 mb-2">Total Discounts Given</p>
                 <p className="text-2xl font-bold text-orange-600">{formatCurrency(summary.totalDiscounts)}</p>
-              </div>
-            </Card>
-          )}
-
-          {/* Daily Sales Breakdown */}
-          {dailySales.length > 0 && (
-            <Card padding="md">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Daily Sales Breakdown</h2>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead>
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Date
-                      </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Orders
-                      </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Total Sales
-                      </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Avg Order Value
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {dailySales.map((day) => (
-                      <tr key={day.date} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-sm text-gray-900">
-                          {new Date(day.date).toLocaleDateString('en-PK', {
-                            weekday: 'short',
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                          })}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-right text-gray-900">
-                          {day.totalOrders}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-right font-semibold text-primary-600">
-                          {formatCurrency(day.totalSales)}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-right text-gray-900">
-                          {formatCurrency(day.averageOrderValue)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot className="bg-gray-50">
-                    <tr className="font-semibold">
-                      <td className="px-4 py-3 text-sm text-gray-900">Total</td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-900">
-                        {dailySales.reduce((sum, day) => sum + day.totalOrders, 0)}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right text-primary-600">
-                        {formatCurrency(dailySales.reduce((sum, day) => sum + day.totalSales, 0))}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-900">
-                        {formatCurrency(summary.averageOrderValue)}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
               </div>
             </Card>
           )}

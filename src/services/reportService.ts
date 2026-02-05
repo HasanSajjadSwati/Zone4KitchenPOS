@@ -688,7 +688,8 @@ export async function getDailySales(range: DateRange): Promise<DailySales[]> {
   }>();
 
   for (const order of orders) {
-    const date = new Date(order.createdAt).toISOString().split('T')[0]; // YYYY-MM-DD
+    const d = new Date(order.createdAt);
+    const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
     if (!dailyMap.has(date)) {
       dailyMap.set(date, {
@@ -804,7 +805,8 @@ export async function getDailyExpenseReport(range: DateRange): Promise<DailyExpe
 
   // Add sales
   completedOrders.forEach((order: Order) => {
-    const dateKey = new Date(order.createdAt).toISOString().split('T')[0];
+    const d = new Date(order.createdAt);
+    const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const existing = dateMap.get(dateKey) || { sales: 0, expenses: 0, expensesByCategory: new Map() };
     existing.sales += order.total;
     dateMap.set(dateKey, existing);
@@ -812,7 +814,8 @@ export async function getDailyExpenseReport(range: DateRange): Promise<DailyExpe
 
   // Add expenses
   expenses.forEach((expense: Expense) => {
-    const dateKey = new Date(expense.date).toISOString().split('T')[0];
+    const d = new Date(expense.date);
+    const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const existing = dateMap.get(dateKey) || { sales: 0, expenses: 0, expensesByCategory: new Map() };
     existing.expenses += expense.amount;
 
