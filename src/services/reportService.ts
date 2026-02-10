@@ -144,6 +144,34 @@ export interface DiscountReportItem {
   subtotal: number;
 }
 
+export interface OrderDetailedReportFilters {
+  status?: 'open' | 'completed' | 'cancelled';
+  orderType?: 'dine_in' | 'take_away' | 'delivery';
+  paymentStatus?: 'paid' | 'unpaid';
+  query?: string;
+}
+
+export interface OrderDetailedReportItem {
+  orderId: string;
+  orderNumber: string;
+  orderDate: Date;
+  orderType: 'dine_in' | 'take_away' | 'delivery';
+  status: 'open' | 'completed' | 'cancelled';
+  isPaid: boolean;
+  paymentMethods: string;
+  paidAmount: number;
+  customerName: string | null;
+  customerPhone: string | null;
+  itemCount: number;
+  itemSummary: string;
+  subtotal: number;
+  discountAmount: number;
+  deliveryCharge: number;
+  total: number;
+  notes: string | null;
+  cancellationReason: string | null;
+}
+
 export interface CustomerDetailedReport {
   customerId: string;
   customerName: string;
@@ -209,6 +237,15 @@ async function fetchPaymentsByOrderIds(orderIds: string[]): Promise<Payment[]> {
   const chunks = chunkArray(orderIds, 200);
   const results = await Promise.all(
     chunks.map((ids) => apiClient.getPayments({ orderIds: ids.join(',') }))
+  );
+  return results.flat();
+}
+
+async function fetchOrderItemsByOrderIds(orderIds: string[]): Promise<OrderItem[]> {
+  if (orderIds.length === 0) return [];
+  const chunks = chunkArray(orderIds, 200);
+  const results = await Promise.all(
+    chunks.map((ids) => apiClient.getOrderItemsBulk({ orderIds: ids.join(',') }))
   );
   return results.flat();
 }
@@ -875,6 +912,138 @@ export async function getHourlySales(): Promise<HourlySales[]> {
   }
 
   return result;
+}
+
+/**
+ * Get detailed orders report for a date range
+ */
+export async function getOrderDetailedReport(
+  range: DateRange,
+  filters: OrderDetailedReportFilters = {}
+): Promise<OrderDetailedReportItem[]> {
+  const rangeFilters = buildRangeFilters(range);
+  const orderFilters: Record<string, string> = { ...rangeFilters };
+
+  if (filters.status) {
+    orderFilters.status = filters.status;
+  }
+  if (filters.orderType) {
+    orderFilters.orderType = filters.orderType;
+  }
+
+  const orders = (await apiClient.getOrders(orderFilters)) as Order[];
+  let filteredOrders = orders;
+
+  if (filters.paymentStatus === 'paid') {
+    filteredOrders = filteredOrders.filter((order) => order.isPaid);
+  } else if (filters.paymentStatus === 'unpaid') {
+    filteredOrders = filteredOrders.filter((order) => !order.isPaid);
+  }
+
+  const orderIds = filteredOrders.map((order) => order.id);
+  const [orderItems, payments, menuItems, deals] = await Promise.all([
+    fetchOrderItemsByOrderIds(orderIds),
+    fetchPaymentsByOrderIds(orderIds),
+    db.menuItems.toArray(),
+    db.deals.toArray(),
+  ]);
+
+  const menuNameById = new Map((menuItems as MenuItem[]).map((item: MenuItem) => [item.id, item.name]));
+  const dealNameById = new Map((deals as Deal[]).map((deal: Deal) => [deal.id, deal.name]));
+
+  const itemsByOrder = new Map<string, Array<{ name: string; quantity: number }>>();
+  for (const item of orderItems) {
+    const name = item.itemType === 'menu_item'
+      ? menuNameById.get(item.menuItemId || '') || 'Unknown Item'
+      : dealNameById.get(item.dealId || '') || 'Unknown Deal';
+
+    if (!itemsByOrder.has(item.orderId)) {
+      itemsByOrder.set(item.orderId, []);
+    }
+    itemsByOrder.get(item.orderId)!.push({ name, quantity: item.quantity });
+  }
+
+  const paymentsByOrder = new Map<string, Payment[]>();
+  for (const payment of payments) {
+    if (!paymentsByOrder.has(payment.orderId)) {
+      paymentsByOrder.set(payment.orderId, []);
+    }
+    paymentsByOrder.get(payment.orderId)!.push(payment);
+  }
+
+  const methodLabel = (method: Payment['method']): string => {
+    switch (method) {
+      case 'cash':
+        return 'Cash';
+      case 'card':
+        return 'Card';
+      case 'online':
+        return 'Online';
+      case 'other':
+        return 'Other';
+      default:
+        return String(method);
+    }
+  };
+
+  const reportRows = filteredOrders
+    .map((order): OrderDetailedReportItem | null => {
+      const orderDate = parseDateValue(order.createdAt);
+      if (!orderDate) return null;
+
+      const items = itemsByOrder.get(order.id) || [];
+      const itemCount = items.reduce((sum, entry) => sum + entry.quantity, 0);
+
+      const itemAggregate = new Map<string, number>();
+      for (const entry of items) {
+        itemAggregate.set(entry.name, (itemAggregate.get(entry.name) || 0) + entry.quantity);
+      }
+      const itemParts = Array.from(itemAggregate.entries()).map(([name, quantity]) => `${quantity}x ${name}`);
+      const itemSummary = itemParts.length > 0
+        ? `${itemParts.slice(0, 3).join(', ')}${itemParts.length > 3 ? ' +' : ''}`
+        : 'No items';
+
+      const orderPayments = paymentsByOrder.get(order.id) || [];
+      const uniqueMethods = Array.from(new Set(orderPayments.map((payment) => payment.method)));
+      const paymentMethods = uniqueMethods.length > 0
+        ? uniqueMethods.map(methodLabel).join(', ')
+        : (order.isPaid ? 'Paid' : 'Unpaid');
+      const paidAmount = orderPayments.reduce((sum, payment) => sum + payment.amount, 0);
+
+      return {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        orderDate,
+        orderType: order.orderType,
+        status: order.status,
+        isPaid: order.isPaid,
+        paymentMethods,
+        paidAmount,
+        customerName: order.customerName,
+        customerPhone: order.customerPhone,
+        itemCount,
+        itemSummary,
+        subtotal: order.subtotal,
+        discountAmount: order.discountAmount,
+        deliveryCharge: order.deliveryCharge || 0,
+        total: order.total,
+        notes: order.notes,
+        cancellationReason: order.cancellationReason,
+      };
+    })
+    .filter((row: OrderDetailedReportItem | null): row is OrderDetailedReportItem => row !== null);
+
+  const query = filters.query?.trim().toLowerCase();
+  const finalRows = query
+    ? reportRows.filter((row) =>
+        row.orderNumber.toLowerCase().includes(query) ||
+        (row.customerName || '').toLowerCase().includes(query) ||
+        (row.customerPhone || '').includes(query) ||
+        row.itemSummary.toLowerCase().includes(query)
+      )
+    : reportRows;
+
+  return finalRows.sort((a, b) => b.orderDate.getTime() - a.orderDate.getTime());
 }
 
 /**

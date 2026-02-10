@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { SunIcon, MoonIcon } from '@heroicons/react/24/outline';
 import { Button, Input, Card } from '@/components/ui';
 import { login } from '@/services/authService';
+import { useTheme } from '@/contexts/ThemeContext';
 import logoUrl from '@/assets/logo.svg';
 
 const loginSchema = z.object({
@@ -16,6 +18,7 @@ type LoginFormData = z.infer<typeof loginSchema>;
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
+  const { isDark, toggleTheme } = useTheme();
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -42,7 +45,18 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center p-4 relative">
+      <button
+        type="button"
+        onClick={toggleTheme}
+        className="absolute top-4 right-4 px-3 py-2 rounded-lg bg-white/20 hover:bg-white/30 text-white transition-colors"
+        aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      >
+        <span className="inline-flex items-center text-sm font-medium">
+          {isDark ? <SunIcon className="w-4 h-4 mr-2" /> : <MoonIcon className="w-4 h-4 mr-2" />}
+          {isDark ? 'Light' : 'Dark'}
+        </span>
+      </button>
       <Card className="w-full max-w-md" padding="lg">
         <div className="text-center mb-8">
           <img src={logoUrl} alt="Zone4Kitchen" className="h-16 mx-auto mb-4" />

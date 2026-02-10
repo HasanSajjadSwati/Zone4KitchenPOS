@@ -59,11 +59,11 @@ const VariantOptionsSelector: React.FC<{
   const allSelected = availableOptionIds.length === 0;
 
   return (
-    <div className="mt-2 pt-2 border-t border-gray-200">
-      <label className="block text-xs font-medium text-gray-700 mb-1">
-        Available Options {allSelected && <span className="text-gray-500">(All selected)</span>}
+    <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-600">
+      <label className="block text-xs font-medium text-gray-700 dark:text-gray-200 mb-1">
+        Available Options {allSelected && <span className="text-gray-500 dark:text-gray-400">(All selected)</span>}
       </label>
-      <p className="text-xs text-gray-500 mb-2">
+      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
         {allSelected ? 'Select specific options to limit choices, or leave all selected for all options' : 'Only checked options will be available to customers'}
       </p>
       <div className="space-y-1">
@@ -72,7 +72,7 @@ const VariantOptionsSelector: React.FC<{
           return (
             <label
               key={option.id}
-              className="flex items-center space-x-2 text-xs cursor-pointer hover:bg-gray-50 p-1 rounded"
+              className="flex items-center space-x-2 text-xs cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-1 rounded"
             >
               <input
                 type="checkbox"
@@ -80,9 +80,9 @@ const VariantOptionsSelector: React.FC<{
                 onChange={() => onToggleOption(option.id)}
                 className="w-3 h-3 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
               />
-              <span className="text-gray-700">{option.name}</span>
+              <span className="text-gray-700 dark:text-gray-200">{option.name}</span>
               {option.priceModifier !== 0 && (
-                <span className="text-gray-500">
+                <span className="text-gray-500 dark:text-gray-400">
                   ({option.priceModifier > 0 ? '+' : ''}{formatCurrency(option.priceModifier)})
                 </span>
               )}
@@ -529,7 +529,9 @@ export const MenuItems: React.FC = () => {
                     <div
                       key={variant.id}
                       className={`border rounded-lg p-3 space-y-2 ${
-                        isSelected ? 'border-primary-500 bg-primary-50' : 'border-gray-200'
+                        isSelected
+                          ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/40 dark:border-primary-400'
+                          : 'border-gray-200'
                       }`}
                     >
                       {/* Variant checkbox */}

@@ -22,9 +22,12 @@ import {
   CurrencyDollarIcon,
   ChevronDownIcon,
   ChevronRightIcon,
+  SunIcon,
+  MoonIcon,
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/stores/authStore';
 import { logout } from '@/services/authService';
+import { useTheme } from '@/contexts/ThemeContext';
 import logo from '@/assets/logo.svg';
 
 interface LayoutProps {
@@ -58,6 +61,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   });
   const currentUser = useAuthStore((state) => state.currentUser);
   const hasPermission = useAuthStore((state) => state.hasPermission);
+  const { isDark, toggleTheme } = useTheme();
 
   const canAccess = (resource: string, action: string = 'read') => hasPermission(resource, action);
 
@@ -117,6 +121,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         { name: 'Sales Summary', href: '/reports/sales-summary', icon: ChartBarIcon, resource: 'reports', action: 'read' },
         { name: 'Item Sales', href: '/reports/item-sales', icon: ChartBarIcon, resource: 'reports', action: 'read' },
         { name: 'Cancelled Orders', href: '/reports/cancelled-orders', icon: ClipboardDocumentListIcon, resource: 'reports', action: 'read' },
+        { name: 'Order Details', href: '/reports/orders-detailed', icon: DocumentTextIcon, resource: 'reports', action: 'read' },
         { name: 'Discounts', href: '/reports/discounts', icon: ReceiptPercentIcon, resource: 'reports', action: 'read' },
         { name: 'Employee Loans', href: '/reports/employee-loans', icon: DocumentTextIcon, resource: 'reports', action: 'read' },
         { name: 'Daily Expense', href: '/reports/daily-expense', icon: DocumentTextIcon, resource: 'reports', action: 'read' },
@@ -255,6 +260,17 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               </div>
             </div>
             <button
+              onClick={toggleTheme}
+              className="flex items-center w-full px-4 py-2 mb-1 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              {isDark ? (
+                <SunIcon className="w-5 h-5 mr-3" />
+              ) : (
+                <MoonIcon className="w-5 h-5 mr-3" />
+              )}
+              {isDark ? 'Light Mode' : 'Dark Mode'}
+            </button>
+            <button
               onClick={handleLogout}
               className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
             >
@@ -275,7 +291,14 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           >
             <Bars3Icon className="w-6 h-6" />
           </button>
-          <img src={logo} alt="Zone4Kitchen" className="h-8 w-auto" />
+          <img src={logo} alt="Zone4Kitchen" className="h-8 w-auto flex-1" />
+          <button
+            onClick={toggleTheme}
+            className="text-gray-600 ml-4"
+            aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {isDark ? <SunIcon className="w-6 h-6" /> : <MoonIcon className="w-6 h-6" />}
+          </button>
         </header>
 
 

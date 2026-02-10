@@ -291,7 +291,9 @@ export const Variants: React.FC = () => {
               <div
                 key={variant.id}
                 className={`p-4 cursor-pointer hover:bg-gray-50 transition ${
-                  selectedVariant?.id === variant.id ? 'bg-primary-50 border-l-4 border-primary-600' : ''
+                  selectedVariant?.id === variant.id
+                    ? 'bg-primary-50 border-l-4 border-primary-600 dark:bg-primary-900/40 dark:border-primary-400 dark:hover:bg-primary-900/50'
+                    : ''
                 }`}
                 onClick={() => setSelectedVariant(variant)}
               >

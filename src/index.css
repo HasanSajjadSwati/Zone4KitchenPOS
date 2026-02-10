@@ -3,16 +3,137 @@
 @tailwind utilities;
 
 @layer base {
+  html,
+  body,
+  #root {
+    @apply min-h-screen;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
   body {
-    @apply bg-gray-50 text-gray-900;
+    @apply bg-gray-50 text-gray-900 transition-colors duration-200;
+  }
+
+  html.dark body {
+    @apply bg-gray-900 text-gray-100;
   }
 }
 
 @layer utilities {
+  .dark .bg-white {
+    @apply bg-gray-800;
+  }
+
+  .dark .bg-gray-50 {
+    @apply bg-gray-900;
+  }
+
+  .dark .bg-gray-100 {
+    @apply bg-gray-800;
+  }
+
+  .dark .bg-gray-200 {
+    @apply bg-gray-700;
+  }
+
+  .dark .bg-gray-300 {
+    @apply bg-gray-600;
+  }
+
+  .dark .bg-blue-50 {
+    @apply bg-blue-900/20;
+  }
+
+  .dark .bg-green-50 {
+    @apply bg-green-900/20;
+  }
+
+  .dark .bg-yellow-50 {
+    @apply bg-yellow-900/20;
+  }
+
+  .dark .bg-red-50 {
+    @apply bg-red-900/20;
+  }
+
+  .dark .bg-purple-50 {
+    @apply bg-purple-900/20;
+  }
+
+  .dark .bg-indigo-50 {
+    @apply bg-indigo-900/20;
+  }
+
+  .dark .text-gray-900 {
+    color: rgb(243 244 246);
+  }
+
+  .dark .text-gray-800 {
+    color: rgb(229 231 235);
+  }
+
+  .dark .text-gray-700 {
+    color: rgb(209 213 219);
+  }
+
+  .dark .text-gray-600 {
+    color: rgb(209 213 219);
+  }
+
+  .dark .text-gray-500 {
+    color: rgb(156 163 175);
+  }
+
+  .dark .text-gray-400 {
+    color: rgb(107 114 128);
+  }
+
+  .dark .border-gray-100,
+  .dark .border-gray-200 {
+    @apply border-gray-700;
+  }
+
+  .dark .border-gray-300 {
+    @apply border-gray-600;
+  }
+
+  .dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
+    border-color: rgb(55 65 81 / var(--tw-divide-opacity, 1));
+  }
+
+  .dark .hover\:bg-gray-50:hover {
+    @apply bg-gray-800;
+  }
+
+  .dark .hover\:bg-gray-100:hover {
+    @apply bg-gray-700;
+  }
+
+  .dark .hover\:bg-gray-200:hover {
+    @apply bg-gray-600;
+  }
+
+  .dark .hover\:text-gray-900:hover {
+    @apply text-gray-100;
+  }
+
+  .dark .hover\:text-gray-700:hover {
+    @apply text-gray-200;
+  }
+
+  .dark input::placeholder,
+  .dark textarea::placeholder {
+    color: rgb(156 163 175);
+  }
+
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
@@ -27,6 +148,8 @@
 
   body {
     margin: 10mm;
+    color: #000;
+    background: #fff;
   }
 
   .no-print {

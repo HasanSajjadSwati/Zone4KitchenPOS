@@ -20,6 +20,7 @@ import { DailyExpenseReport } from '@/pages/Reports/DailyExpenseReport';
 import { DiscountReport } from '@/pages/Reports/DiscountReport';
 import { EmployeeLoanReport } from '@/pages/Reports/EmployeeLoanReport';
 import { CustomerDetailedReport } from '@/pages/Reports/CustomerDetailedReport';
+import { OrderDetailedReport } from '@/pages/Reports/OrderDetailedReport';
 import { EmployeeManagement } from '@/pages/Employees/EmployeeManagement';
 import { EmployeeLoanManagement } from '@/pages/Employees/EmployeeLoanManagement';
 import { ExpenseManagement } from '@/pages/Expenses/ExpenseManagement';
@@ -225,6 +226,14 @@ function App() {
                     element={
                       <RequirePermission resource="reports">
                         <CustomerDetailedReport />
+                      </RequirePermission>
+                    }
+                  />
+                  <Route
+                    path="/reports/orders-detailed"
+                    element={
+                      <RequirePermission resource="reports">
+                        <OrderDetailedReport />
                       </RequirePermission>
                     }
                   />
