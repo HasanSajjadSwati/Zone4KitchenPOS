@@ -4,11 +4,35 @@ import { runAsync, getAsync, allAsync } from '../db/database.js';
 
 export const customerRoutes = express.Router();
 
+const CUSTOMER_WITH_ORDER_STATS_QUERY = `
+  SELECT
+    c.id,
+    c.phone,
+    c.name,
+    c.address,
+    c.notes,
+    c.createdAt,
+    c.updatedAt,
+    (
+      SELECT COUNT(*)::integer
+      FROM orders o
+      WHERE o.customerId = c.id
+         OR (o.customerId IS NULL AND o.customerPhone = c.phone)
+    ) AS "totalOrders",
+    (
+      SELECT MAX(o.createdAt)
+      FROM orders o
+      WHERE o.customerId = c.id
+         OR (o.customerId IS NULL AND o.customerPhone = c.phone)
+    ) AS "lastOrderAt"
+  FROM customers c
+`;
+
 // Get all customers
 customerRoutes.get('/', async (req, res) => {
   try {
     const customers = await allAsync(
-      'SELECT * FROM customers ORDER BY createdAt DESC'
+      `${CUSTOMER_WITH_ORDER_STATS_QUERY} ORDER BY c.createdAt DESC`
     );
     res.json(customers);
   } catch (error) {
@@ -19,7 +43,10 @@ customerRoutes.get('/', async (req, res) => {
 // Get customer by ID
 customerRoutes.get('/:id', async (req, res) => {
   try {
-    const customer = await getAsync('SELECT * FROM customers WHERE id = ?', [req.params.id]);
+    const customer = await getAsync(
+      `${CUSTOMER_WITH_ORDER_STATS_QUERY} WHERE c.id = ?`,
+      [req.params.id]
+    );
     if (!customer) {
       return res.status(404).json({ error: 'Customer not found' });
     }
@@ -32,7 +59,10 @@ customerRoutes.get('/:id', async (req, res) => {
 // Get customer by phone
 customerRoutes.get('/phone/:phone', async (req, res) => {
   try {
-    const customer = await getAsync('SELECT * FROM customers WHERE phone = ?', [req.params.phone]);
+    const customer = await getAsync(
+      `${CUSTOMER_WITH_ORDER_STATS_QUERY} WHERE c.phone = ?`,
+      [req.params.phone]
+    );
     res.json(customer || null);
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -58,7 +88,10 @@ customerRoutes.post('/', async (req, res) => {
       [id, phone, name, address || null, notes || null, now, now]
     );
 
-    const customer = await getAsync('SELECT * FROM customers WHERE id = ?', [id]);
+    const customer = await getAsync(
+      `${CUSTOMER_WITH_ORDER_STATS_QUERY} WHERE c.id = ?`,
+      [id]
+    );
     res.status(201).json(customer);
   } catch (error) {
     const message = (error as Error).message;
@@ -72,7 +105,7 @@ customerRoutes.post('/', async (req, res) => {
 // Update customer
 customerRoutes.put('/:id', async (req, res) => {
   try {
-    const { phone, name, address, notes } = req.body;
+    const { phone, name, address, notes, lastOrderAt, totalOrders } = req.body;
     const now = new Date().toISOString();
 
     const customer = await getAsync('SELECT * FROM customers WHERE id = ?', [req.params.id]);
@@ -80,12 +113,30 @@ customerRoutes.put('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Customer not found' });
     }
 
+    const normalizedTotalOrders = totalOrders !== undefined
+      ? Math.max(0, Number(totalOrders) || 0)
+      : Math.max(0, Number(customer.totalOrders) || 0);
+
     await runAsync(
-      'UPDATE customers SET phone = ?, name = ?, address = ?, notes = ?, updatedAt = ? WHERE id = ?',
-      [phone || customer.phone, name || customer.name, address !== undefined ? address : customer.address, notes !== undefined ? notes : customer.notes, now, req.params.id]
+      `UPDATE customers
+       SET phone = ?, name = ?, address = ?, notes = ?, lastOrderAt = ?, totalOrders = ?, updatedAt = ?
+       WHERE id = ?`,
+      [
+        phone || customer.phone,
+        name || customer.name,
+        address !== undefined ? address : customer.address,
+        notes !== undefined ? notes : customer.notes,
+        lastOrderAt !== undefined ? lastOrderAt : customer.lastOrderAt,
+        normalizedTotalOrders,
+        now,
+        req.params.id
+      ]
     );
 
-    const updated = await getAsync('SELECT * FROM customers WHERE id = ?', [req.params.id]);
+    const updated = await getAsync(
+      `${CUSTOMER_WITH_ORDER_STATS_QUERY} WHERE c.id = ?`,
+      [req.params.id]
+    );
     res.json(updated);
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
