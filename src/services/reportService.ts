@@ -180,11 +180,15 @@ const chunkArray = <T,>(items: T[], size: number): T[][] => {
   return chunks;
 };
 
+const parseDateValue = (value: unknown): Date | null => {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value as string);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
 const resolveOrderDate = (order: Order): Date | null => {
   const raw = (order as any).completedAt || order.createdAt;
-  if (!raw) return null;
-  const date = new Date(raw);
-  return Number.isNaN(date.getTime()) ? null : date;
+  return parseDateValue(raw);
 };
 
 const filterOrdersInRange = (orders: Order[], range: DateRange): Order[] => {
@@ -218,15 +222,22 @@ function buildCustomerReport(customer: Customer, orders: Order[]): CustomerDetai
     .reduce((sum: number, o: Order) => sum + o.total, 0);
   const unpaidAmount = totalAmount - paidAmount;
 
-  const lastOrderDate = orders.length > 0
-    ? orders.reduce((latest: Date, o: Order) => o.createdAt > latest ? o.createdAt : latest, orders[0].createdAt)
+  const datedOrders = orders
+    .map((order: Order) => ({
+      order,
+      orderDate: parseDateValue(order.createdAt),
+    }))
+    .filter((entry: { order: Order; orderDate: Date | null }): entry is { order: Order; orderDate: Date } => entry.orderDate !== null);
+
+  const lastOrderDate = datedOrders.length > 0
+    ? datedOrders.reduce((latest: Date, entry) => entry.orderDate > latest ? entry.orderDate : latest, datedOrders[0].orderDate)
     : null;
 
-  const orderHistory: CustomerOrderDetail[] = orders
-    .map((order: Order) => ({
+  const orderHistory: CustomerOrderDetail[] = datedOrders
+    .map(({ order, orderDate }) => ({
       orderId: order.id,
       orderNumber: order.orderNumber,
-      orderDate: order.createdAt,
+      orderDate,
       orderType: order.orderType,
       total: order.total,
       isPaid: order.isPaid,
@@ -740,8 +751,8 @@ export async function getRegisterSessions(range: DateRange): Promise<RegisterSes
 
     result.push({
       sessionId: session.id,
-      openedAt: session.openedAt,
-      closedAt: session.closedAt,
+      openedAt: parseDateValue(session.openedAt) || new Date(0),
+      closedAt: parseDateValue(session.closedAt),
       openedBy: openedByUser?.fullName || 'Unknown',
       closedBy: closedByUser?.fullName || null,
       openingCash: session.openingCash,
@@ -874,16 +885,26 @@ export async function getCancelledOrders(range: DateRange): Promise<CancelledOrd
   const users = (await db.users.toArray()) as User[];
   const userMap = new Map<string, string>(users.map((u: User) => [u.id, u.fullName]));
 
-  return cancelledOrders.map((order: Order) => ({
-    orderId: order.id,
-    orderNumber: order.orderNumber,
-    orderType: order.orderType,
-    orderDate: order.createdAt,
-    cancellationReason: order.cancellationReason,
-    cancelledBy: order.completedBy || order.createdBy,
-    cancelledByName: userMap.get(order.completedBy || order.createdBy) || 'Unknown',
-    total: order.total,
-  })).sort((a: CancelledOrder, b: CancelledOrder) => b.orderDate.getTime() - a.orderDate.getTime());
+  return cancelledOrders
+    .map((order: Order) => {
+      const orderDate = parseDateValue(order.createdAt);
+      if (!orderDate) {
+        return null;
+      }
+
+      return {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        orderType: order.orderType,
+        orderDate,
+        cancellationReason: order.cancellationReason,
+        cancelledBy: order.completedBy || order.createdBy,
+        cancelledByName: userMap.get(order.completedBy || order.createdBy) || 'Unknown',
+        total: order.total,
+      };
+    })
+    .filter((item: CancelledOrder | null): item is CancelledOrder => item !== null)
+    .sort((a: CancelledOrder, b: CancelledOrder) => b.orderDate.getTime() - a.orderDate.getTime());
 }
 
 /**
@@ -950,17 +971,27 @@ export async function getDiscountedOrders(range: DateRange): Promise<DiscountRep
   const orders = (await apiClient.getOrders({ ...rangeFilters, status: 'completed' }))
     .filter((o: Order) => o.discountAmount > 0);
 
-  return orders.map((order: Order) => ({
-    orderId: order.id,
-    orderNumber: order.orderNumber,
-    orderDate: order.createdAt,
-    discountType: order.discountType!,
-    discountValue: order.discountValue,
-    discountAmount: order.discountAmount,
-    discountReference: order.discountReference,
-    orderTotal: order.total,
-    subtotal: order.subtotal,
-  })).sort((a: DiscountReportItem, b: DiscountReportItem) => b.orderDate.getTime() - a.orderDate.getTime());
+  return orders
+    .map((order: Order) => {
+      const orderDate = new Date(order.createdAt);
+      if (Number.isNaN(orderDate.getTime())) {
+        return null;
+      }
+
+      return {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        orderDate,
+        discountType: order.discountType!,
+        discountValue: order.discountValue,
+        discountAmount: order.discountAmount,
+        discountReference: order.discountReference,
+        orderTotal: order.total,
+        subtotal: order.subtotal,
+      };
+    })
+    .filter((item: DiscountReportItem | null): item is DiscountReportItem => item !== null)
+    .sort((a: DiscountReportItem, b: DiscountReportItem) => b.orderDate.getTime() - a.orderDate.getTime());
 }
 
 /**

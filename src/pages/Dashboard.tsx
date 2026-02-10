@@ -156,12 +156,12 @@ export const Dashboard: React.FC = () => {
               View Orders
             </Button>
           </Link>
-          <Link to="/menu">
+          <Link to="/menu/categories">
             <Button variant="secondary" className="w-full">
               Manage Menu
             </Button>
           </Link>
-          <Link to="/reports">
+          <Link to="/reports/sales-summary">
             <Button variant="secondary" className="w-full">
               View Reports
             </Button>
