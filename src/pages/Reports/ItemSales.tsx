@@ -6,6 +6,7 @@ import {
   getDealSales,
   getCategorySales,
   exportToCSV,
+  exportToPDF,
   type DateRange,
   type ItemSales as ItemSalesType,
   type DealSales,
@@ -76,12 +77,12 @@ export const ItemSales: React.FC = () => {
     }
   };
 
-  const handleExport = () => {
-    const filename = `${tab}-sales-${datePreset}-${new Date().toISOString().split('T')[0]}.csv`;
+  const getExportPayload = () => {
+    const base = `${tab}-sales-${datePreset}-${new Date().toISOString().split('T')[0]}`;
 
     switch (tab) {
       case 'items': {
-        const exportData = getFilteredItems().map(item => ({
+        const data = getFilteredItems().map(item => ({
           'Item Name': item.itemName,
           'Category': item.categoryName || 'N/A',
           'Quantity Sold': item.totalQuantity,
@@ -89,32 +90,44 @@ export const ItemSales: React.FC = () => {
           'Orders': item.orderCount,
           'Average Price': formatCurrency(item.averagePrice),
         }));
-        exportToCSV(exportData, filename);
-        break;
+        return { data, base, title: 'Menu Item Sales Report', orientation: 'landscape' as const };
       }
       case 'deals': {
-        const exportData = getFilteredDeals().map(deal => ({
+        const data = getFilteredDeals().map(deal => ({
           'Deal Name': deal.dealName,
           'Quantity Sold': deal.totalQuantity,
           'Total Sales': formatCurrency(deal.totalSales),
           'Orders': deal.orderCount,
           'Average Price': formatCurrency(deal.averagePrice),
         }));
-        exportToCSV(exportData, filename);
-        break;
+        return { data, base, title: 'Deal Sales Report', orientation: 'portrait' as const };
       }
       case 'categories': {
-        const exportData = getFilteredCategories().map(category => ({
+        const data = getFilteredCategories().map(category => ({
           'Category Name': category.categoryName,
           'Quantity Sold': category.totalQuantity,
           'Total Sales': formatCurrency(category.totalSales),
           'Orders': category.orderCount,
           'Average Price': formatCurrency(category.averagePrice),
         }));
-        exportToCSV(exportData, filename);
-        break;
+        return { data, base, title: 'Category Sales Report', orientation: 'portrait' as const };
       }
     }
+  };
+
+  const handleExportCSV = () => {
+    const payload = getExportPayload();
+    if (!payload || payload.data.length === 0) return;
+    exportToCSV(payload.data, `${payload.base}.csv`);
+  };
+
+  const handleExportPDF = () => {
+    const payload = getExportPayload();
+    if (!payload || payload.data.length === 0) return;
+    exportToPDF(payload.data, `${payload.base}.pdf`, {
+      title: payload.title,
+      orientation: payload.orientation,
+    });
   };
 
   const getFilteredItems = () => {
@@ -142,13 +155,22 @@ export const ItemSales: React.FC = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900">Item Sales Analysis</h1>
-        <Button
-          variant="secondary"
-          onClick={handleExport}
-          leftIcon={<ArrowDownTrayIcon className="w-5 h-5" />}
-        >
-          Export to CSV
-        </Button>
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="secondary"
+            onClick={handleExportCSV}
+            leftIcon={<ArrowDownTrayIcon className="w-5 h-5" />}
+          >
+            Export CSV
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={handleExportPDF}
+            leftIcon={<ArrowDownTrayIcon className="w-5 h-5" />}
+          >
+            Export PDF
+          </Button>
+        </div>
       </div>
 
       {/* Date Range Selection */}

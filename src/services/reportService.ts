@@ -1,6 +1,8 @@
 import { db } from '@/db';
 import { apiClient } from '@/services/api';
 import type { Order, OrderItem, Payment, RegisterSession, User, Customer, Expense, Waiter, Rider, MenuItem, Category, Deal } from '@/db/types';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // Report Types
 export interface DateRange {
@@ -1082,4 +1084,71 @@ export function exportToCSV(data: any[], filename: string): void {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+}
+
+interface PDFExportOptions {
+  title?: string;
+  subtitle?: string;
+  orientation?: 'portrait' | 'landscape';
+}
+
+export function exportToPDF(
+  data: Array<Record<string, unknown>>,
+  filename: string,
+  options: PDFExportOptions = {}
+): void {
+  if (data.length === 0) {
+    alert('No data to export');
+    return;
+  }
+
+  const headers = Object.keys(data[0]);
+  const rows = data.map((row) =>
+    headers.map((header) => {
+      const value = row[header];
+      if (value === null || value === undefined) return '';
+      return String(value);
+    })
+  );
+
+  const doc = new jsPDF({
+    orientation: options.orientation || 'portrait',
+    unit: 'pt',
+    format: 'a4',
+  });
+
+  const marginLeft = 40;
+  let startY = 40;
+
+  const title = options.title || 'Report';
+  doc.setFontSize(16);
+  doc.text(title, marginLeft, startY);
+  startY += 20;
+
+  if (options.subtitle) {
+    doc.setFontSize(10);
+    doc.setTextColor(90, 90, 90);
+    doc.text(options.subtitle, marginLeft, startY);
+    startY += 16;
+  }
+
+  autoTable(doc, {
+    head: [headers],
+    body: rows,
+    startY,
+    margin: { left: marginLeft, right: marginLeft },
+    styles: {
+      fontSize: 9,
+      cellPadding: 4,
+      overflow: 'linebreak',
+    },
+    headStyles: {
+      fillColor: [37, 99, 235],
+      textColor: [255, 255, 255],
+      fontStyle: 'bold',
+    },
+  });
+
+  const normalizedFilename = filename.toLowerCase().endsWith('.pdf') ? filename : `${filename}.pdf`;
+  doc.save(normalizedFilename);
 }

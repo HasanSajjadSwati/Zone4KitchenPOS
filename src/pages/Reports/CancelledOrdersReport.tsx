@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button } from '@/components/ui';
 import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
-import { getCancelledOrders, exportToCSV, type CancelledOrder, type DateRange } from '@/services/reportService';
+import { getCancelledOrders, exportToCSV, exportToPDF, type CancelledOrder, type DateRange } from '@/services/reportService';
 import { formatCurrency, formatDateTime } from '@/utils/validation';
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays } from 'date-fns';
 
@@ -53,8 +53,8 @@ export const CancelledOrdersReport: React.FC = () => {
     }
   };
 
-  const handleExport = () => {
-    const exportData = cancelledOrders.map(order => ({
+  const getExportData = () =>
+    cancelledOrders.map(order => ({
       'Order #': order.orderNumber,
       'Date': formatDateTime(order.orderDate),
       'Type': order.orderType.replace('_', ' ').toUpperCase(),
@@ -63,9 +63,20 @@ export const CancelledOrdersReport: React.FC = () => {
       'Amount': order.total,
     }));
 
+  const handleExportCSV = () => {
+    const exportData = getExportData();
     exportToCSV(
       exportData,
       `cancelled-orders-${datePreset}-${new Date().toISOString().split('T')[0]}.csv`
+    );
+  };
+
+  const handleExportPDF = () => {
+    const exportData = getExportData();
+    exportToPDF(
+      exportData,
+      `cancelled-orders-${datePreset}-${new Date().toISOString().split('T')[0]}.pdf`,
+      { title: 'Cancelled Orders Report', orientation: 'landscape' }
     );
   };
 
@@ -150,10 +161,16 @@ export const CancelledOrdersReport: React.FC = () => {
         <div className="p-4">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold">Cancelled Orders</h2>
-            <Button onClick={handleExport} disabled={cancelledOrders.length === 0}>
-              <ArrowDownTrayIcon className="w-4 h-4 mr-2" />
-              Export CSV
-            </Button>
+            <div className="flex items-center space-x-2">
+              <Button onClick={handleExportCSV} disabled={cancelledOrders.length === 0}>
+                <ArrowDownTrayIcon className="w-4 h-4 mr-2" />
+                Export CSV
+              </Button>
+              <Button onClick={handleExportPDF} disabled={cancelledOrders.length === 0}>
+                <ArrowDownTrayIcon className="w-4 h-4 mr-2" />
+                Export PDF
+              </Button>
+            </div>
           </div>
 
           {isLoading ? (

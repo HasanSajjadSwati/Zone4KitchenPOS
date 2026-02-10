@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Card, Button, Badge } from '@/components/ui';
 import { MagnifyingGlassIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
-import { searchCustomerReports, exportToCSV, type CustomerDetailedReport as CustomerReport } from '@/services/reportService';
+import { searchCustomerReports, exportToCSV, exportToPDF, type CustomerDetailedReport as CustomerReport } from '@/services/reportService';
 import { formatCurrency, formatDate } from '@/utils/validation';
 
 export const CustomerDetailedReport: React.FC = () => {
@@ -41,10 +41,9 @@ export const CustomerDetailedReport: React.FC = () => {
     setSelectedCustomer(customer);
   };
 
-  const handleExport = () => {
-    if (!selectedCustomer) return;
-
-    const exportData = selectedCustomer.orderHistory.map(order => ({
+  const getExportData = () => {
+    if (!selectedCustomer) return [];
+    return selectedCustomer.orderHistory.map(order => ({
       'Order #': order.orderNumber,
       'Date': formatDate(new Date(order.orderDate)),
       'Order Type': order.orderType === 'dine_in' ? 'Dine In' : order.orderType === 'take_away' ? 'Take Away' : 'Delivery',
@@ -52,10 +51,24 @@ export const CustomerDetailedReport: React.FC = () => {
       'Payment Status': order.isPaid ? 'Paid' : 'Unpaid',
       'Status': order.status,
     }));
+  };
 
+  const handleExportCSV = () => {
+    if (!selectedCustomer) return;
+    const exportData = getExportData();
     exportToCSV(
       exportData,
       `customer-${selectedCustomer.customerName}-${new Date().toISOString().split('T')[0]}.csv`
+    );
+  };
+
+  const handleExportPDF = () => {
+    if (!selectedCustomer) return;
+    const exportData = getExportData();
+    exportToPDF(
+      exportData,
+      `customer-${selectedCustomer.customerName}-${new Date().toISOString().split('T')[0]}.pdf`,
+      { title: `Customer Report - ${selectedCustomer.customerName}`, orientation: 'landscape' }
     );
   };
 
@@ -211,14 +224,24 @@ export const CustomerDetailedReport: React.FC = () => {
                 <h2 className="text-lg font-semibold">
                   Order History ({selectedCustomer.orderHistory.length})
                 </h2>
-                <Button
-                  onClick={handleExport}
-                  disabled={selectedCustomer.orderHistory.length === 0}
-                  leftIcon={<ArrowDownTrayIcon className="w-4 h-4" />}
-                  size="sm"
-                >
-                  Export CSV
-                </Button>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    onClick={handleExportCSV}
+                    disabled={selectedCustomer.orderHistory.length === 0}
+                    leftIcon={<ArrowDownTrayIcon className="w-4 h-4" />}
+                    size="sm"
+                  >
+                    Export CSV
+                  </Button>
+                  <Button
+                    onClick={handleExportPDF}
+                    disabled={selectedCustomer.orderHistory.length === 0}
+                    leftIcon={<ArrowDownTrayIcon className="w-4 h-4" />}
+                    size="sm"
+                  >
+                    Export PDF
+                  </Button>
+                </div>
               </div>
 
               {selectedCustomer.orderHistory.length === 0 ? (

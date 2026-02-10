@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import { Button, Card, Badge } from '@/components/ui';
 import { getEmployeeLoanSummaries, getOutstandingLoans } from '@/services/employeeService';
-import { exportToCSV } from '@/services/reportService';
+import { exportToCSV, exportToPDF } from '@/services/reportService';
 import { formatCurrency, formatDate } from '@/utils/validation';
 import type { EmployeeLoanSummary } from '@/services/employeeService';
 import type { EmployeeLoan } from '@/db/types';
@@ -33,8 +33,8 @@ export const EmployeeLoanReport: React.FC = () => {
     }
   };
 
-  const handleExportSummary = () => {
-    const exportData = loanSummaries.map((summary) => ({
+  const getSummaryExportData = () =>
+    loanSummaries.map((summary) => ({
       Employee: summary.employeeName,
       'Total Loans': summary.totalLoans,
       'Total Amount': summary.totalAmount,
@@ -43,14 +43,12 @@ export const EmployeeLoanReport: React.FC = () => {
       'Active Loans': summary.activeLoans,
     }));
 
-    exportToCSV(
-      exportData,
-      `employee-loan-summary-${new Date().toISOString().split('T')[0]}.csv`
-    );
-  };
+  const getOutstandingExportData = () => {
+    const loansToExport = selectedEmployeeId
+      ? outstandingLoans.filter((loan) => loan.employeeId === selectedEmployeeId)
+      : outstandingLoans;
 
-  const handleExportOutstanding = () => {
-    const exportData = outstandingLoans.map((loan) => {
+    return loansToExport.map((loan) => {
       const summary = loanSummaries.find((s) => s.employeeId === loan.employeeId);
       return {
         Employee: summary?.employeeName || 'Unknown',
@@ -61,10 +59,39 @@ export const EmployeeLoanReport: React.FC = () => {
         Reason: loan.reason || 'N/A',
       };
     });
+  };
 
+  const handleExportSummaryCSV = () => {
+    const exportData = getSummaryExportData();
+    exportToCSV(
+      exportData,
+      `employee-loan-summary-${new Date().toISOString().split('T')[0]}.csv`
+    );
+  };
+
+  const handleExportSummaryPDF = () => {
+    const exportData = getSummaryExportData();
+    exportToPDF(
+      exportData,
+      `employee-loan-summary-${new Date().toISOString().split('T')[0]}.pdf`,
+      { title: 'Employee Loan Summary' }
+    );
+  };
+
+  const handleExportOutstandingCSV = () => {
+    const exportData = getOutstandingExportData();
     exportToCSV(
       exportData,
       `outstanding-loans-${new Date().toISOString().split('T')[0]}.csv`
+    );
+  };
+
+  const handleExportOutstandingPDF = () => {
+    const exportData = getOutstandingExportData();
+    exportToPDF(
+      exportData,
+      `outstanding-loans-${new Date().toISOString().split('T')[0]}.pdf`,
+      { title: 'Outstanding Employee Loans', orientation: 'landscape' }
     );
   };
 
@@ -116,14 +143,24 @@ export const EmployeeLoanReport: React.FC = () => {
         <div className="p-4">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold">Loan Summary by Employee</h2>
-            <Button
-              onClick={handleExportSummary}
-              disabled={loanSummaries.length === 0}
-              leftIcon={<ArrowDownTrayIcon className="w-4 h-4" />}
-              size="sm"
-            >
-              Export CSV
-            </Button>
+            <div className="flex items-center space-x-2">
+              <Button
+                onClick={handleExportSummaryCSV}
+                disabled={loanSummaries.length === 0}
+                leftIcon={<ArrowDownTrayIcon className="w-4 h-4" />}
+                size="sm"
+              >
+                Export CSV
+              </Button>
+              <Button
+                onClick={handleExportSummaryPDF}
+                disabled={loanSummaries.length === 0}
+                leftIcon={<ArrowDownTrayIcon className="w-4 h-4" />}
+                size="sm"
+              >
+                Export PDF
+              </Button>
+            </div>
           </div>
 
           {isLoading ? (
@@ -222,12 +259,20 @@ export const EmployeeLoanReport: React.FC = () => {
                 </Button>
               )}
               <Button
-                onClick={handleExportOutstanding}
+                onClick={handleExportOutstandingCSV}
                 disabled={filteredOutstandingLoans.length === 0}
                 leftIcon={<ArrowDownTrayIcon className="w-4 h-4" />}
                 size="sm"
               >
                 Export CSV
+              </Button>
+              <Button
+                onClick={handleExportOutstandingPDF}
+                disabled={filteredOutstandingLoans.length === 0}
+                leftIcon={<ArrowDownTrayIcon className="w-4 h-4" />}
+                size="sm"
+              >
+                Export PDF
               </Button>
             </div>
           </div>

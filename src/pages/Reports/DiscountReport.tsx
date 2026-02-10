@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button } from '@/components/ui';
 import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
-import { getDiscountedOrders, exportToCSV, type DiscountReportItem, type DateRange } from '@/services/reportService';
+import { getDiscountedOrders, exportToCSV, exportToPDF, type DiscountReportItem, type DateRange } from '@/services/reportService';
 import { formatCurrency, formatDate } from '@/utils/validation';
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays } from 'date-fns';
 
@@ -70,8 +70,8 @@ export const DiscountReport: React.FC = () => {
     setFilteredData(filtered);
   };
 
-  const handleExport = () => {
-    const exportData = filteredData.map(item => ({
+  const getExportData = () =>
+    filteredData.map(item => ({
       'Order #': item.orderNumber,
       'Date': formatDate(new Date(item.orderDate)),
       'Discount Type': item.discountType === 'percentage' ? 'Percentage' : 'Fixed',
@@ -82,9 +82,20 @@ export const DiscountReport: React.FC = () => {
       'Order Total': item.orderTotal,
     }));
 
+  const handleExportCSV = () => {
+    const exportData = getExportData();
     exportToCSV(
       exportData,
       `discount-report-${datePreset}-${new Date().toISOString().split('T')[0]}.csv`
+    );
+  };
+
+  const handleExportPDF = () => {
+    const exportData = getExportData();
+    exportToPDF(
+      exportData,
+      `discount-report-${datePreset}-${new Date().toISOString().split('T')[0]}.pdf`,
+      { title: 'Discount Report', orientation: 'landscape' }
     );
   };
 
@@ -193,10 +204,16 @@ export const DiscountReport: React.FC = () => {
         <div className="p-4">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold">Discount Details</h2>
-            <Button onClick={handleExport} disabled={filteredData.length === 0}>
-              <ArrowDownTrayIcon className="w-4 h-4 mr-2" />
-              Export CSV
-            </Button>
+            <div className="flex items-center space-x-2">
+              <Button onClick={handleExportCSV} disabled={filteredData.length === 0}>
+                <ArrowDownTrayIcon className="w-4 h-4 mr-2" />
+                Export CSV
+              </Button>
+              <Button onClick={handleExportPDF} disabled={filteredData.length === 0}>
+                <ArrowDownTrayIcon className="w-4 h-4 mr-2" />
+                Export PDF
+              </Button>
+            </div>
           </div>
 
           {isLoading ? (

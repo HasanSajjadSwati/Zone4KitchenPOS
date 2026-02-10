@@ -5,6 +5,7 @@ import {
   getSalesSummary,
   getDailySales,
   exportToCSV,
+  exportToPDF,
   type DateRange,
   type SalesSummary as SalesSummaryType,
   type DailySales,
@@ -85,10 +86,9 @@ export const SalesSummary: React.FC = () => {
     }
   };
 
-  const handleExportSummary = () => {
-    if (!summary) return;
-
-    const exportData = [
+  const getSummaryExportData = () => {
+    if (!summary) return [];
+    return [
       {
         Metric: 'Total Sales',
         Value: formatCurrency(summary.totalSales),
@@ -138,21 +138,48 @@ export const SalesSummary: React.FC = () => {
         Value: formatCurrency(summary.otherSales),
       },
     ];
-
-    exportToCSV(exportData, `sales-summary-${datePreset}-${new Date().toISOString().split('T')[0]}.csv`);
   };
 
-  const handleExportDaily = () => {
-    if (dailySales.length === 0) return;
-
-    const exportData = dailySales.map(day => ({
+  const getDailyExportData = () => {
+    if (dailySales.length === 0) return [];
+    return dailySales.map(day => ({
       Date: day.date,
       'Total Sales': day.totalSales,
       'Total Orders': day.totalOrders,
       'Average Order Value': day.averageOrderValue.toFixed(2),
     }));
+  };
 
+  const handleExportSummaryCSV = () => {
+    const exportData = getSummaryExportData();
+    if (exportData.length === 0) return;
+    exportToCSV(exportData, `sales-summary-${datePreset}-${new Date().toISOString().split('T')[0]}.csv`);
+  };
+
+  const handleExportSummaryPDF = () => {
+    const exportData = getSummaryExportData();
+    if (exportData.length === 0) return;
+    exportToPDF(
+      exportData,
+      `sales-summary-${datePreset}-${new Date().toISOString().split('T')[0]}.pdf`,
+      { title: 'Sales Summary Report' }
+    );
+  };
+
+  const handleExportDailyCSV = () => {
+    const exportData = getDailyExportData();
+    if (exportData.length === 0) return;
     exportToCSV(exportData, `daily-sales-${datePreset}-${new Date().toISOString().split('T')[0]}.csv`);
+  };
+
+  const handleExportDailyPDF = () => {
+    const exportData = getDailyExportData();
+    if (exportData.length === 0) return;
+    exportToPDF(
+      exportData,
+      `daily-sales-${datePreset}-${new Date().toISOString().split('T')[0]}.pdf`,
+      { title: 'Daily Sales Report' }
+    );
   };
 
   return (
@@ -162,19 +189,35 @@ export const SalesSummary: React.FC = () => {
         <div className="flex items-center space-x-2">
           <Button
             variant="secondary"
-            onClick={handleExportSummary}
+            onClick={handleExportSummaryCSV}
             disabled={!summary}
             leftIcon={<ArrowDownTrayIcon className="w-5 h-5" />}
           >
-            Export Summary
+            Summary CSV
           </Button>
           <Button
             variant="secondary"
-            onClick={handleExportDaily}
+            onClick={handleExportSummaryPDF}
+            disabled={!summary}
+            leftIcon={<ArrowDownTrayIcon className="w-5 h-5" />}
+          >
+            Summary PDF
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={handleExportDailyCSV}
             disabled={dailySales.length === 0}
             leftIcon={<ArrowDownTrayIcon className="w-5 h-5" />}
           >
-            Export Daily
+            Daily CSV
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={handleExportDailyPDF}
+            disabled={dailySales.length === 0}
+            leftIcon={<ArrowDownTrayIcon className="w-5 h-5" />}
+          >
+            Daily PDF
           </Button>
         </div>
       </div>
