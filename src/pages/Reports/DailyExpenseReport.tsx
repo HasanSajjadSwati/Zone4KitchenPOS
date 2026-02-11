@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button } from '@/components/ui';
+import { Card, Button, TimePicker } from '@/components/ui';
 import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import { getDailyExpenseReport, exportToCSV, exportToPDF, type DailyExpenseReport as DailyExpenseReportType, type DateRange } from '@/services/reportService';
 import { formatCurrency } from '@/utils/validation';
@@ -151,12 +151,10 @@ export const DailyExpenseReport: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">Start Time</label>
-                  <input
-                    type="time"
+                  <TimePicker
+                    label="Start Time"
                     value={customStartTime}
-                    onChange={(e) => setCustomStartTime(e.target.value)}
-                    className="w-full px-3 py-2 border rounded"
+                    onChange={setCustomStartTime}
                   />
                 </div>
                 <div>
@@ -169,12 +167,10 @@ export const DailyExpenseReport: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">End Time</label>
-                  <input
-                    type="time"
+                  <TimePicker
+                    label="End Time"
                     value={customEndTime}
-                    onChange={(e) => setCustomEndTime(e.target.value)}
-                    className="w-full px-3 py-2 border rounded"
+                    onChange={setCustomEndTime}
                   />
                 </div>
               </>

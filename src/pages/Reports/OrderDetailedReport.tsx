@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowDownTrayIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
-import { Button, Card, Input, Select } from '@/components/ui';
+import { Button, Card, Input, Select, TimePicker } from '@/components/ui';
 import {
   exportToCSV,
   exportToPDF,
@@ -252,11 +252,10 @@ export const OrderDetailedReport: React.FC = () => {
                 value={customStartDate}
                 onChange={(e) => setCustomStartDate(e.target.value)}
               />
-              <Input
+              <TimePicker
                 label="Start Time"
-                type="time"
                 value={customStartTime}
-                onChange={(e) => setCustomStartTime(e.target.value)}
+                onChange={setCustomStartTime}
               />
               <Input
                 label="End Date"
@@ -264,11 +263,10 @@ export const OrderDetailedReport: React.FC = () => {
                 value={customEndDate}
                 onChange={(e) => setCustomEndDate(e.target.value)}
               />
-              <Input
+              <TimePicker
                 label="End Time"
-                type="time"
                 value={customEndTime}
-                onChange={(e) => setCustomEndTime(e.target.value)}
+                onChange={setCustomEndTime}
               />
             </div>
           )}

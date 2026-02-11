@@ -5,3 +5,4 @@ export { Modal } from './Modal';
 export { Card } from './Card';
 export { Badge } from './Badge';
 export { CategoryFilter } from './CategoryFilter';
+export { TimePicker } from './TimePicker';
