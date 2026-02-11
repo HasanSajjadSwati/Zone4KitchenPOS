@@ -20,10 +20,34 @@ export const SalesSummary: React.FC = () => {
   const dialog = useDialog();
   const [datePreset, setDatePreset] = useState<DateRangePreset>('today');
   const [customStartDate, setCustomStartDate] = useState('');
+  const [customStartTime, setCustomStartTime] = useState('00:00');
   const [customEndDate, setCustomEndDate] = useState('');
+  const [customEndTime, setCustomEndTime] = useState('23:59');
   const [summary, setSummary] = useState<SalesSummaryType | null>(null);
   const [dailySales, setDailySales] = useState<DailySales[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+
+  const combineDateTime = (
+    dateValue: string,
+    timeValue: string,
+    fallback: Date,
+    boundary: 'start' | 'end'
+  ): Date => {
+    if (!dateValue) return fallback;
+    const date = new Date(dateValue);
+    if (Number.isNaN(date.getTime())) return fallback;
+
+    const [hoursRaw, minutesRaw] = (timeValue || '00:00').split(':');
+    const hours = Number.parseInt(hoursRaw || '0', 10);
+    const minutes = Number.parseInt(minutesRaw || '0', 10);
+    date.setHours(
+      Number.isFinite(hours) ? hours : 0,
+      Number.isFinite(minutes) ? minutes : 0,
+      boundary === 'start' ? 0 : 59,
+      boundary === 'start' ? 0 : 999
+    );
+    return date;
+  };
 
   const getDateRange = (): DateRange => {
     const now = new Date();
@@ -39,8 +63,8 @@ export const SalesSummary: React.FC = () => {
         return { startDate: startOfMonth(now), endDate: endOfMonth(now) };
       case 'custom':
         return {
-          startDate: customStartDate ? startOfDay(new Date(customStartDate)) : startOfDay(now),
-          endDate: customEndDate ? endOfDay(new Date(customEndDate)) : endOfDay(now),
+          startDate: combineDateTime(customStartDate, customStartTime, startOfDay(now), 'start'),
+          endDate: combineDateTime(customEndDate, customEndTime, endOfDay(now), 'end'),
         };
       default:
         return { startDate: startOfDay(now), endDate: endOfDay(now) };
@@ -49,7 +73,7 @@ export const SalesSummary: React.FC = () => {
 
   useEffect(() => {
     loadReportData();
-  }, [datePreset, customStartDate, customEndDate]);
+  }, [datePreset, customStartDate, customStartTime, customEndDate, customEndTime]);
 
   const loadReportData = async () => {
     setIsLoading(true);
@@ -254,11 +278,29 @@ export const SalesSummary: React.FC = () => {
               />
             </div>
             <div>
+              <label className="block text-sm font-medium mb-2">Start Time</label>
+              <input
+                type="time"
+                value={customStartTime}
+                onChange={(e) => setCustomStartTime(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+            <div>
               <label className="block text-sm font-medium mb-2">End Date</label>
               <input
                 type="date"
                 value={customEndDate}
                 onChange={(e) => setCustomEndDate(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">End Time</label>
+              <input
+                type="time"
+                value={customEndTime}
+                onChange={(e) => setCustomEndTime(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>

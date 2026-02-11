@@ -38,7 +38,9 @@ const statusBadgeClass = (status: StatusFilter | OrderDetailedReportItem['status
 export const OrderDetailedReport: React.FC = () => {
   const [datePreset, setDatePreset] = useState<DateRangePreset>('today');
   const [customStartDate, setCustomStartDate] = useState('');
+  const [customStartTime, setCustomStartTime] = useState('00:00');
   const [customEndDate, setCustomEndDate] = useState('');
+  const [customEndTime, setCustomEndTime] = useState('23:59');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('completed');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>('all');
@@ -46,6 +48,28 @@ export const OrderDetailedReport: React.FC = () => {
   const [appliedSearchQuery, setAppliedSearchQuery] = useState('');
   const [reportData, setReportData] = useState<OrderDetailedReportItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+
+  const combineDateTime = (
+    dateValue: string,
+    timeValue: string,
+    fallback: Date,
+    boundary: 'start' | 'end'
+  ): Date => {
+    if (!dateValue) return fallback;
+    const date = new Date(dateValue);
+    if (Number.isNaN(date.getTime())) return fallback;
+
+    const [hoursRaw, minutesRaw] = (timeValue || '00:00').split(':');
+    const hours = Number.parseInt(hoursRaw || '0', 10);
+    const minutes = Number.parseInt(minutesRaw || '0', 10);
+    date.setHours(
+      Number.isFinite(hours) ? hours : 0,
+      Number.isFinite(minutes) ? minutes : 0,
+      boundary === 'start' ? 0 : 59,
+      boundary === 'start' ? 0 : 999
+    );
+    return date;
+  };
 
   const getDateRange = (): DateRange => {
     const now = new Date();
@@ -62,8 +86,8 @@ export const OrderDetailedReport: React.FC = () => {
         return { startDate: startOfMonth(now), endDate: endOfMonth(now) };
       case 'custom':
         return {
-          startDate: customStartDate ? startOfDay(new Date(customStartDate)) : startOfDay(now),
-          endDate: customEndDate ? endOfDay(new Date(customEndDate)) : endOfDay(now),
+          startDate: combineDateTime(customStartDate, customStartTime, startOfDay(now), 'start'),
+          endDate: combineDateTime(customEndDate, customEndTime, endOfDay(now), 'end'),
         };
       default:
         return { startDate: startOfDay(now), endDate: endOfDay(now) };
@@ -91,7 +115,7 @@ export const OrderDetailedReport: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, [datePreset, customStartDate, customEndDate, statusFilter, typeFilter, paymentFilter, appliedSearchQuery]);
+  }, [datePreset, customStartDate, customStartTime, customEndDate, customEndTime, statusFilter, typeFilter, paymentFilter, appliedSearchQuery]);
 
   const handleSearch = () => {
     setAppliedSearchQuery(searchQuery.trim());
@@ -229,10 +253,22 @@ export const OrderDetailedReport: React.FC = () => {
                 onChange={(e) => setCustomStartDate(e.target.value)}
               />
               <Input
+                label="Start Time"
+                type="time"
+                value={customStartTime}
+                onChange={(e) => setCustomStartTime(e.target.value)}
+              />
+              <Input
                 label="End Date"
                 type="date"
                 value={customEndDate}
                 onChange={(e) => setCustomEndDate(e.target.value)}
+              />
+              <Input
+                label="End Time"
+                type="time"
+                value={customEndTime}
+                onChange={(e) => setCustomEndTime(e.target.value)}
               />
             </div>
           )}
