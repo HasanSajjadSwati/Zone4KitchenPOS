@@ -250,6 +250,43 @@ async function fetchOrderItemsByOrderIds(orderIds: string[]): Promise<OrderItem[
   return results.flat();
 }
 
+type PaymentMethodTotals = Record<'cash' | 'card' | 'online' | 'other', number>;
+
+const createEmptyPaymentMethodTotals = (): PaymentMethodTotals => ({
+  cash: 0,
+  card: 0,
+  online: 0,
+  other: 0,
+});
+
+function getAppliedPaymentSummary(orderTotal: number, orderPayments: Payment[]) {
+  const byMethod = createEmptyPaymentMethodTotals();
+  const sortedPayments = [...orderPayments].sort((a, b) => {
+    const aTime = parseDateValue(a.paidAt)?.getTime() ?? 0;
+    const bTime = parseDateValue(b.paidAt)?.getTime() ?? 0;
+    if (aTime !== bTime) return aTime - bTime;
+    return String(a.id).localeCompare(String(b.id));
+  });
+
+  let remaining = Math.max(0, orderTotal);
+
+  for (const payment of sortedPayments) {
+    const amount = Number(payment.amount);
+    if (!Number.isFinite(amount) || amount <= 0 || remaining <= 0) {
+      continue;
+    }
+
+    const applied = Math.min(amount, remaining);
+    byMethod[payment.method] += applied;
+    remaining -= applied;
+  }
+
+  return {
+    appliedAmount: Math.max(0, orderTotal - remaining),
+    byMethod,
+  };
+}
+
 function buildCustomerReport(customer: Customer, orders: Order[]): CustomerDetailedReport {
   const totalOrders = orders.length;
   const paidOrders = orders.filter((o: Order) => o.isPaid).length;
@@ -331,8 +368,6 @@ export async function getSalesSummary(range: DateRange): Promise<SalesSummary> {
   let deliveryOrders = 0;
   let paidOrders = 0;
   let unpaidOrders = 0;
-  let paidAmount = 0;
-  let unpaidAmount = 0;
 
   for (const order of orders) {
     totalSales += order.total;
@@ -340,10 +375,8 @@ export async function getSalesSummary(range: DateRange): Promise<SalesSummary> {
 
     if (order.isPaid) {
       paidOrders++;
-      paidAmount += order.total;
     } else {
       unpaidOrders++;
-      unpaidAmount += order.total;
     }
 
     switch (order.orderType) {
@@ -362,19 +395,30 @@ export async function getSalesSummary(range: DateRange): Promise<SalesSummary> {
     }
   }
 
-  // Calculate payment method totals
-  const cashSales = payments
-    .filter((p: Payment) => p.method === 'cash')
-    .reduce((sum: number, p: Payment) => sum + p.amount, 0);
-  const cardSales = payments
-    .filter((p: Payment) => p.method === 'card')
-    .reduce((sum: number, p: Payment) => sum + p.amount, 0);
-  const onlineSales = payments
-    .filter((p: Payment) => p.method === 'online')
-    .reduce((sum: number, p: Payment) => sum + p.amount, 0);
-  const otherSales = payments
-    .filter((p: Payment) => p.method === 'other')
-    .reduce((sum: number, p: Payment) => sum + p.amount, 0);
+  // Calculate payment method totals using applied amounts only (capped per order total)
+  const paymentsByOrder = new Map<string, Payment[]>();
+  for (const payment of payments) {
+    if (!paymentsByOrder.has(payment.orderId)) {
+      paymentsByOrder.set(payment.orderId, []);
+    }
+    paymentsByOrder.get(payment.orderId)!.push(payment);
+  }
+
+  const paymentMethodTotals = createEmptyPaymentMethodTotals();
+  for (const order of orders) {
+    const summary = getAppliedPaymentSummary(order.total, paymentsByOrder.get(order.id) || []);
+    paymentMethodTotals.cash += summary.byMethod.cash;
+    paymentMethodTotals.card += summary.byMethod.card;
+    paymentMethodTotals.online += summary.byMethod.online;
+    paymentMethodTotals.other += summary.byMethod.other;
+  }
+
+  const cashSales = paymentMethodTotals.cash;
+  const cardSales = paymentMethodTotals.card;
+  const onlineSales = paymentMethodTotals.online;
+  const otherSales = paymentMethodTotals.other;
+  const paidAmount = Math.min(totalSales, cashSales + cardSales + onlineSales + otherSales);
+  const unpaidAmount = Math.max(0, totalSales - paidAmount);
 
   // Count total items (non-critical — don't let this fail the entire summary)
   let totalItems = 0;
@@ -922,7 +966,10 @@ export async function getOrderDetailedReport(
   filters: OrderDetailedReportFilters = {}
 ): Promise<OrderDetailedReportItem[]> {
   const rangeFilters = buildRangeFilters(range);
-  const orderFilters: Record<string, string> = { ...rangeFilters };
+  const orderFilters: Record<string, string> = {
+    ...rangeFilters,
+    dateField: filters.status === 'completed' ? 'completedAt' : 'createdAt',
+  };
 
   if (filters.status) {
     orderFilters.status = filters.status;
@@ -1008,7 +1055,7 @@ export async function getOrderDetailedReport(
       const paymentMethods = uniqueMethods.length > 0
         ? uniqueMethods.map(methodLabel).join(', ')
         : (order.isPaid ? 'Paid' : 'Unpaid');
-      const paidAmount = orderPayments.reduce((sum, payment) => sum + payment.amount, 0);
+      const paidAmount = getAppliedPaymentSummary(order.total, orderPayments).appliedAmount;
 
       return {
         orderId: order.id,

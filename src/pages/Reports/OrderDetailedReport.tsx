@@ -39,7 +39,7 @@ export const OrderDetailedReport: React.FC = () => {
   const [datePreset, setDatePreset] = useState<DateRangePreset>('today');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('completed');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -101,6 +101,10 @@ export const OrderDetailedReport: React.FC = () => {
     const totalOrders = reportData.length;
     const totalSales = reportData.reduce((sum, row) => sum + row.total, 0);
     const totalPaidAmount = reportData.reduce((sum, row) => sum + row.paidAmount, 0);
+    const totalUnpaidAmount = reportData.reduce(
+      (sum, row) => sum + Math.max(0, row.total - row.paidAmount),
+      0
+    );
     const paidOrders = reportData.filter((row) => row.isPaid).length;
     const unpaidOrders = totalOrders - paidOrders;
 
@@ -108,7 +112,7 @@ export const OrderDetailedReport: React.FC = () => {
       totalOrders,
       totalSales,
       totalPaidAmount,
-      totalUnpaidAmount: totalSales - totalPaidAmount,
+      totalUnpaidAmount,
       paidOrders,
       unpaidOrders,
     };
@@ -258,6 +262,9 @@ export const OrderDetailedReport: React.FC = () => {
               </Button>
             </div>
           </div>
+          <p className="text-xs text-gray-500 mt-3">
+            Tip: Keep Status as Completed to match Sales Summary and register sales totals.
+          </p>
         </div>
       </Card>
 

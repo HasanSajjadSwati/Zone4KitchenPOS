@@ -417,26 +417,42 @@ interface CompleteOrderParams {
   userId: string;
 }
 
+async function getOrderPaidTotal(orderId: string): Promise<number> {
+  const payments = await db.payments.where('orderId').equals(orderId).toArray();
+  return payments.reduce((sum: number, payment: Payment) => {
+    const amount = Number(payment.amount);
+    return sum + (Number.isFinite(amount) ? Math.max(0, amount) : 0);
+  }, 0);
+}
+
 export async function completeOrder(params: CompleteOrderParams): Promise<void> {
   const order = await db.orders.get(params.orderId);
   if (!order) throw new Error('Order not found');
+
+  const paidTotal = await getOrderPaidTotal(params.orderId);
+  const outstandingAmount = Math.max(0, order.total - paidTotal);
+  const shouldMarkAsPaid = order.isPaid || params.isPaid || paidTotal >= order.total;
+
+  if (params.isPaid && outstandingAmount > 0 && !params.paymentMethod) {
+    throw new Error('Payment method is required when marking order as paid');
+  }
 
   await db.transaction('rw', [db.orders, db.payments, db.customers], async () => {
     // Update order
     await db.orders.update(params.orderId, {
       status: 'completed',
-      isPaid: params.isPaid,
+      isPaid: shouldMarkAsPaid,
       completedBy: params.userId,
       completedAt: new Date(),
       updatedAt: new Date(),
     });
 
-    // Record payment if paid
-    if (params.isPaid && params.paymentMethod) {
+    // Record payment for remaining balance only (never store tendered change as revenue)
+    if (params.isPaid && params.paymentMethod && outstandingAmount > 0) {
       const payment: Payment = {
         id: createId(),
         orderId: params.orderId,
-        amount: params.paymentAmount || order.total,
+        amount: outstandingAmount,
         method: params.paymentMethod,
         reference: params.paymentReference || null,
         paidAt: new Date(),
@@ -506,9 +522,16 @@ export async function markOrderAsPaid(params: MarkAsPaidParams): Promise<void> {
   const order = await db.orders.get(params.orderId);
   if (!order) throw new Error('Order not found');
 
-  if (order.status === 'completed') {
-    throw new Error('Cannot mark completed order as paid');
+  if (order.status !== 'open') {
+    throw new Error('Only open orders can be marked as paid');
   }
+
+  if (order.isPaid) {
+    throw new Error('Order is already marked as paid');
+  }
+
+  const paidTotal = await getOrderPaidTotal(params.orderId);
+  const outstandingAmount = Math.max(0, order.total - paidTotal);
 
   await db.transaction('rw', [db.orders, db.payments], async () => {
     // Update order as paid
@@ -517,19 +540,21 @@ export async function markOrderAsPaid(params: MarkAsPaidParams): Promise<void> {
       updatedAt: new Date(),
     });
 
-    // Record payment
-    const payment: Payment = {
-      id: createId(),
-      orderId: params.orderId,
-      amount: params.paymentAmount || order.total,
-      method: params.paymentMethod,
-      reference: params.paymentReference || null,
-      paidAt: new Date(),
-      receivedBy: params.userId,
-      notes: null,
-      createdAt: new Date(),
-    };
-    await db.payments.add(payment);
+    // Record only remaining balance so payment totals cannot exceed order totals
+    if (outstandingAmount > 0) {
+      const payment: Payment = {
+        id: createId(),
+        orderId: params.orderId,
+        amount: outstandingAmount,
+        method: params.paymentMethod,
+        reference: params.paymentReference || null,
+        paidAt: new Date(),
+        receivedBy: params.userId,
+        notes: null,
+        createdAt: new Date(),
+      };
+      await db.payments.add(payment);
+    }
   });
 
   await logAudit({

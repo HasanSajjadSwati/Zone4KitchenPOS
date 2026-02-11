@@ -105,11 +105,39 @@ reportRoutes.get('/sales-summary', async (req, res) => {
 
     const paymentRows = await allAsync(
       `
-        SELECT p.method AS "method", COALESCE(SUM(p.amount), 0) AS "total"
-        FROM payments p
-        JOIN orders o ON o.id = p.orderId
-        ${whereClause}
-        GROUP BY p.method
+        WITH filtered_orders AS (
+          SELECT o.id, o.total
+          FROM orders o
+          ${whereClause}
+        ),
+        ranked_payments AS (
+          SELECT
+            p.orderId AS "orderId",
+            p.method AS "method",
+            p.amount AS "amount",
+            fo.total AS "orderTotal",
+            COALESCE(
+              SUM(p.amount) OVER (
+                PARTITION BY p.orderId
+                ORDER BY p.paidAt, p.id
+                ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
+              ),
+              0
+            ) AS "paidBefore"
+          FROM payments p
+          JOIN filtered_orders fo ON fo.id = p.orderId
+        ),
+        applied_payments AS (
+          SELECT
+            "method",
+            GREATEST(LEAST("amount", "orderTotal" - "paidBefore"), 0) AS "appliedAmount"
+          FROM ranked_payments
+        )
+        SELECT
+          "method",
+          COALESCE(SUM("appliedAmount"), 0) AS "total"
+        FROM applied_payments
+        GROUP BY "method"
       `,
       params
     );
@@ -129,8 +157,17 @@ reportRoutes.get('/sales-summary', async (req, res) => {
       if (method === 'other') paymentTotals.other = toNumber(row.total);
     }
 
+    const totalSales = toNumber(summary?.totalSales);
+    const totalAppliedPayments =
+      toNumber(paymentTotals.cash) +
+      toNumber(paymentTotals.card) +
+      toNumber(paymentTotals.online) +
+      toNumber(paymentTotals.other);
+    const paidAmount = Math.min(totalSales, totalAppliedPayments);
+    const unpaidAmount = Math.max(0, totalSales - paidAmount);
+
     res.json({
-      totalSales: toNumber(summary?.totalSales),
+      totalSales,
       totalOrders: toNumber(summary?.totalOrders),
       averageOrderValue: toNumber(summary?.averageOrderValue),
       totalItems: toNumber(itemsRow?.totalItems),
@@ -147,8 +184,8 @@ reportRoutes.get('/sales-summary', async (req, res) => {
       otherSales: toNumber(paymentTotals.other),
       paidOrders: toNumber(summary?.paidOrders),
       unpaidOrders: toNumber(summary?.unpaidOrders),
-      paidAmount: toNumber(summary?.paidAmount),
-      unpaidAmount: toNumber(summary?.unpaidAmount),
+      paidAmount,
+      unpaidAmount,
     });
   } catch (error) {
     logger.error('Sales summary report error', error);

@@ -48,9 +48,11 @@ orderRoutes.get('/', async (req, res) => {
       orderType,
       startDate,
       endDate,
+      dateField,
     } = req.query;
     let query = 'SELECT * FROM orders WHERE 1=1';
     const params: any[] = [];
+    const resolvedDateField = dateField === 'completedAt' ? 'completedAt' : 'createdAt';
 
     if (status) {
       query += ' AND status = ?';
@@ -89,15 +91,15 @@ orderRoutes.get('/', async (req, res) => {
       }
     }
     if (startDate) {
-      query += ' AND createdAt >= ?';
+      query += ` AND ${resolvedDateField} >= ?`;
       params.push(startDate);
     }
     if (endDate) {
-      query += ' AND createdAt <= ?';
+      query += ` AND ${resolvedDateField} <= ?`;
       params.push(endDate);
     }
 
-    query += ' ORDER BY createdAt DESC';
+    query += ` ORDER BY ${resolvedDateField} DESC, createdAt DESC`;
     const orders = await allAsync(query, params);
     res.json(convertBooleansArray(orders));
   } catch (error) {

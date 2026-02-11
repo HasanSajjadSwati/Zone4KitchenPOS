@@ -8,6 +8,61 @@ async function userExists(userId: string): Promise<boolean> {
   return Boolean(row);
 }
 
+function toNumber(value: unknown): number {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : 0;
+}
+
+async function getSessionFinancials(sessionId: string): Promise<{
+  totalSales: number;
+  totalOrders: number;
+  cashSales: number;
+}> {
+  const row = await getAsync(
+    `
+      WITH session_orders AS (
+        SELECT o.id, o.total
+        FROM orders o
+        WHERE o.registerSessionId = ? AND o.status = 'completed'
+      ),
+      ranked_payments AS (
+        SELECT
+          p.orderId AS "orderId",
+          p.method AS "method",
+          p.amount AS "amount",
+          so.total AS "orderTotal",
+          COALESCE(
+            SUM(p.amount) OVER (
+              PARTITION BY p.orderId
+              ORDER BY p.paidAt, p.id
+              ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
+            ),
+            0
+          ) AS "paidBefore"
+        FROM payments p
+        JOIN session_orders so ON so.id = p.orderId
+      ),
+      applied_payments AS (
+        SELECT
+          "method",
+          GREATEST(LEAST("amount", "orderTotal" - "paidBefore"), 0) AS "appliedAmount"
+        FROM ranked_payments
+      )
+      SELECT
+        COALESCE((SELECT SUM(total) FROM session_orders), 0) AS "totalSales",
+        COALESCE((SELECT COUNT(*) FROM session_orders), 0) AS "totalOrders",
+        COALESCE((SELECT SUM("appliedAmount") FROM applied_payments WHERE "method" = 'cash'), 0) AS "cashSales"
+    `,
+    [sessionId]
+  );
+
+  return {
+    totalSales: toNumber(row?.totalSales),
+    totalOrders: toNumber(row?.totalOrders),
+    cashSales: toNumber(row?.cashSales),
+  };
+}
+
 export const registerSessionRoutes = express.Router();
 
 // Get all register sessions
@@ -77,14 +132,31 @@ registerSessionRoutes.put('/:id', async (req, res) => {
       return res.status(400).json({ error: 'Closing user not found' });
     }
 
+    const financials = await getSessionFinancials(req.params.id);
     const now = new Date().toISOString();
-    const cashDifference = expectedCash && closingCash ? closingCash - expectedCash : null;
+    const computedExpectedCash = toNumber(session.openingCash) + financials.cashSales;
+    const resolvedExpectedCash = expectedCash ?? computedExpectedCash;
+    const resolvedClosingCash = closingCash ?? session.closingCash;
+    const cashDifference =
+      resolvedClosingCash === null || resolvedClosingCash === undefined
+        ? null
+        : toNumber(resolvedClosingCash) - toNumber(resolvedExpectedCash);
 
     await runAsync(
       `UPDATE registerSessions SET closedBy = ?, closedAt = ?, closingCash = ?, expectedCash = ?,
-       cashDifference = ?, notes = ?, status = ? WHERE id = ?`,
-      [closedBy || session.closedBy, now, closingCash || session.closingCash,
-       expectedCash || session.expectedCash, cashDifference, notes || session.notes, 'closed', req.params.id]
+       cashDifference = ?, notes = ?, status = ?, totalSales = ?, totalOrders = ? WHERE id = ?`,
+      [
+        closedBy ?? session.closedBy,
+        now,
+        resolvedClosingCash,
+        resolvedExpectedCash,
+        cashDifference,
+        notes ?? session.notes,
+        'closed',
+        financials.totalSales,
+        financials.totalOrders,
+        req.params.id,
+      ]
     );
 
     const updated = await getAsync('SELECT * FROM registerSessions WHERE id = ?', [req.params.id]);
@@ -116,13 +188,32 @@ registerSessionRoutes.post('/:id/close', async (req, res) => {
       return res.status(400).json({ error: 'Session is already closed' });
     }
 
+    if (closingCash === undefined || closingCash === null || Number.isNaN(Number(closingCash))) {
+      return res.status(400).json({ error: 'closingCash is required to close the session' });
+    }
+
+    const financials = await getSessionFinancials(req.params.id);
     const now = new Date().toISOString();
-    const cashDifference = closingCash - (expectedCash || 0);
+    const normalizedClosingCash = toNumber(closingCash);
+    const computedExpectedCash = toNumber(session.openingCash) + financials.cashSales;
+    const resolvedExpectedCash = expectedCash ?? computedExpectedCash;
+    const cashDifference = normalizedClosingCash - toNumber(resolvedExpectedCash);
 
     await runAsync(
       `UPDATE registerSessions SET closedBy = ?, closedAt = ?, closingCash = ?, expectedCash = ?,
-       cashDifference = ?, notes = ?, status = ? WHERE id = ?`,
-      [closedBy, now, closingCash, expectedCash, cashDifference, notes || null, 'closed', req.params.id]
+       cashDifference = ?, notes = ?, status = ?, totalSales = ?, totalOrders = ? WHERE id = ?`,
+      [
+        closedBy,
+        now,
+        normalizedClosingCash,
+        resolvedExpectedCash,
+        cashDifference,
+        notes ?? null,
+        'closed',
+        financials.totalSales,
+        financials.totalOrders,
+        req.params.id,
+      ]
     );
 
     const updated = await getAsync('SELECT * FROM registerSessions WHERE id = ?', [req.params.id]);

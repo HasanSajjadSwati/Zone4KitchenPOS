@@ -678,9 +678,10 @@ export const OrderList: React.FC = () => {
             </Select>
 
             <Input
-              label="Amount Received"
+              label="Amount Tendered"
               type="number"
               step="0.01"
+              helperText="Used for change calculation only. Recorded payment is capped to remaining order balance."
               {...paymentForm.register('paymentAmount', { valueAsNumber: true })}
               error={paymentForm.formState.errors.paymentAmount?.message}
             />

@@ -1941,7 +1941,7 @@ export const CreateOrder: React.FC = () => {
                   variant="success"
                   onClick={() => {
                     completeForm.reset({
-                      isPaid: false,
+                      isPaid: currentOrder?.isPaid || false,
                       paymentMethod: 'cash',
                       paymentAmount: currentOrder?.total || 0,
                       paymentReference: '',
@@ -2769,10 +2769,11 @@ export const CreateOrder: React.FC = () => {
               </Select>
 
               <Input
-                label="Amount Received"
+                label="Amount Tendered"
                 type="number"
                 step="0.01"
                 placeholder={currentOrder?.total.toString()}
+                helperText="Used for change calculation only. Recorded payment is capped to remaining order balance."
                 {...completeForm.register('paymentAmount', { valueAsNumber: true })}
               />
 

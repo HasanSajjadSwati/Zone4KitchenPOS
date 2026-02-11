@@ -1,7 +1,38 @@
 import { db } from '@/db';
-import type { RegisterSession } from '@/db/types';
+import type { Order, Payment, RegisterSession } from '@/db/types';
+import { apiClient } from '@/services/api';
 import { logAudit } from '@/utils/audit';
 import { createId } from '@/utils/uuid';
+
+function getAppliedPaymentsByMethod(orderTotal: number, payments: Payment[]) {
+  const sortedPayments = [...payments].sort((a, b) => {
+    const aTime = new Date(a.paidAt).getTime();
+    const bTime = new Date(b.paidAt).getTime();
+    const safeATime = Number.isFinite(aTime) ? aTime : 0;
+    const safeBTime = Number.isFinite(bTime) ? bTime : 0;
+    if (safeATime !== safeBTime) return safeATime - safeBTime;
+    return String(a.id).localeCompare(String(b.id));
+  });
+
+  const byMethod = {
+    cash: 0,
+    card: 0,
+    online: 0,
+    other: 0,
+  };
+
+  let remaining = Math.max(0, orderTotal);
+  for (const payment of sortedPayments) {
+    const amount = Number(payment.amount);
+    if (!Number.isFinite(amount) || amount <= 0 || remaining <= 0) continue;
+
+    const applied = Math.min(amount, remaining);
+    byMethod[payment.method] += applied;
+    remaining -= applied;
+  }
+
+  return byMethod;
+}
 
 export async function openRegister(
   openingCash: number,
@@ -73,14 +104,25 @@ export async function closeRegister(
   const totalSales = completedOrders.reduce((sum, o) => sum + o.total, 0);
   const totalOrders = completedOrders.length;
 
-  // Calculate expected cash (opening + cash sales)
-  const cashPayments = await db.payments
+  // Calculate expected cash (opening + applied cash sales)
+  const payments = await db.payments
     .where('orderId')
     .anyOf(completedOrders.map((o) => o.id))
-    .and((p) => p.method === 'cash')
     .toArray();
 
-  const cashSales = cashPayments.reduce((sum, p) => sum + p.amount, 0);
+  const paymentsByOrder = new Map<string, Payment[]>();
+  for (const payment of payments) {
+    if (!paymentsByOrder.has(payment.orderId)) {
+      paymentsByOrder.set(payment.orderId, []);
+    }
+    paymentsByOrder.get(payment.orderId)!.push(payment);
+  }
+
+  const cashSales = completedOrders.reduce((sum, order) => {
+    const applied = getAppliedPaymentsByMethod(order.total, paymentsByOrder.get(order.id) || []);
+    return sum + applied.cash;
+  }, 0);
+
   const expectedCash = session.openingCash + cashSales;
   const cashDifference = closingCash - expectedCash;
 
@@ -116,11 +158,63 @@ export async function getCurrentSession(): Promise<RegisterSession | undefined> 
 }
 
 export async function getRecentSessions(limit: number = 10): Promise<RegisterSession[]> {
-  return await db.registerSessions
+  const sessions = await db.registerSessions
     .orderBy('openedAt')
     .reverse()
     .limit(limit)
     .toArray();
+
+  if (sessions.length === 0) {
+    return [];
+  }
+
+  const completedOrders = await apiClient.getOrders({
+    registerSessionIds: sessions.map((session: RegisterSession) => session.id).join(','),
+    status: 'completed',
+  }) as Order[];
+
+  const payments = completedOrders.length > 0
+    ? await apiClient.getPayments({ orderIds: completedOrders.map((order) => order.id).join(',') }) as Payment[]
+    : [];
+
+  const paymentsByOrder = new Map<string, Payment[]>();
+  for (const payment of payments) {
+    if (!paymentsByOrder.has(payment.orderId)) {
+      paymentsByOrder.set(payment.orderId, []);
+    }
+    paymentsByOrder.get(payment.orderId)!.push(payment);
+  }
+
+  const totalsBySession = new Map<string, { totalSales: number; totalOrders: number; cashSales: number }>();
+  for (const order of completedOrders) {
+    const existing = totalsBySession.get(order.registerSessionId) || { totalSales: 0, totalOrders: 0, cashSales: 0 };
+    const applied = getAppliedPaymentsByMethod(order.total, paymentsByOrder.get(order.id) || []);
+    existing.totalSales += order.total;
+    existing.totalOrders += 1;
+    existing.cashSales += applied.cash;
+    totalsBySession.set(order.registerSessionId, existing);
+  }
+
+  return sessions.map((session: RegisterSession) => {
+    const totals = totalsBySession.get(session.id);
+    const resolvedExpectedCash = totals
+      ? session.openingCash + totals.cashSales
+      : session.expectedCash;
+    const resolvedCashDifference =
+      session.status === 'closed' &&
+      session.closingCash !== null &&
+      resolvedExpectedCash !== null
+        ? session.closingCash - resolvedExpectedCash
+        : session.cashDifference;
+
+    return {
+      ...session,
+      totalSales: totals?.totalSales ?? session.totalSales ?? 0,
+      totalOrders: totals?.totalOrders ?? session.totalOrders ?? 0,
+      expectedCash: resolvedExpectedCash,
+      cashDifference: resolvedCashDifference,
+    };
+  });
 }
 
 export async function getSessionStats(sessionId: string) {
@@ -141,8 +235,20 @@ export async function getSessionStats(sessionId: string) {
     .anyOf(completedOrders.map((o) => o.id))
     .toArray();
 
-  const paymentsByMethod = payments.reduce((acc, payment) => {
-    acc[payment.method] = (acc[payment.method] || 0) + payment.amount;
+  const paymentsByOrder = new Map<string, Payment[]>();
+  for (const payment of payments) {
+    if (!paymentsByOrder.has(payment.orderId)) {
+      paymentsByOrder.set(payment.orderId, []);
+    }
+    paymentsByOrder.get(payment.orderId)!.push(payment);
+  }
+
+  const paymentsByMethod = completedOrders.reduce((acc, order) => {
+    const applied = getAppliedPaymentsByMethod(order.total, paymentsByOrder.get(order.id) || []);
+    acc.cash = (acc.cash || 0) + applied.cash;
+    acc.card = (acc.card || 0) + applied.card;
+    acc.online = (acc.online || 0) + applied.online;
+    acc.other = (acc.other || 0) + applied.other;
     return acc;
   }, {} as Record<string, number>);
 
