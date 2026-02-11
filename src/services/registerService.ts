@@ -4,6 +4,25 @@ import { apiClient } from '@/services/api';
 import { logAudit } from '@/utils/audit';
 import { createId } from '@/utils/uuid';
 
+const BULK_QUERY_CHUNK_SIZE = 40;
+
+const chunkArray = <T,>(items: T[], size: number): T[][] => {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+};
+
+async function fetchPaymentsByOrderIds(orderIds: string[]): Promise<Payment[]> {
+  if (orderIds.length === 0) return [];
+  const chunks = chunkArray(orderIds, BULK_QUERY_CHUNK_SIZE);
+  const results = await Promise.all(
+    chunks.map((ids) => apiClient.getPayments({ orderIds: ids.join(',') }) as Promise<Payment[]>)
+  );
+  return results.flat();
+}
+
 function getAppliedPaymentsByMethod(orderTotal: number, payments: Payment[]) {
   const sortedPayments = [...payments].sort((a, b) => {
     const aTime = new Date(a.paidAt).getTime();
@@ -173,9 +192,7 @@ export async function getRecentSessions(limit: number = 10): Promise<RegisterSes
     status: 'completed',
   }) as Order[];
 
-  const payments = completedOrders.length > 0
-    ? await apiClient.getPayments({ orderIds: completedOrders.map((order) => order.id).join(',') }) as Payment[]
-    : [];
+  const payments = await fetchPaymentsByOrderIds(completedOrders.map((order) => order.id));
 
   const paymentsByOrder = new Map<string, Payment[]>();
   for (const payment of payments) {

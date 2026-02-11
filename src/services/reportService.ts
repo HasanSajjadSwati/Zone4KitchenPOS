@@ -202,6 +202,9 @@ const buildRangeFilters = (range: DateRange): Record<string, string> => ({
   endDate: range.endDate.toISOString(),
 });
 
+// Keep query strings comfortably below proxy/server limits.
+const BULK_QUERY_CHUNK_SIZE = 40;
+
 const chunkArray = <T,>(items: T[], size: number): T[][] => {
   const chunks: T[][] = [];
   for (let i = 0; i < items.length; i += size) {
@@ -234,7 +237,7 @@ const filterOrdersInRange = (orders: Order[], range: DateRange): Order[] => {
 
 async function fetchPaymentsByOrderIds(orderIds: string[]): Promise<Payment[]> {
   if (orderIds.length === 0) return [];
-  const chunks = chunkArray(orderIds, 200);
+  const chunks = chunkArray(orderIds, BULK_QUERY_CHUNK_SIZE);
   const results = await Promise.all(
     chunks.map((ids) => apiClient.getPayments({ orderIds: ids.join(',') }))
   );
@@ -243,7 +246,7 @@ async function fetchPaymentsByOrderIds(orderIds: string[]): Promise<Payment[]> {
 
 async function fetchOrderItemsByOrderIds(orderIds: string[]): Promise<OrderItem[]> {
   if (orderIds.length === 0) return [];
-  const chunks = chunkArray(orderIds, 200);
+  const chunks = chunkArray(orderIds, BULK_QUERY_CHUNK_SIZE);
   const results = await Promise.all(
     chunks.map((ids) => apiClient.getOrderItemsBulk({ orderIds: ids.join(',') }))
   );
@@ -424,9 +427,7 @@ export async function getSalesSummary(range: DateRange): Promise<SalesSummary> {
   let totalItems = 0;
   try {
     const orderIdsForItems = orders.map((order: Order) => order.id);
-    const orderItems = orderIdsForItems.length > 0
-      ? await apiClient.getOrderItemsBulk({ orderIds: orderIdsForItems.join(',') })
-      : [];
+    const orderItems = await fetchOrderItemsByOrderIds(orderIdsForItems);
     totalItems = orderItems.reduce((sum: number, item: OrderItem) => sum + item.quantity, 0);
   } catch (error) {
     console.warn('Failed to fetch order items for total count, defaulting to 0:', error);
@@ -474,9 +475,7 @@ export async function getCategorySales(range: DateRange): Promise<CategorySales[
     range
   );
   const orderIds = orders.map((order: Order) => order.id);
-  const allItems = orderIds.length > 0
-    ? await apiClient.getOrderItemsBulk({ orderIds: orderIds.join(',') }) as OrderItem[]
-    : [];
+  const allItems = await fetchOrderItemsByOrderIds(orderIds);
   const orderItems = allItems.filter((item: OrderItem) => item.itemType === 'menu_item');
 
   const categories = await db.categories.toArray();
@@ -549,9 +548,7 @@ export async function getItemSales(range: DateRange): Promise<ItemSales[]> {
     range
   );
   const orderIds = orders.map((order: Order) => order.id);
-  const allItems = orderIds.length > 0
-    ? await apiClient.getOrderItemsBulk({ orderIds: orderIds.join(',') }) as OrderItem[]
-    : [];
+  const allItems = await fetchOrderItemsByOrderIds(orderIds);
   const orderItems = allItems.filter((item: OrderItem) => item.itemType === 'menu_item');
 
   const menuItems = await db.menuItems.toArray();
@@ -624,9 +621,7 @@ export async function getDealSales(range: DateRange): Promise<DealSales[]> {
     range
   );
   const orderIds = orders.map((order: Order) => order.id);
-  const allItems = orderIds.length > 0
-    ? await apiClient.getOrderItemsBulk({ orderIds: orderIds.join(',') }) as OrderItem[]
-    : [];
+  const allItems = await fetchOrderItemsByOrderIds(orderIds);
   const orderItems = allItems.filter((item: OrderItem) => item.itemType === 'deal');
 
   const deals = await db.deals.toArray();
