@@ -172,8 +172,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             {/* Dashboard */}
             <Link
               to="/"
-              className={`flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors ${
-                location.pathname === '/' ? 'bg-blue-50 text-blue-600' : ''
+              className={`flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-200 dark:hover:bg-gray-700 ${
+                location.pathname === '/' ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/40 dark:text-blue-200' : ''
               }`}
               onClick={() => setSidebarOpen(false)}
             >
@@ -191,8 +191,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <div key={section.name} className="space-y-1">
                   <button
                     onClick={() => toggleSection(sectionKey)}
-                    className={`flex items-center justify-between w-full px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors ${
-                      isActive ? 'bg-gray-50 font-medium' : ''
+                      className={`flex items-center justify-between w-full px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-200 dark:hover:bg-gray-700 ${
+                        isActive ? 'bg-gray-50 font-medium dark:bg-gray-800' : ''
                     }`}
                   >
                     <div className="flex items-center">
@@ -212,9 +212,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                         <Link
                           key={item.href}
                           to={item.href}
-                          className={`flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-gray-100 transition-colors ${
+                          className={`flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700 ${
                             location.pathname === item.href
-                              ? 'bg-blue-50 text-blue-600 font-medium'
+                              ? 'bg-blue-50 text-blue-600 font-medium dark:bg-blue-900/40 dark:text-blue-200'
                               : ''
                           }`}
                           onClick={() => setSidebarOpen(false)}
@@ -233,8 +233,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             {canAccess('settings', 'read') && (
               <Link
                 to="/settings"
-                className={`flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors ${
-                  location.pathname === '/settings' ? 'bg-blue-50 text-blue-600' : ''
+                className={`flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-200 dark:hover:bg-gray-700 ${
+                  location.pathname === '/settings' ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/40 dark:text-blue-200' : ''
                 }`}
                 onClick={() => setSidebarOpen(false)}
               >
@@ -261,7 +261,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             </div>
             <button
               onClick={toggleTheme}
-              className="flex items-center w-full px-4 py-2 mb-1 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              className="flex items-center w-full px-4 py-2 mb-1 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors dark:text-gray-200 dark:hover:bg-gray-700"
             >
               {isDark ? (
                 <SunIcon className="w-5 h-5 mr-3" />
@@ -272,7 +272,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             </button>
             <button
               onClick={handleLogout}
-              className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors dark:text-gray-200 dark:hover:bg-gray-700"
             >
               <ArrowLeftOnRectangleIcon className="w-5 h-5 mr-3" />
               Logout

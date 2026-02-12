@@ -28,7 +28,7 @@
   }
 
   .dark .bg-gray-50 {
-    @apply bg-gray-900;
+    @apply bg-gray-800;
   }
 
   .dark .bg-gray-100 {
@@ -44,27 +44,55 @@
   }
 
   .dark .bg-blue-50 {
-    @apply bg-blue-900/20;
+    @apply bg-blue-900/40;
   }
 
   .dark .bg-green-50 {
-    @apply bg-green-900/20;
+    @apply bg-green-900/35;
   }
 
   .dark .bg-yellow-50 {
-    @apply bg-yellow-900/20;
+    @apply bg-yellow-900/35;
   }
 
   .dark .bg-red-50 {
-    @apply bg-red-900/20;
+    @apply bg-red-900/35;
   }
 
   .dark .bg-purple-50 {
-    @apply bg-purple-900/20;
+    @apply bg-purple-900/35;
   }
 
   .dark .bg-indigo-50 {
-    @apply bg-indigo-900/20;
+    @apply bg-indigo-900/35;
+  }
+
+  .dark .bg-gray-50\/80 {
+    @apply bg-gray-800/80;
+  }
+
+  .dark .bg-gray-50\/50 {
+    @apply bg-gray-800/60;
+  }
+
+  .dark .bg-blue-50\/70 {
+    @apply bg-blue-900/40;
+  }
+
+  .dark .bg-emerald-50\/70 {
+    @apply bg-emerald-900/35;
+  }
+
+  .dark .bg-violet-50\/70 {
+    @apply bg-violet-900/35;
+  }
+
+  .dark .bg-red-50\/70 {
+    @apply bg-red-900/35;
+  }
+
+  .dark .bg-amber-50\/70 {
+    @apply bg-amber-900/35;
   }
 
   .dark .text-gray-900 {
@@ -91,6 +119,26 @@
     color: rgb(107 114 128);
   }
 
+  .dark .text-blue-600 {
+    color: rgb(147 197 253);
+  }
+
+  .dark .text-emerald-600 {
+    color: rgb(110 231 183);
+  }
+
+  .dark .text-violet-600 {
+    color: rgb(196 181 253);
+  }
+
+  .dark .text-red-600 {
+    color: rgb(252 165 165);
+  }
+
+  .dark .text-amber-600 {
+    color: rgb(252 211 77);
+  }
+
   .dark .border-gray-100,
   .dark .border-gray-200 {
     @apply border-gray-700;
@@ -100,16 +148,36 @@
     @apply border-gray-600;
   }
 
+  .dark .border-blue-100 {
+    border-color: rgb(30 64 175 / 0.6);
+  }
+
+  .dark .border-emerald-100 {
+    border-color: rgb(6 78 59 / 0.6);
+  }
+
+  .dark .border-violet-100 {
+    border-color: rgb(91 33 182 / 0.6);
+  }
+
+  .dark .border-red-100 {
+    border-color: rgb(127 29 29 / 0.6);
+  }
+
+  .dark .border-amber-100 {
+    border-color: rgb(120 53 15 / 0.6);
+  }
+
   .dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
     border-color: rgb(55 65 81 / var(--tw-divide-opacity, 1));
   }
 
   .dark .hover\:bg-gray-50:hover {
-    @apply bg-gray-800;
+    @apply bg-gray-700;
   }
 
   .dark .hover\:bg-gray-100:hover {
-    @apply bg-gray-700;
+    @apply bg-gray-600;
   }
 
   .dark .hover\:bg-gray-200:hover {

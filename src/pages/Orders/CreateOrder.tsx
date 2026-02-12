@@ -1570,24 +1570,24 @@ export const CreateOrder: React.FC = () => {
                     {filteredDeals.map((deal) => (
                     <div
                       key={deal.id}
-                      className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg hover:from-green-100 hover:to-blue-100 cursor-pointer border border-green-200"
+                      className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg hover:from-green-100 hover:to-blue-100 cursor-pointer border border-green-200 dark:from-emerald-900/40 dark:to-sky-900/40 dark:hover:from-emerald-900/60 dark:hover:to-sky-900/60 dark:border-emerald-700/60"
                       onClick={() => handleAddDeal(deal)}
                     >
                       <div className="flex-1">
                         <div className="flex items-center space-x-2 mb-1">
-                          <p className="font-bold text-gray-900">{deal.name}</p>
-                          <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded font-medium">
+                          <p className="font-bold text-gray-900 dark:text-gray-100">{deal.name}</p>
+                          <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded font-medium dark:bg-emerald-900/70 dark:text-emerald-200">
                             DEAL
                           </span>
                         </div>
                         {deal.description && (
-                          <p className="text-xs text-gray-600 mb-2 line-clamp-1">{deal.description}</p>
+                          <p className="text-xs text-gray-600 mb-2 line-clamp-1 dark:text-gray-300">{deal.description}</p>
                         )}
-                        <p className="text-lg font-bold text-primary-600">
+                        <p className="text-lg font-bold text-primary-600 dark:text-primary-300">
                           {formatCurrency(deal.price)}
                         </p>
                       </div>
-                      <PlusIcon className="w-6 h-6 text-primary-600" />
+                      <PlusIcon className="w-6 h-6 text-primary-600 dark:text-primary-300" />
                     </div>
                     ))}
                     {filteredDeals.length === 0 && (
@@ -1617,8 +1617,8 @@ export const CreateOrder: React.FC = () => {
                 {orderItems.map((item) => (
                   <div key={item.id} className={`border rounded-lg p-3 ${
                     item.itemType === 'deal'
-                      ? 'border-green-300 bg-green-50'
-                      : 'border-gray-200'
+                      ? 'border-green-300 bg-green-50 dark:border-emerald-700/60 dark:bg-emerald-900/30'
+                      : 'border-gray-200 dark:border-gray-700'
                   }`}>
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex-1">
@@ -1629,7 +1629,7 @@ export const CreateOrder: React.FC = () => {
                               : deals.find((d) => d.id === item.dealId)?.name || 'Deal'}
                           </p>
                           {item.itemType === 'deal' && (
-                            <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded font-medium">
+                            <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded font-medium dark:bg-emerald-900/70 dark:text-emerald-200">
                               DEAL
                             </span>
                           )}
@@ -1637,7 +1637,7 @@ export const CreateOrder: React.FC = () => {
 
                         {/* Deal Breakdown */}
                         {item.itemType === 'deal' && item.dealBreakdown && (
-                          <div className="mt-2 pl-3 border-l-2 border-green-300 space-y-1">
+                          <div className="mt-2 pl-3 border-l-2 border-green-300 space-y-1 dark:border-emerald-700/60">
                             {item.dealBreakdown.map((breakdown, idx) => (
                               <div key={idx} className="text-xs text-gray-700">
                                 <span className="font-medium">{breakdown.quantity}x</span> {breakdown.menuItemName}
