@@ -25,13 +25,13 @@ const ORDER_TYPE_LABELS: Record<'dine_in' | 'take_away' | 'delivery', string> = 
 const statusBadgeClass = (status: StatusFilter | OrderDetailedReportItem['status']) => {
   switch (status) {
     case 'completed':
-      return 'bg-green-100 text-green-800';
+      return 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20';
     case 'open':
-      return 'bg-yellow-100 text-yellow-800';
+      return 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20';
     case 'cancelled':
-      return 'bg-gray-100 text-gray-800';
+      return 'bg-gray-50 text-gray-600 ring-1 ring-gray-500/20';
     default:
-      return 'bg-gray-100 text-gray-800';
+      return 'bg-gray-50 text-gray-600 ring-1 ring-gray-500/20';
   }
 };
 
@@ -184,33 +184,53 @@ export const OrderDetailedReport: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold">Order Detailed Report</h1>
-        <p className="text-gray-600">Detailed order-level reporting with payment and item breakdown</p>
+        <h1 className="text-2xl font-semibold text-gray-900">Order Detailed Report</h1>
+        <p className="text-sm text-gray-500 mt-1">Detailed order-level reporting with payment and item breakdown</p>
       </div>
 
-      <Card>
-        <div className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            <div className="lg:col-span-2">
-              <label className="block text-sm font-medium mb-2">Date Range</label>
-              <div className="flex flex-wrap gap-2">
-                {(['today', 'yesterday', 'this_week', 'this_month', 'custom'] as DateRangePreset[]).map((preset) => (
-                  <button
-                    key={preset}
-                    onClick={() => setDatePreset(preset)}
-                    className={`px-3 py-1 rounded text-sm ${
-                      datePreset === preset
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                    }`}
-                  >
-                    {preset.replace('_', ' ').charAt(0).toUpperCase() + preset.replace('_', ' ').slice(1)}
-                  </button>
-                ))}
-              </div>
-            </div>
+      {/* Filters */}
+      <Card padding="md">
+        <div className="space-y-4">
+          {/* Date range pills */}
+          <div className="flex flex-wrap items-center gap-2">
+            {(['today', 'yesterday', 'this_week', 'this_month', 'custom'] as DateRangePreset[]).map((preset) => (
+              <button
+                key={preset}
+                onClick={() => setDatePreset(preset)}
+                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  datePreset === preset
+                    ? 'bg-primary-600 text-white shadow-sm'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {preset.replace('_', ' ').charAt(0).toUpperCase() + preset.replace('_', ' ').slice(1)}
+              </button>
+            ))}
+          </div>
 
+          {datePreset === 'custom' && (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-3 border-t border-gray-100">
+              <Input
+                label="Start Date"
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+              />
+              <TimePicker label="Start Time" value={customStartTime} onChange={setCustomStartTime} />
+              <Input
+                label="End Date"
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+              />
+              <TimePicker label="End Time" value={customEndTime} onChange={setCustomEndTime} />
+            </div>
+          )}
+
+          {/* Filters row */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-gray-100">
             <Select
               label="Status"
               value={statusFilter}
@@ -244,154 +264,144 @@ export const OrderDetailedReport: React.FC = () => {
             </Select>
           </div>
 
-          {datePreset === 'custom' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          {/* Search row */}
+          <div className="flex items-end gap-2 pt-3 border-t border-gray-100">
+            <div className="flex-1 max-w-sm">
               <Input
-                label="Start Date"
-                type="date"
-                value={customStartDate}
-                onChange={(e) => setCustomStartDate(e.target.value)}
-              />
-              <TimePicker
-                label="Start Time"
-                value={customStartTime}
-                onChange={setCustomStartTime}
-              />
-              <Input
-                label="End Date"
-                type="date"
-                value={customEndDate}
-                onChange={(e) => setCustomEndDate(e.target.value)}
-              />
-              <TimePicker
-                label="End Time"
-                value={customEndTime}
-                onChange={setCustomEndTime}
+                label="Search"
+                placeholder="Order #, customer, phone, items..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSearch();
+                  }
+                }}
               />
             </div>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
-            <Input
-              label="Search"
-              placeholder="Order #, customer, phone, items..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleSearch();
-                }
-              }}
-            />
-            <div className="md:col-span-2 flex items-end gap-2">
-              <Button variant="secondary" onClick={handleSearch} leftIcon={<MagnifyingGlassIcon className="w-4 h-4" />}>
-                Apply Search
+            <Button variant="secondary" size="sm" onClick={handleSearch} leftIcon={<MagnifyingGlassIcon className="w-4 h-4" />}>
+              Search
+            </Button>
+            {appliedSearchQuery && (
+              <Button variant="ghost" size="sm" onClick={() => { setSearchQuery(''); setAppliedSearchQuery(''); }}>
+                Clear
               </Button>
-              <Button variant="secondary" onClick={() => { setSearchQuery(''); setAppliedSearchQuery(''); }}>
-                Clear Search
-              </Button>
-              <Button variant="secondary" onClick={loadData}>
-                Refresh
-              </Button>
-            </div>
+            )}
           </div>
-          <p className="text-xs text-gray-500 mt-3">
+
+          <p className="text-xs text-gray-400">
             Tip: Keep Status as Completed to match Sales Summary and register sales totals.
           </p>
         </div>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <Card><div className="p-4"><div className="text-sm text-gray-600">Orders</div><div className="text-2xl font-bold">{summary.totalOrders}</div></div></Card>
-        <Card><div className="p-4"><div className="text-sm text-gray-600">Total Sales</div><div className="text-2xl font-bold text-blue-600">{formatCurrency(summary.totalSales)}</div></div></Card>
-        <Card><div className="p-4"><div className="text-sm text-gray-600">Paid Amount</div><div className="text-2xl font-bold text-green-600">{formatCurrency(summary.totalPaidAmount)}</div></div></Card>
-        <Card><div className="p-4"><div className="text-sm text-gray-600">Unpaid Amount</div><div className="text-2xl font-bold text-red-600">{formatCurrency(summary.totalUnpaidAmount)}</div></div></Card>
-        <Card><div className="p-4"><div className="text-sm text-gray-600">Paid Orders</div><div className="text-2xl font-bold">{summary.paidOrders}</div></div></Card>
-        <Card><div className="p-4"><div className="text-sm text-gray-600">Unpaid Orders</div><div className="text-2xl font-bold">{summary.unpaidOrders}</div></div></Card>
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <Card padding="md" className="border-l-4 border-l-gray-400">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Orders</p>
+          <p className="text-2xl font-bold text-gray-900 mt-1">{summary.totalOrders}</p>
+        </Card>
+        <Card padding="md" className="border-l-4 border-l-blue-500">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Sales</p>
+          <p className="text-2xl font-bold text-gray-900 mt-1">{formatCurrency(summary.totalSales)}</p>
+        </Card>
+        <Card padding="md" className="border-l-4 border-l-emerald-500">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Paid Amount</p>
+          <p className="text-2xl font-bold text-gray-900 mt-1">{formatCurrency(summary.totalPaidAmount)}</p>
+        </Card>
+        <Card padding="md" className="border-l-4 border-l-red-500">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Unpaid Amount</p>
+          <p className="text-2xl font-bold text-gray-900 mt-1">{formatCurrency(summary.totalUnpaidAmount)}</p>
+        </Card>
+        <Card padding="md" className="border-l-4 border-l-emerald-400">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Paid Orders</p>
+          <p className="text-2xl font-bold text-gray-900 mt-1">{summary.paidOrders}</p>
+        </Card>
+        <Card padding="md" className="border-l-4 border-l-red-400">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Unpaid Orders</p>
+          <p className="text-2xl font-bold text-gray-900 mt-1">{summary.unpaidOrders}</p>
+        </Card>
       </div>
 
-      <Card>
-        <div className="p-4">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold">Order Details</h2>
-            <div className="flex items-center gap-2">
-              <Button onClick={handleExportCSV} disabled={reportData.length === 0} leftIcon={<ArrowDownTrayIcon className="w-4 h-4" />}>
-                Export CSV
-              </Button>
-              <Button onClick={handleExportPDF} disabled={reportData.length === 0} leftIcon={<ArrowDownTrayIcon className="w-4 h-4" />}>
-                Export PDF
-              </Button>
-            </div>
+      {/* Order Details Table */}
+      <Card padding="md">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <h2 className="text-base font-semibold text-gray-900">Order Details</h2>
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={handleExportCSV} disabled={reportData.length === 0} leftIcon={<ArrowDownTrayIcon className="w-4 h-4" />}>
+              Export CSV
+            </Button>
+            <Button variant="secondary" size="sm" onClick={handleExportPDF} disabled={reportData.length === 0} leftIcon={<ArrowDownTrayIcon className="w-4 h-4" />}>
+              Export PDF
+            </Button>
           </div>
-
-          {isLoading ? (
-            <div className="text-center py-8 text-gray-600">Loading...</div>
-          ) : reportData.length === 0 ? (
-            <div className="text-center py-8 text-gray-600">No orders found for selected filters</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Items</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Subtotal</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Discount</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Delivery</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {reportData.map((row) => (
-                    <tr key={row.orderId} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-sm">
-                        <div className="font-medium">{row.orderNumber}</div>
-                        <div className={`inline-flex px-2 py-0.5 rounded text-xs mt-1 ${row.isPaid ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                          {row.isPaid ? 'Paid' : 'Unpaid'} | {row.paymentMethods}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{formatDateTime(row.orderDate)}</td>
-                      <td className="px-4 py-3 text-sm">{ORDER_TYPE_LABELS[row.orderType]}</td>
-                      <td className="px-4 py-3 text-sm">
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${statusBadgeClass(row.status)}`}>
-                          {row.status.toUpperCase()}
-                        </span>
-                        {row.cancellationReason && (
-                          <div className="text-xs text-gray-500 mt-1 max-w-48 truncate">
-                            {row.cancellationReason}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-sm">
-                        <div className="font-medium">{row.customerName || 'Walk-in'}</div>
-                        <div className="text-xs text-gray-500">{row.customerPhone || 'No phone'}</div>
-                      </td>
-                      <td className="px-4 py-3 text-sm">
-                        <div className="font-medium">{row.itemCount} item(s)</div>
-                        <div className="text-xs text-gray-500 max-w-64 truncate">{row.itemSummary}</div>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right">{formatCurrency(row.subtotal)}</td>
-                      <td className="px-4 py-3 text-sm text-right text-red-600">{formatCurrency(row.discountAmount)}</td>
-                      <td className="px-4 py-3 text-sm text-right">{formatCurrency(row.deliveryCharge)}</td>
-                      <td className="px-4 py-3 text-sm text-right font-bold">{formatCurrency(row.total)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot className="bg-gray-50 font-bold">
-                  <tr>
-                    <td colSpan={9} className="px-4 py-3 text-sm">TOTAL</td>
-                    <td className="px-4 py-3 text-sm text-right text-blue-600">{formatCurrency(summary.totalSales)}</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          )}
         </div>
+
+        {isLoading ? (
+          <div className="text-center py-12 text-gray-400">Loading...</div>
+        ) : reportData.length === 0 ? (
+          <div className="text-center py-12 text-gray-400">No orders found for selected filters</div>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border border-gray-200">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead>
+                <tr className="bg-gray-50/80">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Order</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Date</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Type</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Customer</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Items</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">Subtotal</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">Discount</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">Delivery</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {reportData.map((row) => (
+                  <tr key={row.orderId} className="hover:bg-gray-50/50 transition-colors">
+                    <td className="px-4 py-3 text-sm">
+                      <div className="font-medium text-gray-900">{row.orderNumber}</div>
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium mt-1 ${row.isPaid ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20' : 'bg-red-50 text-red-700 ring-1 ring-red-600/20'}`}>
+                        {row.isPaid ? 'Paid' : 'Unpaid'} | {row.paymentMethods}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">{formatDateTime(row.orderDate)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700">{ORDER_TYPE_LABELS[row.orderType]}</td>
+                    <td className="px-4 py-3 text-sm">
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusBadgeClass(row.status)}`}>
+                        {row.status.charAt(0).toUpperCase() + row.status.slice(1)}
+                      </span>
+                      {row.cancellationReason && (
+                        <div className="text-xs text-gray-400 mt-1 max-w-48 truncate">{row.cancellationReason}</div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      <div className="font-medium text-gray-900">{row.customerName || 'Walk-in'}</div>
+                      <div className="text-xs text-gray-400">{row.customerPhone || 'No phone'}</div>
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      <div className="font-medium text-gray-700">{row.itemCount} item(s)</div>
+                      <div className="text-xs text-gray-400 max-w-64 truncate">{row.itemSummary}</div>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-right text-gray-700">{formatCurrency(row.subtotal)}</td>
+                    <td className="px-4 py-3 text-sm text-right text-red-600">{formatCurrency(row.discountAmount)}</td>
+                    <td className="px-4 py-3 text-sm text-right text-gray-700">{formatCurrency(row.deliveryCharge)}</td>
+                    <td className="px-4 py-3 text-sm text-right font-bold text-gray-900">{formatCurrency(row.total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="bg-gray-50/80 font-semibold">
+                  <td colSpan={9} className="px-4 py-3 text-sm text-gray-900">Total</td>
+                  <td className="px-4 py-3 text-sm text-right text-gray-900">{formatCurrency(summary.totalSales)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
       </Card>
     </div>
   );

@@ -105,250 +105,219 @@ export const EmployeeLoanReport: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold">Employee Loan Report</h1>
-          <p className="text-gray-600">View loan summaries and outstanding balances</p>
-        </div>
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-semibold text-gray-900">Employee Loan Report</h1>
+        <p className="text-sm text-gray-500 mt-1">View loan summaries and outstanding balances</p>
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <div className="p-4">
-            <div className="text-sm text-gray-600">Total Outstanding</div>
-            <div className="text-2xl font-bold text-red-600">
-              {formatCurrency(totalOutstanding)}
-            </div>
-          </div>
+        <Card padding="md" className="border-l-4 border-l-red-500">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Outstanding</p>
+          <p className="text-2xl font-bold text-gray-900 mt-1">{formatCurrency(totalOutstanding)}</p>
         </Card>
-        <Card>
-          <div className="p-4">
-            <div className="text-sm text-gray-600">Total Loan Amount</div>
-            <div className="text-2xl font-bold">{formatCurrency(totalLoanAmount)}</div>
-          </div>
+        <Card padding="md" className="border-l-4 border-l-blue-500">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Loan Amount</p>
+          <p className="text-2xl font-bold text-gray-900 mt-1">{formatCurrency(totalLoanAmount)}</p>
         </Card>
-        <Card>
-          <div className="p-4">
-            <div className="text-sm text-gray-600">Total Paid</div>
-            <div className="text-2xl font-bold text-green-600">
-              {formatCurrency(totalPaid)}
-            </div>
-          </div>
+        <Card padding="md" className="border-l-4 border-l-emerald-500">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Paid</p>
+          <p className="text-2xl font-bold text-gray-900 mt-1">{formatCurrency(totalPaid)}</p>
         </Card>
       </div>
 
       {/* Employee Loan Summary */}
-      <Card>
-        <div className="p-4">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold">Loan Summary by Employee</h2>
-            <div className="flex items-center space-x-2">
-              <Button
-                onClick={handleExportSummaryCSV}
-                disabled={loanSummaries.length === 0}
-                leftIcon={<ArrowDownTrayIcon className="w-4 h-4" />}
-                size="sm"
-              >
-                Export CSV
-              </Button>
-              <Button
-                onClick={handleExportSummaryPDF}
-                disabled={loanSummaries.length === 0}
-                leftIcon={<ArrowDownTrayIcon className="w-4 h-4" />}
-                size="sm"
-              >
-                Export PDF
-              </Button>
-            </div>
+      <Card padding="md">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <h2 className="text-base font-semibold text-gray-900">Loan Summary by Employee</h2>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleExportSummaryCSV}
+              disabled={loanSummaries.length === 0}
+              leftIcon={<ArrowDownTrayIcon className="w-4 h-4" />}
+            >
+              Export CSV
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleExportSummaryPDF}
+              disabled={loanSummaries.length === 0}
+              leftIcon={<ArrowDownTrayIcon className="w-4 h-4" />}
+            >
+              Export PDF
+            </Button>
           </div>
-
-          {isLoading ? (
-            <div className="text-center py-8 text-gray-600">Loading...</div>
-          ) : loanSummaries.length === 0 ? (
-            <div className="text-center py-8 text-gray-600">No loan data found</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Employee
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Total Loans
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                      Loan Amount
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                      Paid
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                      Remaining
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Active Loans
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {loanSummaries.map((summary) => (
-                    <tr
-                      key={summary.employeeId}
-                      className="hover:bg-gray-50 cursor-pointer"
-                      onClick={() =>
-                        setSelectedEmployeeId(
-                          selectedEmployeeId === summary.employeeId
-                            ? null
-                            : summary.employeeId
-                        )
-                      }
-                    >
-                      <td className="px-6 py-4 whitespace-nowrap font-medium">
-                        {summary.employeeName}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        {summary.totalLoans}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                        {formatCurrency(summary.totalAmount)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-green-600">
-                        {formatCurrency(summary.totalPaid)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-red-600">
-                        {formatCurrency(summary.totalRemaining)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {summary.activeLoans > 0 ? (
-                          <Badge variant="warning">{summary.activeLoans} Active</Badge>
-                        ) : (
-                          <Badge variant="success">All Paid</Badge>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
         </div>
+
+        {isLoading ? (
+          <div className="text-center py-12 text-gray-400">Loading...</div>
+        ) : loanSummaries.length === 0 ? (
+          <div className="text-center py-12 text-gray-400">No loan data found</div>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border border-gray-200">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead>
+                <tr className="bg-gray-50/80">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Employee</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Total Loans</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">Loan Amount</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">Paid</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">Remaining</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Active Loans</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {loanSummaries.map((summary) => (
+                  <tr
+                    key={summary.employeeId}
+                    className={`cursor-pointer transition-colors ${
+                      selectedEmployeeId === summary.employeeId
+                        ? 'bg-primary-50/50'
+                        : 'hover:bg-gray-50/50'
+                    }`}
+                    onClick={() =>
+                      setSelectedEmployeeId(
+                        selectedEmployeeId === summary.employeeId
+                          ? null
+                          : summary.employeeId
+                      )
+                    }
+                  >
+                    <td className="px-4 py-3 whitespace-nowrap font-medium text-sm text-gray-900">
+                      {summary.employeeName}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                      {summary.totalLoans}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-700">
+                      {formatCurrency(summary.totalAmount)}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-emerald-600 font-medium">
+                      {formatCurrency(summary.totalPaid)}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-red-600 font-medium">
+                      {formatCurrency(summary.totalRemaining)}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {summary.activeLoans > 0 ? (
+                        <Badge variant="warning">{summary.activeLoans} Active</Badge>
+                      ) : (
+                        <Badge variant="success">All Paid</Badge>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
 
       {/* Outstanding Loans Detail */}
-      <Card>
-        <div className="p-4">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold">
-              Outstanding Loans{' '}
-              {selectedEmployeeId && (
-                <span className="text-sm text-gray-600">
-                  - {loanSummaries.find((s) => s.employeeId === selectedEmployeeId)?.employeeName}
-                </span>
-              )}
-            </h2>
-            <div className="flex space-x-2">
-              {selectedEmployeeId && (
-                <Button
-                  onClick={() => setSelectedEmployeeId(null)}
-                  variant="secondary"
-                  size="sm"
-                >
-                  Show All
-                </Button>
-              )}
+      <Card padding="md">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <h2 className="text-base font-semibold text-gray-900">
+            Outstanding Loans
+            {selectedEmployeeId && (
+              <span className="text-sm font-normal text-gray-500 ml-2">
+                - {loanSummaries.find((s) => s.employeeId === selectedEmployeeId)?.employeeName}
+              </span>
+            )}
+          </h2>
+          <div className="flex items-center gap-2">
+            {selectedEmployeeId && (
               <Button
-                onClick={handleExportOutstandingCSV}
-                disabled={filteredOutstandingLoans.length === 0}
-                leftIcon={<ArrowDownTrayIcon className="w-4 h-4" />}
+                onClick={() => setSelectedEmployeeId(null)}
+                variant="ghost"
                 size="sm"
               >
-                Export CSV
+                Show All
               </Button>
-              <Button
-                onClick={handleExportOutstandingPDF}
-                disabled={filteredOutstandingLoans.length === 0}
-                leftIcon={<ArrowDownTrayIcon className="w-4 h-4" />}
-                size="sm"
-              >
-                Export PDF
-              </Button>
-            </div>
+            )}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleExportOutstandingCSV}
+              disabled={filteredOutstandingLoans.length === 0}
+              leftIcon={<ArrowDownTrayIcon className="w-4 h-4" />}
+            >
+              Export CSV
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleExportOutstandingPDF}
+              disabled={filteredOutstandingLoans.length === 0}
+              leftIcon={<ArrowDownTrayIcon className="w-4 h-4" />}
+            >
+              Export PDF
+            </Button>
           </div>
-
-          {filteredOutstandingLoans.length === 0 ? (
-            <div className="text-center py-8 text-gray-600">
-              {selectedEmployeeId
-                ? 'No outstanding loans for this employee'
-                : 'No outstanding loans'}
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Employee
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Issue Date
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                      Loan Amount
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Installments
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                      Remaining
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Reason
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredOutstandingLoans.map((loan) => {
-                    const summary = loanSummaries.find((s) => s.employeeId === loan.employeeId);
-                    const progress = (loan.paidInstallments / loan.totalInstallments) * 100;
-
-                    return (
-                      <tr key={loan.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap font-medium">
-                          {summary?.employeeName || 'Unknown'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          {formatDate(new Date(loan.issueDate))}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                          {formatCurrency(loan.amount)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          <div>
-                            {loan.paidInstallments}/{loan.totalInstallments}
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
-                            <div
-                              className="bg-blue-600 h-2 rounded-full"
-                              style={{ width: `${progress}%` }}
-                            />
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-red-600">
-                          {formatCurrency(loan.remainingAmount)}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">
-                          {loan.reason || 'N/A'}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
         </div>
+
+        {filteredOutstandingLoans.length === 0 ? (
+          <div className="text-center py-12 text-gray-400">
+            {selectedEmployeeId
+              ? 'No outstanding loans for this employee'
+              : 'No outstanding loans'}
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border border-gray-200">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead>
+                <tr className="bg-gray-50/80">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Employee</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Issue Date</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">Loan Amount</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Installments</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">Remaining</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Reason</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filteredOutstandingLoans.map((loan) => {
+                  const summary = loanSummaries.find((s) => s.employeeId === loan.employeeId);
+                  const progress = (loan.paidInstallments / loan.totalInstallments) * 100;
+
+                  return (
+                    <tr key={loan.id} className="hover:bg-gray-50/50 transition-colors">
+                      <td className="px-4 py-3 whitespace-nowrap font-medium text-sm text-gray-900">
+                        {summary?.employeeName || 'Unknown'}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                        {formatDate(new Date(loan.issueDate))}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-700">
+                        {formatCurrency(loan.amount)}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm">
+                        <div className="text-gray-700">
+                          {loan.paidInstallments}/{loan.totalInstallments}
+                        </div>
+                        <div className="w-24 bg-gray-100 rounded-full h-1.5 mt-1.5">
+                          <div
+                            className="bg-blue-500 h-1.5 rounded-full transition-all"
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-right font-medium text-red-600">
+                        {formatCurrency(loan.remainingAmount)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-500 max-w-xs truncate">
+                        {loan.reason || 'N/A'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
     </div>
   );

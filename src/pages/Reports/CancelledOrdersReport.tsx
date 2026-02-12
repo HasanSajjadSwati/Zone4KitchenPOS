@@ -108,154 +108,128 @@ export const CancelledOrdersReport: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold">Cancelled Orders Report</h1>
-          <p className="text-gray-600">View and analyze cancelled orders</p>
-        </div>
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-semibold text-gray-900">Cancelled Orders</h1>
+        <p className="text-sm text-gray-500 mt-1">View and analyze cancelled orders</p>
       </div>
 
       {/* Date Range Selector */}
-      <Card>
-        <div className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium mb-2">Date Range</label>
-              <div className="flex flex-wrap gap-2">
-                {(['today', 'yesterday', 'this_week', 'this_month', 'custom'] as DateRangePreset[]).map((preset) => (
-                  <button
-                    key={preset}
-                    onClick={() => setDatePreset(preset)}
-                    className={`px-3 py-1 rounded text-sm ${
-                      datePreset === preset
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                    }`}
-                  >
-                    {preset.replace('_', ' ').charAt(0).toUpperCase() + preset.replace('_', ' ').slice(1)}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {datePreset === 'custom' && (
-              <>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Start Date</label>
-                  <input
-                    type="date"
-                    value={customStartDate}
-                    onChange={(e) => setCustomStartDate(e.target.value)}
-                    className="w-full px-3 py-2 border rounded"
-                  />
-                </div>
-                <div>
-                  <TimePicker
-                    label="Start Time"
-                    value={customStartTime}
-                    onChange={setCustomStartTime}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">End Date</label>
-                  <input
-                    type="date"
-                    value={customEndDate}
-                    onChange={(e) => setCustomEndDate(e.target.value)}
-                    className="w-full px-3 py-2 border rounded"
-                  />
-                </div>
-                <div>
-                  <TimePicker
-                    label="End Time"
-                    value={customEndTime}
-                    onChange={setCustomEndTime}
-                  />
-                </div>
-              </>
-            )}
+      <Card padding="md">
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            {(['today', 'yesterday', 'this_week', 'this_month', 'custom'] as DateRangePreset[]).map((preset) => (
+              <button
+                key={preset}
+                onClick={() => setDatePreset(preset)}
+                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  datePreset === preset
+                    ? 'bg-primary-600 text-white shadow-sm'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {preset.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+              </button>
+            ))}
           </div>
+
+          {datePreset === 'custom' && (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-3 border-t border-gray-100">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Start Date</label>
+                <input
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+              </div>
+              <TimePicker label="Start Time" value={customStartTime} onChange={setCustomStartTime} />
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">End Date</label>
+                <input
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+              </div>
+              <TimePicker label="End Time" value={customEndTime} onChange={setCustomEndTime} />
+            </div>
+          )}
         </div>
       </Card>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
-          <div className="p-4">
-            <div className="text-sm text-gray-600">Total Cancelled Orders</div>
-            <div className="text-2xl font-bold">{cancelledOrders.length}</div>
-          </div>
+        <Card padding="md" className="border-l-4 border-l-red-500">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Cancelled Orders</p>
+          <p className="text-2xl font-bold text-gray-900 mt-1">{cancelledOrders.length}</p>
         </Card>
-        <Card>
-          <div className="p-4">
-            <div className="text-sm text-gray-600">Total Amount</div>
-            <div className="text-2xl font-bold">{formatCurrency(totalAmount)}</div>
-          </div>
+        <Card padding="md" className="border-l-4 border-l-amber-500">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Amount</p>
+          <p className="text-2xl font-bold text-gray-900 mt-1">{formatCurrency(totalAmount)}</p>
         </Card>
       </div>
 
       {/* Cancelled Orders Table */}
-      <Card>
-        <div className="p-4">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold">Cancelled Orders</h2>
-            <div className="flex items-center space-x-2">
-              <Button onClick={handleExportCSV} disabled={cancelledOrders.length === 0}>
-                <ArrowDownTrayIcon className="w-4 h-4 mr-2" />
-                Export CSV
-              </Button>
-              <Button onClick={handleExportPDF} disabled={cancelledOrders.length === 0}>
-                <ArrowDownTrayIcon className="w-4 h-4 mr-2" />
-                Export PDF
-              </Button>
-            </div>
+      <Card padding="md">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <h2 className="text-base font-semibold text-gray-900">Cancelled Orders</h2>
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={handleExportCSV} disabled={cancelledOrders.length === 0} leftIcon={<ArrowDownTrayIcon className="w-4 h-4" />}>
+              Export CSV
+            </Button>
+            <Button variant="secondary" size="sm" onClick={handleExportPDF} disabled={cancelledOrders.length === 0} leftIcon={<ArrowDownTrayIcon className="w-4 h-4" />}>
+              Export PDF
+            </Button>
           </div>
-
-          {isLoading ? (
-            <div className="text-center py-8 text-gray-600">Loading...</div>
-          ) : cancelledOrders.length === 0 ? (
-            <div className="text-center py-8 text-gray-600">No cancelled orders found</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order #</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cancelled By</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {cancelledOrders.map((order) => (
-                    <tr key={order.orderId} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">{order.orderNumber}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {formatDateTime(order.orderDate)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span className="px-2 py-1 rounded text-xs bg-gray-100">
-                          {order.orderType.replace('_', ' ').toUpperCase()}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">
-                        {order.cancellationReason || 'No reason provided'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {order.cancelledByName}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
-                        {formatCurrency(order.total)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
         </div>
+
+        {isLoading ? (
+          <div className="text-center py-12 text-gray-400">Loading...</div>
+        ) : cancelledOrders.length === 0 ? (
+          <div className="text-center py-12 text-gray-400">No cancelled orders found</div>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border border-gray-200">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead>
+                <tr className="bg-gray-50/80">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Order #</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Date</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Type</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Reason</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Cancelled By</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {cancelledOrders.map((order) => (
+                  <tr key={order.orderId} className="hover:bg-gray-50/50 transition-colors">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{order.orderNumber}</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                      {formatDateTime(order.orderDate)}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm">
+                      <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-gray-50 text-gray-600 ring-1 ring-gray-500/20">
+                        {order.orderType.replace('_', ' ').toUpperCase()}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-500 max-w-xs truncate">
+                      {order.cancellationReason || 'No reason provided'}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                      {order.cancelledByName}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-right font-semibold text-gray-900">
+                      {formatCurrency(order.total)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
     </div>
   );

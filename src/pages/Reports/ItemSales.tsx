@@ -175,22 +175,34 @@ export const ItemSales: React.FC = () => {
     return categorySales.filter(category => category.categoryName.toLowerCase().includes(query));
   };
 
+  const tabs: { key: TabType; label: string; count: number }[] = [
+    { key: 'items', label: 'Menu Items', count: itemSales.length },
+    { key: 'deals', label: 'Deals', count: dealSales.length },
+    { key: 'categories', label: 'Categories', count: categorySales.length },
+  ];
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900">Item Sales Analysis</h1>
-        <div className="flex items-center space-x-2">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900">Item Sales Analysis</h1>
+          <p className="text-sm text-gray-500 mt-1">Track performance of menu items, deals, and categories</p>
+        </div>
+        <div className="flex items-center gap-2">
           <Button
             variant="secondary"
+            size="sm"
             onClick={handleExportCSV}
-            leftIcon={<ArrowDownTrayIcon className="w-5 h-5" />}
+            leftIcon={<ArrowDownTrayIcon className="w-4 h-4" />}
           >
             Export CSV
           </Button>
           <Button
             variant="secondary"
+            size="sm"
             onClick={handleExportPDF}
-            leftIcon={<ArrowDownTrayIcon className="w-5 h-5" />}
+            leftIcon={<ArrowDownTrayIcon className="w-4 h-4" />}
           >
             Export PDF
           </Button>
@@ -199,17 +211,15 @@ export const ItemSales: React.FC = () => {
 
       {/* Date Range Selection */}
       <Card padding="md">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Date Range</h2>
-
-        <div className="flex flex-wrap gap-2 mb-4">
+        <div className="flex flex-wrap items-center gap-2">
           {(['today', 'yesterday', 'this_week', 'this_month', 'custom'] as DateRangePreset[]).map((preset) => (
             <button
               key={preset}
               onClick={() => setDatePreset(preset)}
-              className={`px-3 py-1.5 rounded text-sm font-medium ${
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
                 datePreset === preset
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  ? 'bg-primary-600 text-white shadow-sm'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
               {preset.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
@@ -218,161 +228,103 @@ export const ItemSales: React.FC = () => {
         </div>
 
         {datePreset === 'custom' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4 pt-4 border-t border-gray-100">
             <div>
-              <label className="block text-sm font-medium mb-2">Start Date</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">Start Date</label>
               <input
                 type="date"
                 value={customStartDate}
                 onChange={(e) => setCustomStartDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
             </div>
+            <TimePicker label="Start Time" value={customStartTime} onChange={setCustomStartTime} />
             <div>
-              <TimePicker
-                label="Start Time"
-                value={customStartTime}
-                onChange={setCustomStartTime}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">End Date</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">End Date</label>
               <input
                 type="date"
                 value={customEndDate}
                 onChange={(e) => setCustomEndDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
             </div>
-            <div>
-              <TimePicker
-                label="End Time"
-                value={customEndTime}
-                onChange={setCustomEndTime}
-              />
-            </div>
+            <TimePicker label="End Time" value={customEndTime} onChange={setCustomEndTime} />
           </div>
         )}
 
-        {isLoading && (
-          <p className="text-sm text-gray-500">Loading report data...</p>
-        )}
+        {isLoading && <p className="text-sm text-gray-400 mt-3">Loading report data...</p>}
       </Card>
 
-      {/* Tabs */}
-      <div className="flex space-x-2 border-b border-gray-200">
-        <button
-          className={`px-4 py-2 text-sm font-medium ${
-            tab === 'items'
-              ? 'border-b-2 border-primary-600 text-primary-600'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
-          onClick={() => setTab('items')}
-        >
-          Menu Items ({itemSales.length})
-        </button>
-        <button
-          className={`px-4 py-2 text-sm font-medium ${
-            tab === 'deals'
-              ? 'border-b-2 border-primary-600 text-primary-600'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
-          onClick={() => setTab('deals')}
-        >
-          Deals ({dealSales.length})
-        </button>
-        <button
-          className={`px-4 py-2 text-sm font-medium ${
-            tab === 'categories'
-              ? 'border-b-2 border-primary-600 text-primary-600'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
-          onClick={() => setTab('categories')}
-        >
-          Categories ({categorySales.length})
-        </button>
-      </div>
-
-      {/* Search */}
-      <div className="relative">
-        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
+      {/* Tabs & Search */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+        <div className="flex bg-gray-100 rounded-lg p-1">
+          {tabs.map((t) => (
+            <button
+              key={t.key}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                tab === t.key
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+              onClick={() => setTab(t.key)}
+            >
+              {t.label} <span className="text-gray-400 ml-1">({t.count})</span>
+            </button>
+          ))}
         </div>
-        <input
-          type="text"
-          className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-          placeholder={`Search ${tab}...`}
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
+        <div className="relative flex-1 max-w-sm">
+          <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input
+            type="text"
+            className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            placeholder={`Search ${tab}...`}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
       </div>
 
       {/* Menu Items Tab */}
       {tab === 'items' && (
         <Card padding="md">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Menu Item Sales</h2>
           {getFilteredItems().length > 0 ? (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto rounded-lg border border-gray-200">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead>
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Item Name
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Category
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Qty Sold
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Total Sales
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Orders
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Avg Price
-                    </th>
+                  <tr className="bg-gray-50/80">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Item Name</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Category</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">Qty Sold</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">Total Sales</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">Orders</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">Avg Price</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="divide-y divide-gray-100">
                   {getFilteredItems().map((item, index) => (
-                    <tr key={item.itemId} className="hover:bg-gray-50">
+                    <tr key={item.itemId} className="hover:bg-gray-50/50 transition-colors">
                       <td className="px-4 py-3">
                         <div className="flex items-center">
-                          <div className="flex-shrink-0 w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center mr-3">
-                            <span className="text-primary-600 font-semibold text-sm">
-                              {index + 1}
-                            </span>
+                          <div className="flex-shrink-0 w-7 h-7 bg-primary-50 text-primary-600 rounded-full flex items-center justify-center mr-3">
+                            <span className="font-semibold text-xs">{index + 1}</span>
                           </div>
-                          <div className="text-sm font-medium text-gray-900">{item.itemName}</div>
+                          <span className="text-sm font-medium text-gray-900">{item.itemName}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">
-                        {item.categoryName || 'N/A'}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-900">
-                        {item.totalQuantity}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right font-semibold text-primary-600">
+                      <td className="px-4 py-3 text-sm text-gray-500">{item.categoryName || 'N/A'}</td>
+                      <td className="px-4 py-3 text-sm text-right text-gray-700">{item.totalQuantity}</td>
+                      <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">
                         {formatCurrency(item.totalSales)}
                       </td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-900">
-                        {item.orderCount}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-900">
-                        {formatCurrency(item.averagePrice)}
-                      </td>
+                      <td className="px-4 py-3 text-sm text-right text-gray-700">{item.orderCount}</td>
+                      <td className="px-4 py-3 text-sm text-right text-gray-700">{formatCurrency(item.averagePrice)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           ) : (
-            <div className="text-center text-gray-500 py-12">
-              <p>No menu items sold in this period.</p>
-            </div>
+            <div className="text-center py-12 text-gray-400">No menu items sold in this period.</div>
           )}
         </Card>
       )}
@@ -380,63 +332,42 @@ export const ItemSales: React.FC = () => {
       {/* Deals Tab */}
       {tab === 'deals' && (
         <Card padding="md">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Deal Sales</h2>
           {getFilteredDeals().length > 0 ? (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto rounded-lg border border-gray-200">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead>
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Deal Name
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Qty Sold
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Total Sales
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Orders
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Avg Price
-                    </th>
+                  <tr className="bg-gray-50/80">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Deal Name</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">Qty Sold</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">Total Sales</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">Orders</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">Avg Price</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="divide-y divide-gray-100">
                   {getFilteredDeals().map((deal, index) => (
-                    <tr key={deal.dealId} className="hover:bg-gray-50">
+                    <tr key={deal.dealId} className="hover:bg-gray-50/50 transition-colors">
                       <td className="px-4 py-3">
                         <div className="flex items-center">
-                          <div className="flex-shrink-0 w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
-                            <span className="text-green-600 font-semibold text-sm">
-                              {index + 1}
-                            </span>
+                          <div className="flex-shrink-0 w-7 h-7 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mr-3">
+                            <span className="font-semibold text-xs">{index + 1}</span>
                           </div>
-                          <div className="text-sm font-medium text-gray-900">{deal.dealName}</div>
+                          <span className="text-sm font-medium text-gray-900">{deal.dealName}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-900">
-                        {deal.totalQuantity}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right font-semibold text-green-600">
+                      <td className="px-4 py-3 text-sm text-right text-gray-700">{deal.totalQuantity}</td>
+                      <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">
                         {formatCurrency(deal.totalSales)}
                       </td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-900">
-                        {deal.orderCount}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-900">
-                        {formatCurrency(deal.averagePrice)}
-                      </td>
+                      <td className="px-4 py-3 text-sm text-right text-gray-700">{deal.orderCount}</td>
+                      <td className="px-4 py-3 text-sm text-right text-gray-700">{formatCurrency(deal.averagePrice)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           ) : (
-            <div className="text-center text-gray-500 py-12">
-              <p>No deals sold in this period.</p>
-            </div>
+            <div className="text-center py-12 text-gray-400">No deals sold in this period.</div>
           )}
         </Card>
       )}
@@ -444,63 +375,42 @@ export const ItemSales: React.FC = () => {
       {/* Categories Tab */}
       {tab === 'categories' && (
         <Card padding="md">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Category Sales</h2>
           {getFilteredCategories().length > 0 ? (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto rounded-lg border border-gray-200">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead>
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Category Name
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Qty Sold
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Total Sales
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Orders
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Avg Price
-                    </th>
+                  <tr className="bg-gray-50/80">
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Category Name</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">Qty Sold</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">Total Sales</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">Orders</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">Avg Price</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="divide-y divide-gray-100">
                   {getFilteredCategories().map((category, index) => (
-                    <tr key={category.categoryId} className="hover:bg-gray-50">
+                    <tr key={category.categoryId} className="hover:bg-gray-50/50 transition-colors">
                       <td className="px-4 py-3">
                         <div className="flex items-center">
-                          <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                            <span className="text-blue-600 font-semibold text-sm">
-                              {index + 1}
-                            </span>
+                          <div className="flex-shrink-0 w-7 h-7 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mr-3">
+                            <span className="font-semibold text-xs">{index + 1}</span>
                           </div>
-                          <div className="text-sm font-medium text-gray-900">{category.categoryName}</div>
+                          <span className="text-sm font-medium text-gray-900">{category.categoryName}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-900">
-                        {category.totalQuantity}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right font-semibold text-blue-600">
+                      <td className="px-4 py-3 text-sm text-right text-gray-700">{category.totalQuantity}</td>
+                      <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">
                         {formatCurrency(category.totalSales)}
                       </td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-900">
-                        {category.orderCount}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-900">
-                        {formatCurrency(category.averagePrice)}
-                      </td>
+                      <td className="px-4 py-3 text-sm text-right text-gray-700">{category.orderCount}</td>
+                      <td className="px-4 py-3 text-sm text-right text-gray-700">{formatCurrency(category.averagePrice)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           ) : (
-            <div className="text-center text-gray-500 py-12">
-              <p>No category sales in this period.</p>
-            </div>
+            <div className="text-center py-12 text-gray-400">No category sales in this period.</div>
           )}
         </Card>
       )}

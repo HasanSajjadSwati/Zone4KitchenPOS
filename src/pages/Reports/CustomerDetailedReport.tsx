@@ -18,7 +18,6 @@ export const CustomerDetailedReport: React.FC = () => {
       const results = await searchCustomerReports(searchQuery);
       setSearchResults(results);
 
-      // Auto-select if only one result
       if (results.length === 1) {
         setSelectedCustomer(results[0]);
       } else {
@@ -74,64 +73,58 @@ export const CustomerDetailedReport: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold">Customer Detailed Report</h1>
-          <p className="text-gray-600">Search for customers and view their order history</p>
-        </div>
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-semibold text-gray-900">Customer Report</h1>
+        <p className="text-sm text-gray-500 mt-1">Search for customers and view their order history</p>
       </div>
 
       {/* Search Bar */}
-      <Card>
-        <div className="p-4">
-          <label className="block text-sm font-medium mb-2">Search Customer</label>
-          <div className="flex gap-3">
-            <div className="flex-1 relative">
-              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Search by customer name or phone number..."
-                className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <Button onClick={handleSearch} isLoading={isSearching}>
-              Search
-            </Button>
+      <Card padding="md">
+        <div className="flex gap-3">
+          <div className="flex-1 relative">
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder="Search by customer name or phone number..."
+              className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
           </div>
+          <Button onClick={handleSearch} isLoading={isSearching} size="sm">
+            Search
+          </Button>
         </div>
       </Card>
 
       {/* Search Results */}
       {searchResults.length > 1 && !selectedCustomer && (
-        <Card>
-          <div className="p-4">
-            <h2 className="text-lg font-semibold mb-4">Search Results ({searchResults.length})</h2>
-            <div className="space-y-2">
-              {searchResults.map((customer) => (
-                <div
-                  key={customer.customerId}
-                  onClick={() => handleSelectCustomer(customer)}
-                  className="p-4 border rounded-lg hover:bg-gray-50 cursor-pointer transition"
-                >
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <div className="font-medium">{customer.customerName}</div>
-                      <div className="text-sm text-gray-600">{customer.customerPhone}</div>
-                      {customer.customerAddress && (
-                        <div className="text-xs text-gray-500 mt-1">{customer.customerAddress}</div>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm font-medium">{customer.totalOrders} Orders</div>
-                      <div className="text-sm text-gray-600">{formatCurrency(customer.totalAmount)}</div>
-                    </div>
+        <Card padding="md">
+          <h2 className="text-base font-semibold text-gray-900 mb-4">Search Results ({searchResults.length})</h2>
+          <div className="space-y-2">
+            {searchResults.map((customer) => (
+              <div
+                key={customer.customerId}
+                onClick={() => handleSelectCustomer(customer)}
+                className="p-4 rounded-xl border border-gray-200 hover:border-primary-300 hover:bg-gray-50/50 cursor-pointer transition-all"
+              >
+                <div className="flex justify-between items-center">
+                  <div>
+                    <div className="font-medium text-gray-900">{customer.customerName}</div>
+                    <div className="text-sm text-gray-500">{customer.customerPhone}</div>
+                    {customer.customerAddress && (
+                      <div className="text-xs text-gray-400 mt-1">{customer.customerAddress}</div>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-medium text-gray-900">{customer.totalOrders} Orders</div>
+                    <div className="text-sm text-gray-500">{formatCurrency(customer.totalAmount)}</div>
                   </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
         </Card>
       )}
@@ -140,196 +133,173 @@ export const CustomerDetailedReport: React.FC = () => {
       {selectedCustomer && (
         <>
           {/* Customer Info */}
-          <Card>
-            <div className="p-4">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h2 className="text-xl font-bold">{selectedCustomer.customerName}</h2>
-                  <div className="text-sm text-gray-600 mt-1">Phone: {selectedCustomer.customerPhone}</div>
-                  {selectedCustomer.customerAddress && (
-                    <div className="text-sm text-gray-600">Address: {selectedCustomer.customerAddress}</div>
-                  )}
-                  {selectedCustomer.lastOrderDate && (
-                    <div className="text-sm text-gray-500 mt-2">
-                      Last Order: {formatDate(new Date(selectedCustomer.lastOrderDate))}
-                    </div>
-                  )}
-                </div>
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    setSelectedCustomer(null);
-                    setSearchResults([]);
-                    setSearchQuery('');
-                  }}
-                >
-                  Search Another
-                </Button>
+          <Card padding="md">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900">{selectedCustomer.customerName}</h2>
+                <div className="text-sm text-gray-500 mt-1">Phone: {selectedCustomer.customerPhone}</div>
+                {selectedCustomer.customerAddress && (
+                  <div className="text-sm text-gray-500">Address: {selectedCustomer.customerAddress}</div>
+                )}
+                {selectedCustomer.lastOrderDate && (
+                  <div className="text-xs text-gray-400 mt-2">
+                    Last Order: {formatDate(new Date(selectedCustomer.lastOrderDate))}
+                  </div>
+                )}
               </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setSelectedCustomer(null);
+                  setSearchResults([]);
+                  setSearchQuery('');
+                }}
+              >
+                Search Another
+              </Button>
             </div>
           </Card>
 
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card>
-              <div className="p-4">
-                <div className="text-sm text-gray-600">Total Orders</div>
-                <div className="text-2xl font-bold">{selectedCustomer.totalOrders}</div>
-                <div className="text-xs text-gray-500 mt-1">
-                  {selectedCustomer.paidOrders} paid, {selectedCustomer.unpaidOrders} unpaid
-                </div>
-              </div>
+            <Card padding="md" className="border-l-4 border-l-blue-500">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Orders</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">{selectedCustomer.totalOrders}</p>
+              <p className="text-xs text-gray-400 mt-1">
+                {selectedCustomer.paidOrders} paid, {selectedCustomer.unpaidOrders} unpaid
+              </p>
             </Card>
-            <Card>
-              <div className="p-4">
-                <div className="text-sm text-gray-600">Total Amount</div>
-                <div className="text-2xl font-bold">{formatCurrency(selectedCustomer.totalAmount)}</div>
-              </div>
+            <Card padding="md" className="border-l-4 border-l-emerald-500">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Amount</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">{formatCurrency(selectedCustomer.totalAmount)}</p>
             </Card>
-            <Card>
-              <div className="p-4">
-                <div className="text-sm text-gray-600">Outstanding Balance</div>
-                <div className={`text-2xl font-bold ${
-                  selectedCustomer.unpaidAmount > 0 ? 'text-red-600' : 'text-green-600'
-                }`}>
-                  {formatCurrency(selectedCustomer.unpaidAmount)}
-                </div>
-              </div>
+            <Card padding="md" className={`border-l-4 ${selectedCustomer.unpaidAmount > 0 ? 'border-l-red-500' : 'border-l-emerald-500'}`}>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Outstanding Balance</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {formatCurrency(selectedCustomer.unpaidAmount)}
+              </p>
             </Card>
           </div>
 
           {/* Payment Breakdown */}
-          <Card>
-            <div className="p-4">
-              <h3 className="text-lg font-semibold mb-3">Payment Summary</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="text-sm text-gray-600">Paid Orders</div>
-                  <div className="font-medium">{selectedCustomer.paidOrders} orders</div>
-                  <div className="text-sm text-green-600">{formatCurrency(selectedCustomer.paidAmount)}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-600">Unpaid Orders</div>
-                  <div className="font-medium">{selectedCustomer.unpaidOrders} orders</div>
-                  <div className="text-sm text-red-600">{formatCurrency(selectedCustomer.unpaidAmount)}</div>
-                </div>
+          <Card padding="md">
+            <h3 className="text-base font-semibold text-gray-900 mb-4">Payment Summary</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-emerald-50/70 rounded-xl p-4 border border-emerald-100">
+                <p className="text-xs font-medium text-emerald-600 uppercase tracking-wider">Paid Orders</p>
+                <p className="font-semibold text-gray-900 mt-1">{selectedCustomer.paidOrders} orders</p>
+                <p className="text-sm text-gray-500 mt-0.5">{formatCurrency(selectedCustomer.paidAmount)}</p>
+              </div>
+              <div className="bg-red-50/70 rounded-xl p-4 border border-red-100">
+                <p className="text-xs font-medium text-red-600 uppercase tracking-wider">Unpaid Orders</p>
+                <p className="font-semibold text-gray-900 mt-1">{selectedCustomer.unpaidOrders} orders</p>
+                <p className="text-sm text-gray-500 mt-0.5">{formatCurrency(selectedCustomer.unpaidAmount)}</p>
               </div>
             </div>
           </Card>
 
           {/* Order History */}
-          <Card>
-            <div className="p-4">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-semibold">
-                  Order History ({selectedCustomer.orderHistory.length})
-                </h2>
-                <div className="flex items-center space-x-2">
-                  <Button
-                    onClick={handleExportCSV}
-                    disabled={selectedCustomer.orderHistory.length === 0}
-                    leftIcon={<ArrowDownTrayIcon className="w-4 h-4" />}
-                    size="sm"
-                  >
-                    Export CSV
-                  </Button>
-                  <Button
-                    onClick={handleExportPDF}
-                    disabled={selectedCustomer.orderHistory.length === 0}
-                    leftIcon={<ArrowDownTrayIcon className="w-4 h-4" />}
-                    size="sm"
-                  >
-                    Export PDF
-                  </Button>
-                </div>
+          <Card padding="md">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+              <h2 className="text-base font-semibold text-gray-900">
+                Order History ({selectedCustomer.orderHistory.length})
+              </h2>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleExportCSV}
+                  disabled={selectedCustomer.orderHistory.length === 0}
+                  leftIcon={<ArrowDownTrayIcon className="w-4 h-4" />}
+                >
+                  Export CSV
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleExportPDF}
+                  disabled={selectedCustomer.orderHistory.length === 0}
+                  leftIcon={<ArrowDownTrayIcon className="w-4 h-4" />}
+                >
+                  Export PDF
+                </Button>
               </div>
-
-              {selectedCustomer.orderHistory.length === 0 ? (
-                <div className="text-center py-8 text-gray-600">No orders found</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          Order #
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          Date
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          Type
-                        </th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                          Total
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          Payment
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                          Status
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {selectedCustomer.orderHistory.map((order) => (
-                        <tr key={order.orderId} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            {order.orderNumber}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                            {formatDate(new Date(order.orderDate))}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            {order.orderType === 'dine_in' ? 'Dine In' :
-                             order.orderType === 'take_away' ? 'Take Away' :
-                             'Delivery'}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
-                            {formatCurrency(order.total)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <Badge variant={order.isPaid ? 'success' : 'warning'}>
-                              {order.isPaid ? 'Paid' : 'Unpaid'}
-                            </Badge>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <Badge
-                              variant={
-                                order.status === 'completed' ? 'success' :
-                                order.status === 'cancelled' ? 'default' :
-                                'warning'
-                              }
-                            >
-                              {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                            </Badge>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot className="bg-gray-50 font-bold">
-                      <tr>
-                        <td colSpan={3} className="px-6 py-4 text-sm">TOTAL</td>
-                        <td className="px-6 py-4 text-sm text-right">
-                          {formatCurrency(selectedCustomer.totalAmount)}
-                        </td>
-                        <td colSpan={2} className="px-6 py-4"></td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-              )}
             </div>
+
+            {selectedCustomer.orderHistory.length === 0 ? (
+              <div className="text-center py-12 text-gray-400">No orders found</div>
+            ) : (
+              <div className="overflow-x-auto rounded-lg border border-gray-200">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead>
+                    <tr className="bg-gray-50/80">
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Order #</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Date</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Type</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">Total</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Payment</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {selectedCustomer.orderHistory.map((order) => (
+                      <tr key={order.orderId} className="hover:bg-gray-50/50 transition-colors">
+                        <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {order.orderNumber}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                          {formatDate(new Date(order.orderDate))}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                          {order.orderType === 'dine_in' ? 'Dine In' :
+                           order.orderType === 'take_away' ? 'Take Away' :
+                           'Delivery'}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-right font-semibold text-gray-900">
+                          {formatCurrency(order.total)}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <Badge variant={order.isPaid ? 'success' : 'warning'}>
+                            {order.isPaid ? 'Paid' : 'Unpaid'}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <Badge
+                            variant={
+                              order.status === 'completed' ? 'success' :
+                              order.status === 'cancelled' ? 'default' :
+                              'warning'
+                            }
+                          >
+                            {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                          </Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-gray-50/80 font-semibold">
+                      <td colSpan={3} className="px-4 py-3 text-sm text-gray-900">Total</td>
+                      <td className="px-4 py-3 text-sm text-right text-gray-900">
+                        {formatCurrency(selectedCustomer.totalAmount)}
+                      </td>
+                      <td colSpan={2} className="px-4 py-3"></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
           </Card>
         </>
       )}
 
       {/* No Results */}
       {searchResults.length === 0 && searchQuery && !isSearching && (
-        <Card>
-          <div className="p-8 text-center text-gray-600">
-            <div className="mb-2">No customers found</div>
-            <div className="text-sm">Try searching with a different name or phone number</div>
+        <Card padding="lg">
+          <div className="text-center py-12">
+            <p className="text-gray-400">No customers found</p>
+            <p className="text-sm text-gray-300 mt-1">Try searching with a different name or phone number</p>
           </div>
         </Card>
       )}

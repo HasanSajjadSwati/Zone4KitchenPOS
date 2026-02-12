@@ -79,7 +79,6 @@ export const SalesSummary: React.FC = () => {
     setIsLoading(true);
     try {
       const range = getDateRange();
-      // Use allSettled so one failure doesn't block the other
       const [summaryResult, dailyResult] = await Promise.allSettled([
         getSalesSummary(range),
         getDailySales(range),
@@ -208,38 +207,46 @@ export const SalesSummary: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900">Sales Summary Report</h1>
-        <div className="flex items-center space-x-2">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900">Sales Summary</h1>
+          <p className="text-sm text-gray-500 mt-1">Overview of sales performance and revenue breakdown</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="secondary"
+            size="sm"
             onClick={handleExportSummaryCSV}
             disabled={!summary}
-            leftIcon={<ArrowDownTrayIcon className="w-5 h-5" />}
+            leftIcon={<ArrowDownTrayIcon className="w-4 h-4" />}
           >
             Summary CSV
           </Button>
           <Button
             variant="secondary"
+            size="sm"
             onClick={handleExportSummaryPDF}
             disabled={!summary}
-            leftIcon={<ArrowDownTrayIcon className="w-5 h-5" />}
+            leftIcon={<ArrowDownTrayIcon className="w-4 h-4" />}
           >
             Summary PDF
           </Button>
           <Button
             variant="secondary"
+            size="sm"
             onClick={handleExportDailyCSV}
             disabled={dailySales.length === 0}
-            leftIcon={<ArrowDownTrayIcon className="w-5 h-5" />}
+            leftIcon={<ArrowDownTrayIcon className="w-4 h-4" />}
           >
             Daily CSV
           </Button>
           <Button
             variant="secondary"
+            size="sm"
             onClick={handleExportDailyPDF}
             disabled={dailySales.length === 0}
-            leftIcon={<ArrowDownTrayIcon className="w-5 h-5" />}
+            leftIcon={<ArrowDownTrayIcon className="w-4 h-4" />}
           >
             Daily PDF
           </Button>
@@ -248,17 +255,15 @@ export const SalesSummary: React.FC = () => {
 
       {/* Date Range Selection */}
       <Card padding="md">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Date Range</h2>
-
-        <div className="flex flex-wrap gap-2 mb-4">
+        <div className="flex flex-wrap items-center gap-2">
           {(['today', 'yesterday', 'this_week', 'this_month', 'custom'] as DateRangePreset[]).map((preset) => (
             <button
               key={preset}
               onClick={() => setDatePreset(preset)}
-              className={`px-3 py-1.5 rounded text-sm font-medium ${
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
                 datePreset === preset
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  ? 'bg-primary-600 text-white shadow-sm'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
               {preset.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
@@ -267,97 +272,147 @@ export const SalesSummary: React.FC = () => {
         </div>
 
         {datePreset === 'custom' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4 pt-4 border-t border-gray-100">
             <div>
-              <label className="block text-sm font-medium mb-2">Start Date</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">Start Date</label>
               <input
                 type="date"
                 value={customStartDate}
                 onChange={(e) => setCustomStartDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
             </div>
+            <TimePicker
+              label="Start Time"
+              value={customStartTime}
+              onChange={setCustomStartTime}
+            />
             <div>
-              <TimePicker
-                label="Start Time"
-                value={customStartTime}
-                onChange={setCustomStartTime}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">End Date</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">End Date</label>
               <input
                 type="date"
                 value={customEndDate}
                 onChange={(e) => setCustomEndDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
             </div>
-            <div>
-              <TimePicker
-                label="End Time"
-                value={customEndTime}
-                onChange={setCustomEndTime}
-              />
-            </div>
+            <TimePicker
+              label="End Time"
+              value={customEndTime}
+              onChange={setCustomEndTime}
+            />
           </div>
         )}
 
         {isLoading && (
-          <p className="text-sm text-gray-500">{summary ? 'Refreshing report data...' : 'Loading report data...'}</p>
+          <p className="text-sm text-gray-400 mt-3">{summary ? 'Refreshing...' : 'Loading report data...'}</p>
         )}
       </Card>
 
       {summary && (
         <>
           {/* Overall Summary */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card padding="md">
-              <p className="text-sm text-gray-600 mb-1">Total Sales</p>
-              <p className="text-2xl font-bold text-primary-600">{formatCurrency(summary.totalSales)}</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card padding="md" className="border-l-4 border-l-primary-500">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Sales</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">{formatCurrency(summary.totalSales)}</p>
             </Card>
-            <Card padding="md">
-              <p className="text-sm text-gray-600 mb-1">Total Orders</p>
-              <p className="text-2xl font-bold text-gray-900">{summary.totalOrders}</p>
+            <Card padding="md" className="border-l-4 border-l-blue-500">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Orders</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">{summary.totalOrders}</p>
             </Card>
-            <Card padding="md">
-              <p className="text-sm text-gray-600 mb-1">Average Order Value</p>
-              <p className="text-2xl font-bold text-gray-900">{formatCurrency(summary.averageOrderValue)}</p>
+            <Card padding="md" className="border-l-4 border-l-emerald-500">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Avg Order Value</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">{formatCurrency(summary.averageOrderValue)}</p>
             </Card>
-            <Card padding="md">
-              <p className="text-sm text-gray-600 mb-1">Total Items Sold</p>
-              <p className="text-2xl font-bold text-gray-900">{summary.totalItems}</p>
+            <Card padding="md" className="border-l-4 border-l-violet-500">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Items Sold</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">{summary.totalItems}</p>
             </Card>
           </div>
 
-          {/* Daily Sales Breakdown - shown prominently after summary */}
+          {/* Sales by Order Type */}
           <Card padding="md">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Daily Sales Breakdown</h2>
+            <h2 className="text-base font-semibold text-gray-900 mb-4">Sales by Order Type</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-blue-50/70 rounded-xl p-4 border border-blue-100">
+                <p className="text-xs font-medium text-blue-600 uppercase tracking-wider">Dine In</p>
+                <p className="text-xl font-bold text-gray-900 mt-1">{formatCurrency(summary.dineInSales)}</p>
+                <p className="text-sm text-gray-500 mt-1">{summary.dineInOrders} orders</p>
+              </div>
+              <div className="bg-emerald-50/70 rounded-xl p-4 border border-emerald-100">
+                <p className="text-xs font-medium text-emerald-600 uppercase tracking-wider">Take Away</p>
+                <p className="text-xl font-bold text-gray-900 mt-1">{formatCurrency(summary.takeAwaySales)}</p>
+                <p className="text-sm text-gray-500 mt-1">{summary.takeAwayOrders} orders</p>
+              </div>
+              <div className="bg-violet-50/70 rounded-xl p-4 border border-violet-100">
+                <p className="text-xs font-medium text-violet-600 uppercase tracking-wider">Delivery</p>
+                <p className="text-xl font-bold text-gray-900 mt-1">{formatCurrency(summary.deliverySales)}</p>
+                <p className="text-sm text-gray-500 mt-1">{summary.deliveryOrders} orders</p>
+              </div>
+            </div>
+          </Card>
+
+          {/* Payment Methods */}
+          <Card padding="md">
+            <h2 className="text-base font-semibold text-gray-900 mb-4">Payment Methods</h2>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="rounded-xl p-4 bg-gray-50 border border-gray-100">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Cash</p>
+                <p className="text-lg font-bold text-gray-900 mt-1">{formatCurrency(summary.cashSales)}</p>
+              </div>
+              <div className="rounded-xl p-4 bg-gray-50 border border-gray-100">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Card</p>
+                <p className="text-lg font-bold text-gray-900 mt-1">{formatCurrency(summary.cardSales)}</p>
+              </div>
+              <div className="rounded-xl p-4 bg-gray-50 border border-gray-100">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Online Transfer</p>
+                <p className="text-lg font-bold text-gray-900 mt-1">{formatCurrency(summary.onlineSales)}</p>
+              </div>
+              <div className="rounded-xl p-4 bg-gray-50 border border-gray-100">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Other</p>
+                <p className="text-lg font-bold text-gray-900 mt-1">{formatCurrency(summary.otherSales)}</p>
+              </div>
+            </div>
+          </Card>
+
+          {/* Payment Status */}
+          <Card padding="md">
+            <h2 className="text-base font-semibold text-gray-900 mb-4">Payment Status</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-emerald-50/70 rounded-xl p-4 border border-emerald-100">
+                <p className="text-xs font-medium text-emerald-600 uppercase tracking-wider">Paid Orders</p>
+                <p className="text-xl font-bold text-gray-900 mt-1">{formatCurrency(summary.paidAmount)}</p>
+                <p className="text-sm text-gray-500 mt-1">{summary.paidOrders} orders</p>
+              </div>
+              <div className="bg-red-50/70 rounded-xl p-4 border border-red-100">
+                <p className="text-xs font-medium text-red-600 uppercase tracking-wider">Unpaid Orders</p>
+                <p className="text-xl font-bold text-gray-900 mt-1">{formatCurrency(summary.unpaidAmount)}</p>
+                <p className="text-sm text-gray-500 mt-1">{summary.unpaidOrders} orders</p>
+              </div>
+            </div>
+          </Card>
+
+          {/* Daily Sales Breakdown */}
+          <Card padding="md">
+            <h2 className="text-base font-semibold text-gray-900 mb-4">Daily Sales Breakdown</h2>
             {dailySales.length > 0 ? (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto rounded-lg border border-gray-200">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead>
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Date
-                      </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Orders
-                      </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Total Sales
-                      </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Avg Order Value
-                      </th>
+                    <tr className="bg-gray-50/80">
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Date</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">Orders</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">Total Sales</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">Avg Order Value</th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className="divide-y divide-gray-100">
                     {dailySales.map((day) => {
                       const [year, month, dayNum] = day.date.split('-').map(Number);
                       const dateObj = new Date(year, month - 1, dayNum);
                       return (
-                        <tr key={day.date} className="hover:bg-gray-50">
+                        <tr key={day.date} className="hover:bg-gray-50/50 transition-colors">
                           <td className="px-4 py-3 text-sm text-gray-900">
                             {dateObj.toLocaleDateString('en-PK', {
                               weekday: 'short',
@@ -366,26 +421,24 @@ export const SalesSummary: React.FC = () => {
                               day: 'numeric',
                             })}
                           </td>
-                          <td className="px-4 py-3 text-sm text-right text-gray-900">
-                            {day.totalOrders}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-right font-semibold text-primary-600">
+                          <td className="px-4 py-3 text-sm text-right text-gray-700">{day.totalOrders}</td>
+                          <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">
                             {formatCurrency(day.totalSales)}
                           </td>
-                          <td className="px-4 py-3 text-sm text-right text-gray-900">
+                          <td className="px-4 py-3 text-sm text-right text-gray-700">
                             {formatCurrency(day.averageOrderValue)}
                           </td>
                         </tr>
                       );
                     })}
                   </tbody>
-                  <tfoot className="bg-gray-50">
-                    <tr className="font-semibold">
+                  <tfoot>
+                    <tr className="bg-gray-50/80 font-semibold">
                       <td className="px-4 py-3 text-sm text-gray-900">Total</td>
                       <td className="px-4 py-3 text-sm text-right text-gray-900">
                         {dailySales.reduce((sum, day) => sum + day.totalOrders, 0)}
                       </td>
-                      <td className="px-4 py-3 text-sm text-right text-primary-600">
+                      <td className="px-4 py-3 text-sm text-right text-gray-900">
                         {formatCurrency(dailySales.reduce((sum, day) => sum + day.totalSales, 0))}
                       </td>
                       <td className="px-4 py-3 text-sm text-right text-gray-900">
@@ -396,81 +449,19 @@ export const SalesSummary: React.FC = () => {
                 </table>
               </div>
             ) : (
-              <p className="text-center text-gray-500 py-4">
+              <div className="text-center py-12 text-gray-400">
                 {isLoading ? 'Loading daily sales data...' : 'No daily sales data for the selected period.'}
-              </p>
+              </div>
             )}
-          </Card>
-
-          {/* Sales by Order Type */}
-          <Card padding="md">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Sales by Order Type</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-blue-50 rounded-lg p-4">
-                <p className="text-sm text-gray-600 mb-2">Dine In</p>
-                <p className="text-xl font-bold text-blue-600">{formatCurrency(summary.dineInSales)}</p>
-                <p className="text-sm text-gray-600 mt-1">{summary.dineInOrders} orders</p>
-              </div>
-              <div className="bg-green-50 rounded-lg p-4">
-                <p className="text-sm text-gray-600 mb-2">Take Away</p>
-                <p className="text-xl font-bold text-green-600">{formatCurrency(summary.takeAwaySales)}</p>
-                <p className="text-sm text-gray-600 mt-1">{summary.takeAwayOrders} orders</p>
-              </div>
-              <div className="bg-purple-50 rounded-lg p-4">
-                <p className="text-sm text-gray-600 mb-2">Delivery</p>
-                <p className="text-xl font-bold text-purple-600">{formatCurrency(summary.deliverySales)}</p>
-                <p className="text-sm text-gray-600 mt-1">{summary.deliveryOrders} orders</p>
-              </div>
-            </div>
-          </Card>
-
-          {/* Payment Methods */}
-          <Card padding="md">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Payment Methods</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-gray-50 rounded-lg p-4">
-                <p className="text-sm text-gray-600 mb-2">Cash</p>
-                <p className="text-xl font-bold text-gray-900">{formatCurrency(summary.cashSales)}</p>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-4">
-                <p className="text-sm text-gray-600 mb-2">Card</p>
-                <p className="text-xl font-bold text-gray-900">{formatCurrency(summary.cardSales)}</p>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-4">
-                <p className="text-sm text-gray-600 mb-2">Online Transfer</p>
-                <p className="text-xl font-bold text-gray-900">{formatCurrency(summary.onlineSales)}</p>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-4">
-                <p className="text-sm text-gray-600 mb-2">Other</p>
-                <p className="text-xl font-bold text-gray-900">{formatCurrency(summary.otherSales)}</p>
-              </div>
-            </div>
-          </Card>
-
-          {/* Payment Status */}
-          <Card padding="md">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Payment Status</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-green-50 rounded-lg p-4">
-                <p className="text-sm text-gray-600 mb-2">Paid Orders</p>
-                <p className="text-xl font-bold text-green-600">{formatCurrency(summary.paidAmount)}</p>
-                <p className="text-sm text-gray-600 mt-1">{summary.paidOrders} orders</p>
-              </div>
-              <div className="bg-red-50 rounded-lg p-4">
-                <p className="text-sm text-gray-600 mb-2">Unpaid Orders</p>
-                <p className="text-xl font-bold text-red-600">{formatCurrency(summary.unpaidAmount)}</p>
-                <p className="text-sm text-gray-600 mt-1">{summary.unpaidOrders} orders</p>
-              </div>
-            </div>
           </Card>
 
           {/* Discounts */}
           {summary.totalDiscounts > 0 && (
             <Card padding="md">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Discounts Applied</h2>
-              <div className="bg-orange-50 rounded-lg p-4">
-                <p className="text-sm text-gray-600 mb-2">Total Discounts Given</p>
-                <p className="text-2xl font-bold text-orange-600">{formatCurrency(summary.totalDiscounts)}</p>
+              <h2 className="text-base font-semibold text-gray-900 mb-4">Discounts Applied</h2>
+              <div className="bg-amber-50/70 rounded-xl p-4 border border-amber-100">
+                <p className="text-xs font-medium text-amber-600 uppercase tracking-wider">Total Discounts Given</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{formatCurrency(summary.totalDiscounts)}</p>
               </div>
             </Card>
           )}
@@ -479,8 +470,8 @@ export const SalesSummary: React.FC = () => {
 
       {!summary && !isLoading && (
         <Card padding="lg">
-          <div className="text-center text-gray-500 py-12">
-            <p>No sales data found for the selected date range.</p>
+          <div className="text-center py-12">
+            <p className="text-gray-400">No sales data found for the selected date range.</p>
           </div>
         </Card>
       )}

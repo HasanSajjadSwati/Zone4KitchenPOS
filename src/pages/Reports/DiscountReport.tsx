@@ -129,199 +129,173 @@ export const DiscountReport: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold">Discount Report</h1>
-          <p className="text-gray-600">Track discounted orders and discount performance</p>
-        </div>
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-semibold text-gray-900">Discount Report</h1>
+        <p className="text-sm text-gray-500 mt-1">Track discounted orders and discount performance</p>
       </div>
 
-      {/* Date Range Selector */}
-      <Card>
-        <div className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium mb-2">Date Range</label>
-              <div className="flex flex-wrap gap-2">
-                {(['today', 'yesterday', 'this_week', 'this_month', 'custom'] as DateRangePreset[]).map((preset) => (
-                  <button
-                    key={preset}
-                    onClick={() => setDatePreset(preset)}
-                    className={`px-3 py-1 rounded text-sm ${
-                      datePreset === preset
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                    }`}
-                  >
-                    {preset.replace('_', ' ').charAt(0).toUpperCase() + preset.replace('_', ' ').slice(1)}
-                  </button>
-                ))}
-              </div>
-            </div>
+      {/* Date Range & Filter */}
+      <Card padding="md">
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            {(['today', 'yesterday', 'this_week', 'this_month', 'custom'] as DateRangePreset[]).map((preset) => (
+              <button
+                key={preset}
+                onClick={() => setDatePreset(preset)}
+                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  datePreset === preset
+                    ? 'bg-primary-600 text-white shadow-sm'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {preset.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+              </button>
+            ))}
+          </div>
 
-            {datePreset === 'custom' && (
-              <>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Start Date</label>
-                  <input
-                    type="date"
-                    value={customStartDate}
-                    onChange={(e) => setCustomStartDate(e.target.value)}
-                    className="w-full px-3 py-2 border rounded"
-                  />
-                </div>
-                <div>
-                  <TimePicker
-                    label="Start Time"
-                    value={customStartTime}
-                    onChange={setCustomStartTime}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">End Date</label>
-                  <input
-                    type="date"
-                    value={customEndDate}
-                    onChange={(e) => setCustomEndDate(e.target.value)}
-                    className="w-full px-3 py-2 border rounded"
-                  />
-                </div>
-                <div>
-                  <TimePicker
-                    label="End Time"
-                    value={customEndTime}
-                    onChange={setCustomEndTime}
-                  />
-                </div>
-              </>
-            )}
+          {datePreset === 'custom' && (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-3 border-t border-gray-100">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Start Date</label>
+                <input
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+              </div>
+              <TimePicker label="Start Time" value={customStartTime} onChange={setCustomStartTime} />
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">End Date</label>
+                <input
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+              </div>
+              <TimePicker label="End Time" value={customEndTime} onChange={setCustomEndTime} />
+            </div>
+          )}
+
+          {/* Discount type filter */}
+          <div className="flex items-center gap-2 pt-3 border-t border-gray-100">
+            <span className="text-xs font-medium text-gray-500">Type:</span>
+            {(['all', 'percentage', 'fixed'] as DiscountTypeFilter[]).map((type) => (
+              <button
+                key={type}
+                onClick={() => setDiscountTypeFilter(type)}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                  discountTypeFilter === type
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {type === 'all' ? 'All' : type === 'percentage' ? 'Percentage' : 'Fixed'}
+              </button>
+            ))}
           </div>
         </div>
       </Card>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <div className="p-4">
-            <div className="text-sm text-gray-600">Total Discount Amount</div>
-            <div className="text-2xl font-bold text-orange-600">{formatCurrency(totalDiscountAmount)}</div>
-          </div>
+        <Card padding="md" className="border-l-4 border-l-amber-500">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Discount Amount</p>
+          <p className="text-2xl font-bold text-gray-900 mt-1">{formatCurrency(totalDiscountAmount)}</p>
         </Card>
-        <Card>
-          <div className="p-4">
-            <div className="text-sm text-gray-600">Discounted Orders</div>
-            <div className="text-2xl font-bold">{totalDiscountedOrders}</div>
-          </div>
+        <Card padding="md" className="border-l-4 border-l-blue-500">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Discounted Orders</p>
+          <p className="text-2xl font-bold text-gray-900 mt-1">{totalDiscountedOrders}</p>
         </Card>
-        <Card>
-          <div className="p-4">
-            <div className="text-sm text-gray-600">Average Discount</div>
-            <div className="text-2xl font-bold text-blue-600">{formatCurrency(averageDiscount)}</div>
-          </div>
+        <Card padding="md" className="border-l-4 border-l-violet-500">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Average Discount</p>
+          <p className="text-2xl font-bold text-gray-900 mt-1">{formatCurrency(averageDiscount)}</p>
         </Card>
       </div>
 
-      {/* Discount Type Filter */}
-      <Card>
-        <div className="p-4">
-          <label className="block text-sm font-medium mb-2">Filter by Discount Type</label>
-          <select
-            value={discountTypeFilter}
-            onChange={(e) => setDiscountTypeFilter(e.target.value as DiscountTypeFilter)}
-            className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">All Discounts</option>
-            <option value="percentage">Percentage Discounts</option>
-            <option value="fixed">Fixed Discounts</option>
-          </select>
-        </div>
-      </Card>
-
       {/* Discount Details Table */}
-      <Card>
-        <div className="p-4">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold">Discount Details</h2>
-            <div className="flex items-center space-x-2">
-              <Button onClick={handleExportCSV} disabled={filteredData.length === 0}>
-                <ArrowDownTrayIcon className="w-4 h-4 mr-2" />
-                Export CSV
-              </Button>
-              <Button onClick={handleExportPDF} disabled={filteredData.length === 0}>
-                <ArrowDownTrayIcon className="w-4 h-4 mr-2" />
-                Export PDF
-              </Button>
-            </div>
+      <Card padding="md">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <h2 className="text-base font-semibold text-gray-900">Discount Details</h2>
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={handleExportCSV} disabled={filteredData.length === 0} leftIcon={<ArrowDownTrayIcon className="w-4 h-4" />}>
+              Export CSV
+            </Button>
+            <Button variant="secondary" size="sm" onClick={handleExportPDF} disabled={filteredData.length === 0} leftIcon={<ArrowDownTrayIcon className="w-4 h-4" />}>
+              Export PDF
+            </Button>
           </div>
-
-          {isLoading ? (
-            <div className="text-center py-8 text-gray-600">Loading...</div>
-          ) : filteredData.length === 0 ? (
-            <div className="text-center py-8 text-gray-600">No discounted orders found for this period</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order #</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Value</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Discount Amount</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reference</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Subtotal</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredData.map((item) => (
-                    <tr key={item.orderId} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">{item.orderNumber}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {formatDate(new Date(item.orderDate))}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          item.discountType === 'percentage'
-                            ? 'bg-purple-100 text-purple-800'
-                            : 'bg-indigo-100 text-indigo-800'
-                        }`}>
-                          {item.discountType === 'percentage' ? 'Percentage' : 'Fixed'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                        {item.discountType === 'percentage'
-                          ? `${item.discountValue}%`
-                          : formatCurrency(item.discountValue)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-orange-600">
-                        {formatCurrency(item.discountAmount)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {item.discountReference || 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-600">
-                        {formatCurrency(item.subtotal)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold">
-                        {formatCurrency(item.orderTotal)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot className="bg-gray-50 font-bold">
-                  <tr>
-                    <td colSpan={4} className="px-6 py-4 text-sm">TOTAL</td>
-                    <td className="px-6 py-4 text-sm text-right text-orange-600">
-                      {formatCurrency(totalDiscountAmount)}
-                    </td>
-                    <td colSpan={3} className="px-6 py-4"></td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          )}
         </div>
+
+        {isLoading ? (
+          <div className="text-center py-12 text-gray-400">Loading...</div>
+        ) : filteredData.length === 0 ? (
+          <div className="text-center py-12 text-gray-400">No discounted orders found for this period</div>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border border-gray-200">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead>
+                <tr className="bg-gray-50/80">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Order #</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Date</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Type</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">Value</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">Discount Amount</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Reference</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">Subtotal</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500">Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filteredData.map((item) => (
+                  <tr key={item.orderId} className="hover:bg-gray-50/50 transition-colors">
+                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{item.orderNumber}</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                      {formatDate(new Date(item.orderDate))}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm">
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
+                        item.discountType === 'percentage'
+                          ? 'bg-violet-50 text-violet-700 ring-1 ring-violet-600/20'
+                          : 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20'
+                      }`}>
+                        {item.discountType === 'percentage' ? 'Percentage' : 'Fixed'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-700">
+                      {item.discountType === 'percentage'
+                        ? `${item.discountValue}%`
+                        : formatCurrency(item.discountValue)}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-right font-semibold text-amber-600">
+                      {formatCurrency(item.discountAmount)}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                      {item.discountReference || 'N/A'}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-500">
+                      {formatCurrency(item.subtotal)}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-right font-bold text-gray-900">
+                      {formatCurrency(item.orderTotal)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="bg-gray-50/80 font-semibold">
+                  <td colSpan={4} className="px-4 py-3 text-sm text-gray-900">Total</td>
+                  <td className="px-4 py-3 text-sm text-right text-amber-600">
+                    {formatCurrency(totalDiscountAmount)}
+                  </td>
+                  <td colSpan={3} className="px-4 py-3"></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
       </Card>
     </div>
   );
