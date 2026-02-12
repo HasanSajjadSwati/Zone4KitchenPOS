@@ -1,6 +1,7 @@
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { runAsync, getAsync, allAsync, convertBooleans, convertBooleansArray } from '../db/database.js';
+import { broadcastSync } from '../websocket.js';
 
 type ReferentialTable = 'registerSessions' | 'users' | 'diningTables' | 'waiters' | 'customers' | 'riders';
 
@@ -218,6 +219,10 @@ orderRoutes.post('/', async (req, res) => {
     );
 
     const order = await getAsync('SELECT * FROM orders WHERE id = ?', [id]);
+    
+    // Broadcast to all connected clients
+    broadcastSync('orders', 'create', id);
+    
     res.status(201).json(convertBooleans({ ...order, items: [] }));
   } catch (error) {
     console.error('Order creation error:', error);
@@ -344,6 +349,10 @@ orderRoutes.put('/:id', async (req, res) => {
     }
 
     const updated = await getAsync('SELECT * FROM orders WHERE id = ?', [req.params.id]);
+    
+    // Broadcast to all connected clients
+    broadcastSync('orders', 'update', req.params.id);
+    
     res.json(convertBooleans(updated));
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -375,6 +384,10 @@ orderRoutes.post('/:id/items', async (req, res) => {
     );
 
     const item = await getAsync('SELECT * FROM orderItems WHERE id = ?', [itemId]);
+    
+    // Broadcast to all connected clients
+    broadcastSync('order_items', 'create', orderId);
+    
     res.status(201).json(convertBooleans({
       ...item,
       selectedVariants: JSON.parse(item.selectedVariants),
@@ -445,6 +458,10 @@ orderRoutes.put('/:id/items/:itemId', async (req, res) => {
     }
 
     const updated = await getAsync('SELECT * FROM orderItems WHERE id = ?', [req.params.itemId]);
+    
+    // Broadcast to all connected clients
+    broadcastSync('order_items', 'update', req.params.id);
+    
     res.json(convertBooleans({
       ...updated,
       selectedVariants: updated.selectedVariants ? JSON.parse(updated.selectedVariants) : [],
@@ -486,6 +503,10 @@ orderRoutes.put('/:id/delivery-status', async (req, res) => {
     );
 
     const updated = await getAsync('SELECT * FROM orders WHERE id = ?', [id]);
+    
+    // Broadcast to all connected clients
+    broadcastSync('orders', 'update', id);
+    
     res.json(convertBooleans(updated));
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -501,6 +522,10 @@ orderRoutes.delete('/:id/items/:itemId', async (req, res) => {
     }
 
     await runAsync('DELETE FROM orderItems WHERE id = ?', [req.params.itemId]);
+    
+    // Broadcast to all connected clients
+    broadcastSync('order_items', 'delete', req.params.id);
+    
     res.json({ message: 'Order item deleted successfully' });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });

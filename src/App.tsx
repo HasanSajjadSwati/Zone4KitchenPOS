@@ -26,6 +26,7 @@ import { EmployeeLoanManagement } from '@/pages/Employees/EmployeeLoanManagement
 import { ExpenseManagement } from '@/pages/Expenses/ExpenseManagement';
 import { Settings } from '@/pages/Settings/Settings';
 import { DialogProvider } from '@/components/DialogProvider';
+import { SyncProvider } from '@/contexts/SyncContext';
 import { restoreSession } from '@/services/authService';
 
 // Protected Route wrapper
@@ -74,8 +75,9 @@ function App() {
           path="/*"
           element={
             <ProtectedRoute>
-              <Layout>
-                <Routes>
+              <SyncProvider>
+                <Layout>
+                  <Routes>
                   <Route path="/" element={<Dashboard />} />
                   <Route
                     path="/menu/categories"
@@ -247,12 +249,13 @@ function App() {
                   />
                 </Routes>
               </Layout>
-            </ProtectedRoute>
-          }
-        />
-      </Routes>
-    </BrowserRouter>
-  );
+            </SyncProvider>
+          </ProtectedRoute>
+        }
+      />
+    </Routes>
+  </BrowserRouter>
+);
 }
 
 export default App;

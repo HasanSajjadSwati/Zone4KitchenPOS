@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   ShoppingCartIcon,
@@ -43,6 +43,7 @@ import { getCurrentSession } from '@/services/registerService';
 import { printKOT, printCustomerReceipt, printCounterCopy, printRiderReceipt, printAllReceipts } from '@/services/printService';
 import { useAuthStore } from '@/stores/authStore';
 import { useDialog } from '@/hooks/useDialog';
+import { useSyncRefresh } from '@/contexts/SyncContext';
 import { formatCurrency } from '@/utils/validation';
 import type {
   Order,
@@ -230,6 +231,26 @@ export const CreateOrder: React.FC = () => {
       orderTypeForm.setValue('deliveryCharge', 0);
     }
   }, [selectedOrderType, orderTypeForm]);
+
+  // Real-time sync: auto-refresh order items when changes occur on other terminals
+  const refreshCurrentOrder = useCallback(async () => {
+    if (currentOrder) {
+      try {
+        const [updatedOrder, items] = await Promise.all([
+          getOrder(currentOrder.id),
+          getOrderItems(currentOrder.id),
+        ]);
+        if (updatedOrder) {
+          setCurrentOrder(updatedOrder);
+          setOrderItems(items);
+        }
+      } catch (error) {
+        console.error('Failed to refresh order:', error);
+      }
+    }
+  }, [currentOrder?.id]);
+
+  useSyncRefresh(['orders', 'order_items', 'payments'], refreshCurrentOrder);
 
   const loadInitialData = async () => {
     const session = await getCurrentSession();

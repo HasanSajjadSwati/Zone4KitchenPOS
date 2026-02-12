@@ -4,6 +4,8 @@ import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import { createServer } from 'http';
+import { initWebSocket, getConnectedClientsCount } from './websocket.js';
 
 // Route imports
 import { userRoutes } from './routes/users.js';
@@ -82,6 +84,7 @@ app.get('/api/health', (req, res) => {
     status: 'ok',
     debug: DEBUG,
     timestamp: new Date().toISOString(),
+    connectedClients: getConnectedClientsCount(),
   });
 });
 
@@ -106,11 +109,16 @@ if (shouldServeFrontend) {
   }
 }
 
+// Create HTTP server and attach WebSocket
+const server = createServer(app);
+initWebSocket(server);
+
 // Start server
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`\n🚀 POS Backend running on http://localhost:${PORT}`);
   console.log(`⚙️  Environment: ${NODE_ENV.toUpperCase()}`);
   console.log('📦 Database: PostgreSQL (DATABASE_URL)');
+  console.log(`🔄 WebSocket: Enabled on ws://localhost:${PORT}/api/ws`);
   console.log(`🔍 Debug mode: ${DEBUG ? 'ENABLED' : 'DISABLED'} (set DEBUG=true in .env to enable)\n`);
   logger.info(`Backend server started in ${NODE_ENV} mode`);
 });

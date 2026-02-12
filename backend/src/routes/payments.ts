@@ -1,6 +1,7 @@
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { runAsync, getAsync, allAsync } from '../db/database.js';
+import { broadcastSync } from '../websocket.js';
 
 export const paymentRoutes = express.Router();
 
@@ -93,6 +94,10 @@ paymentRoutes.post('/', async (req, res) => {
     );
 
     const payment = await getAsync('SELECT * FROM payments WHERE id = ?', [id]);
+    
+    // Broadcast to all connected clients
+    broadcastSync('payments', 'create', id);
+    
     res.status(201).json(payment);
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -116,6 +121,10 @@ paymentRoutes.put('/:id', async (req, res) => {
     );
 
     const updated = await getAsync('SELECT * FROM payments WHERE id = ?', [req.params.id]);
+    
+    // Broadcast to all connected clients
+    broadcastSync('payments', 'update', req.params.id);
+    
     res.json(updated);
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -131,6 +140,10 @@ paymentRoutes.delete('/:id', async (req, res) => {
     }
 
     await runAsync('DELETE FROM payments WHERE id = ?', [req.params.id]);
+    
+    // Broadcast to all connected clients
+    broadcastSync('payments', 'delete', req.params.id);
+    
     res.json({ message: 'Payment deleted successfully' });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });

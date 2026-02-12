@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   MagnifyingGlassIcon,
@@ -25,6 +25,7 @@ import {
 import { printKOT, printCustomerReceipt } from '@/services/printService';
 import { useAuthStore } from '@/stores/authStore';
 import { useDialog } from '@/hooks/useDialog';
+import { useSyncRefresh } from '@/contexts/SyncContext';
 import { formatCurrency, formatDateTime } from '@/utils/validation';
 import type { Order, OrderItem, MenuItem, Deal } from '@/db/types';
 import { db } from '@/db';
@@ -123,7 +124,7 @@ export const OrderList: React.FC = () => {
     return item.dealId ? dealNameById[item.dealId] || 'Unknown Deal' : 'Unknown Deal';
   };
 
-  const loadOrders = async () => {
+  const loadOrders = useCallback(async () => {
     let allOrders: Order[] = [];
 
     if (filterDate === 'past') {
@@ -153,7 +154,10 @@ export const OrderList: React.FC = () => {
     }
 
     setOrders(allOrders);
-  };
+  }, [filterDate, filterStatus, filterType, filterPayment]);
+
+  // Real-time sync: auto-refresh when orders/payments change on other terminals
+  useSyncRefresh(['orders', 'order_items', 'payments'], loadOrders);
 
   const handleViewDetails = async (order: Order) => {
     setSelectedOrder(order);

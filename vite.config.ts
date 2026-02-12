@@ -12,5 +12,13 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    proxy: {
+      // Proxy API requests (including WebSocket at /api/ws) to backend
+      '/api': {
+        target: 'http://localhost:3033',
+        changeOrigin: true,
+        ws: true,
+      },
+    },
   },
 })
