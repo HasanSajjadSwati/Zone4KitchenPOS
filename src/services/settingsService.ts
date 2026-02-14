@@ -1,6 +1,6 @@
 import { db } from '@/db';
 import { apiClient } from '@/services/api';
-import type { Settings } from '@/db/types';
+import type { Settings, Permission } from '@/db/types';
 import { logAudit } from '@/utils/audit';
 
 export async function getSettings(): Promise<Settings | undefined> {
@@ -46,4 +46,27 @@ export async function getAllUsers() {
 
 export async function getAllRoles() {
   return await db.roles.toArray();
+}
+
+export async function updateRolePermissions(
+  roleId: string,
+  permissions: Permission[],
+  userId: string
+): Promise<void> {
+  const role = await db.roles.get(roleId);
+  if (!role) {
+    throw new Error('Role not found');
+  }
+
+  await db.roles.update(roleId, { permissions });
+
+  await logAudit({
+    userId,
+    action: 'update',
+    tableName: 'roles',
+    recordId: roleId,
+    description: `Updated permissions for role: ${role.name}`,
+    before: { permissions: role.permissions },
+    after: { permissions },
+  });
 }

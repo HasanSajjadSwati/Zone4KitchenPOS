@@ -4,7 +4,9 @@ import {
   PrinterIcon,
   UserGroupIcon,
   ClipboardDocumentListIcon,
+  ShieldCheckIcon,
 } from '@heroicons/react/24/outline';
+import { PermissionManagement } from './PermissionManagement';
 import { Button, Card, Input, Modal, Select } from '@/components/ui';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -45,7 +47,7 @@ const userSchema = z.object({
 type BusinessInfoFormData = z.infer<typeof businessInfoSchema>;
 type KOTSettingsFormData = z.infer<typeof kotSettingsSchema>;
 type UserFormData = z.infer<typeof userSchema>;
-type TabType = 'business' | 'kot' | 'users' | 'audit';
+type TabType = 'business' | 'kot' | 'users' | 'permissions' | 'audit';
 
 export const Settings: React.FC = () => {
   const currentUser = useAuthStore((state) => state.currentUser);
@@ -294,6 +296,7 @@ export const Settings: React.FC = () => {
     { id: 'business' as TabType, name: 'Business Info', icon: BuildingStorefrontIcon },
     { id: 'kot' as TabType, name: 'KOT/Printing', icon: PrinterIcon },
     ...(canViewUsers ? [{ id: 'users' as TabType, name: 'Users', icon: UserGroupIcon }] : []),
+    ...(isAdmin ? [{ id: 'permissions' as TabType, name: 'Permissions', icon: ShieldCheckIcon }] : []),
     ...(canViewAudit ? [{ id: 'audit' as TabType, name: 'Audit Logs', icon: ClipboardDocumentListIcon }] : []),
   ];
 
@@ -570,6 +573,10 @@ export const Settings: React.FC = () => {
               </table>
             </div>
           </Card>
+        )}
+
+        {activeTab === 'permissions' && isAdmin && (
+          <PermissionManagement />
         )}
 
         {activeTab === 'audit' && canViewAudit && (
