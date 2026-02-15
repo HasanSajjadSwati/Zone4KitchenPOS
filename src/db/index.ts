@@ -1089,27 +1089,20 @@ export const db = {
       return apiClient.addOrderItem(item.orderId, item);
     },
     update: async (id: string, changes: any) => {
-      // Find the item's order first
-      const orders = await apiClient.getOrders();
-      for (const order of orders) {
-        const items = await apiClient.getOrderItems(order.id);
-        const item = items.find((i: any) => i.id === id);
-        if (item) {
-          return apiClient.updateOrderItem(order.id, id, changes);
-        }
+      // First get the item to find its orderId (single API call)
+      const items = await apiClient.getOrderItemsBulk();
+      const item = items.find((i: any) => i.id === id);
+      if (item) {
+        return apiClient.updateOrderItem(item.orderId, id, changes);
       }
       return null;
     },
     delete: async (id: string) => {
-      // Find the item's order first
-      const orders = await apiClient.getOrders();
-      for (const order of orders) {
-        const items = await apiClient.getOrderItems(order.id);
-        const item = items.find((i: any) => i.id === id);
-        if (item) {
-          await apiClient.deleteOrderItem(order.id, id);
-          return;
-        }
+      // First get the item to find its orderId (single API call)
+      const items = await apiClient.getOrderItemsBulk();
+      const item = items.find((i: any) => i.id === id);
+      if (item) {
+        await apiClient.deleteOrderItem(item.orderId, id);
       }
     },
     clear: async () => {},

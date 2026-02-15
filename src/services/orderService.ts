@@ -1,4 +1,5 @@
 import { db } from '@/db';
+import { apiClient } from '@/services/api';
 import { createId } from '@/utils/uuid';
 import type {
   Order,
@@ -235,7 +236,8 @@ export async function updateOrderItemQuantity(
 
   const newTotalPrice = (item.totalPrice / item.quantity) * quantity;
 
-  await db.orderItems.update(itemId, {
+  // Use direct API call with orderId we already have (avoids redundant fetch)
+  await apiClient.updateOrderItem(item.orderId, itemId, {
     quantity,
     totalPrice: newTotalPrice,
   });
@@ -290,7 +292,8 @@ export async function updateOrderItemVariants(
 
   const before = { ...item };
 
-  await db.orderItems.update(params.itemId, {
+  // Use direct API call with orderId we already have (avoids redundant fetch)
+  await apiClient.updateOrderItem(item.orderId, params.itemId, {
     selectedVariants: params.selectedVariants,
     notes: params.notes || null,
     unitPrice: newUnitPrice,
@@ -316,7 +319,8 @@ export async function removeOrderItem(itemId: string, userId: string): Promise<v
 
   const orderId = item.orderId;
 
-  await db.orderItems.delete(itemId);
+  // Use direct API call with orderId we already have (avoids redundant fetch)
+  await apiClient.deleteOrderItem(orderId, itemId);
   await recalculateOrderTotal(orderId);
 
   await logAudit({
