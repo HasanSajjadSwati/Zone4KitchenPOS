@@ -321,7 +321,14 @@ export async function updateOrderItemQuantityFast(
   quantity: number,
   _userId: string
 ): Promise<void> {
-  const newTotalPrice = (item.totalPrice / item.quantity) * quantity;
+  // Calculate unit price safely to avoid NaN from division by zero
+  const unitPrice = item.quantity > 0 ? item.totalPrice / item.quantity : (item.unitPrice || 0);
+  const newTotalPrice = Math.max(0, unitPrice * quantity);
+
+  // Guard against invalid calculations
+  if (!Number.isFinite(newTotalPrice)) {
+    throw new Error('Invalid price calculation - please refresh the order');
+  }
 
   // Direct API call - no fetch needed since we have the item
   await apiClient.updateOrderItem(item.orderId, item.id, {
@@ -349,7 +356,14 @@ export async function updateOrderItemQuantity(
   const item = await db.orderItems.get(itemId);
   if (!item) throw new Error('Order item not found');
 
-  const newTotalPrice = (item.totalPrice / item.quantity) * quantity;
+  // Calculate unit price safely to avoid NaN from division by zero
+  const unitPrice = item.quantity > 0 ? item.totalPrice / item.quantity : (item.unitPrice || 0);
+  const newTotalPrice = Math.max(0, unitPrice * quantity);
+
+  // Guard against invalid calculations
+  if (!Number.isFinite(newTotalPrice)) {
+    throw new Error('Invalid price calculation - please refresh the order');
+  }
 
   // Use direct API call with orderId we already have (avoids redundant fetch)
   await apiClient.updateOrderItem(item.orderId, itemId, {
@@ -857,7 +871,11 @@ export function calculateOrderTotals(
     ? Math.max(0, order.deliveryCharge || 0)
     : 0;
 
-  const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
+  // Safely calculate subtotal, treating NaN/Infinity values as 0
+  const subtotal = items.reduce((sum, item) => {
+    const itemPrice = Number.isFinite(item.totalPrice) ? item.totalPrice : 0;
+    return sum + itemPrice;
+  }, 0);
 
   let discountAmount = 0;
   if (order.discountType === 'percentage') {
@@ -865,6 +883,9 @@ export function calculateOrderTotals(
   } else if (order.discountType === 'fixed') {
     discountAmount = order.discountValue;
   }
+
+  // Ensure discountAmount is valid
+  discountAmount = Number.isFinite(discountAmount) ? discountAmount : 0;
 
   const totalBeforeCharges = Math.max(0, subtotal - discountAmount);
   const total = Math.max(0, totalBeforeCharges + deliveryCharge);

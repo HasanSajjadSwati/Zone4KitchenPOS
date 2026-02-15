@@ -1134,35 +1134,45 @@ export const CreateOrder: React.FC = () => {
   };
 
   const handleUpdateQuantity = async (itemId: string, newQuantity: number) => {
-    if (!currentUser) return;
+    if (!currentUser || !currentOrder) return;
 
     // Find the item from state (no API fetch needed)
     const item = orderItems.find(i => i.id === itemId);
     if (!item) return;
 
+    // Calculate unit price safely to avoid NaN from division by zero
+    const unitPrice = item.quantity > 0 ? item.totalPrice / item.quantity : item.unitPrice || 0;
+
     try {
       if (newQuantity <= 0) {
-        // Optimistic update: remove from UI immediately
-        const newItems = orderItems.filter(i => i.id !== itemId);
-        setOrderItems(newItems);
-        // Update order totals locally (no API call)
-        if (currentOrder) {
+        // Optimistic update: remove from UI immediately using functional update to avoid stale closure
+        setOrderItems(prevItems => {
+          const newItems = prevItems.filter(i => i.id !== itemId);
+          // Update order totals in the same render cycle
           const totals = calculateOrderTotals(currentOrder, newItems);
-          setCurrentOrder({ ...currentOrder, ...totals, updatedAt: new Date() });
-        }
+          setCurrentOrder(prev => prev ? { ...prev, ...totals, updatedAt: new Date() } : prev);
+          return newItems;
+        });
         await removeOrderItemFast(item, currentUser.id);
       } else {
-        // Optimistic update: update quantity in UI immediately
-        const newTotalPrice = (item.totalPrice / item.quantity) * newQuantity;
-        const newItems = orderItems.map(i => 
-          i.id === itemId ? { ...i, quantity: newQuantity, totalPrice: newTotalPrice } : i
-        );
-        setOrderItems(newItems);
-        // Update order totals locally (no API call)
-        if (currentOrder) {
-          const totals = calculateOrderTotals(currentOrder, newItems);
-          setCurrentOrder({ ...currentOrder, ...totals, updatedAt: new Date() });
+        // Calculate new total price safely
+        const newTotalPrice = Math.max(0, unitPrice * newQuantity);
+        // Ensure the price is a valid number
+        if (!Number.isFinite(newTotalPrice)) {
+          console.error('Invalid price calculation detected', { unitPrice, newQuantity, item });
+          await refreshOrder();
+          return;
         }
+        // Optimistic update using functional update to avoid stale closure
+        setOrderItems(prevItems => {
+          const newItems = prevItems.map(i => 
+            i.id === itemId ? { ...i, quantity: newQuantity, totalPrice: newTotalPrice } : i
+          );
+          // Update order totals in the same render cycle
+          const totals = calculateOrderTotals(currentOrder, newItems);
+          setCurrentOrder(prev => prev ? { ...prev, ...totals, updatedAt: new Date() } : prev);
+          return newItems;
+        });
         await updateOrderItemQuantityFast(item, newQuantity, currentUser.id);
       }
     } catch (error) {
