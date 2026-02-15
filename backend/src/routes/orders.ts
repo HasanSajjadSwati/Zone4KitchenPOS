@@ -10,6 +10,32 @@ async function recordExists(table: ReferentialTable, id: string): Promise<boolea
   return Boolean(row);
 }
 
+// Helper function to recalculate and update order totals
+async function recalculateOrderTotals(orderId: string): Promise<void> {
+  const order = await getAsync('SELECT * FROM orders WHERE id = ?', [orderId]);
+  if (!order) return;
+
+  const items = await allAsync('SELECT totalPrice FROM orderItems WHERE orderId = ?', [orderId]);
+  const subtotal = items.reduce((sum: number, item: any) => sum + (item.totalPrice || 0), 0);
+
+  const deliveryCharge = order.orderType === 'delivery' ? Math.max(0, order.deliveryCharge || 0) : 0;
+
+  let discountAmount = 0;
+  if (order.discountType === 'percentage') {
+    discountAmount = (subtotal * (order.discountValue || 0)) / 100;
+  } else if (order.discountType === 'fixed') {
+    discountAmount = order.discountValue || 0;
+  }
+
+  const totalBeforeCharges = Math.max(0, subtotal - discountAmount);
+  const total = Math.max(0, totalBeforeCharges + deliveryCharge);
+
+  await runAsync(
+    'UPDATE orders SET subtotal = ?, discountAmount = ?, total = ?, updatedAt = ? WHERE id = ?',
+    [subtotal, discountAmount, total, new Date().toISOString(), orderId]
+  );
+}
+
 export const orderRoutes = express.Router();
 
 // Helper function to generate next order number
@@ -123,6 +149,49 @@ orderRoutes.get('/', async (req, res) => {
     }
 
     const orders = await allAsync(query, params);
+    
+    // Recalculate totals for orders with 0 subtotal that have items
+    // This fixes legacy data where totals weren't persisted correctly
+    const ordersToFix = orders.filter((o: any) => o.subtotal === 0 || o.subtotal === null);
+    if (ordersToFix.length > 0) {
+      const orderIds = ordersToFix.map((o: any) => o.id);
+      const allItems = await allAsync(
+        `SELECT orderId, SUM(totalPrice) as itemsTotal FROM orderItems WHERE orderId IN (${orderIds.map(() => '?').join(',')}) GROUP BY orderId`,
+        orderIds
+      );
+      const itemsTotalByOrder = new Map<string, number>();
+      for (const item of allItems) {
+        itemsTotalByOrder.set(item.orderId, item.itemsTotal || 0);
+      }
+      
+      // Update orders in memory and persist fixes
+      for (const order of orders) {
+        const itemsTotal = itemsTotalByOrder.get(order.id);
+        if (itemsTotal && itemsTotal > 0 && (order.subtotal === 0 || order.subtotal === null)) {
+          const deliveryCharge = order.orderType === 'delivery' ? Math.max(0, order.deliveryCharge || 0) : 0;
+          let discountAmount = 0;
+          if (order.discountType === 'percentage') {
+            discountAmount = (itemsTotal * (order.discountValue || 0)) / 100;
+          } else if (order.discountType === 'fixed') {
+            discountAmount = order.discountValue || 0;
+          }
+          const totalBeforeCharges = Math.max(0, itemsTotal - discountAmount);
+          const total = Math.max(0, totalBeforeCharges + deliveryCharge);
+          
+          // Update in memory for response
+          order.subtotal = itemsTotal;
+          order.discountAmount = discountAmount;
+          order.total = total;
+          
+          // Persist the fix (fire and forget)
+          runAsync(
+            'UPDATE orders SET subtotal = ?, discountAmount = ?, total = ? WHERE id = ?',
+            [itemsTotal, discountAmount, total, order.id]
+          ).catch(err => console.error('Failed to fix order totals:', err));
+        }
+      }
+    }
+    
     res.json({ orders: convertBooleansArray(orders), total });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -132,7 +201,7 @@ orderRoutes.get('/', async (req, res) => {
 // Get order with items
 orderRoutes.get('/:id', async (req, res) => {
   try {
-    const order = await getAsync('SELECT * FROM orders WHERE id = ?', [req.params.id]);
+    let order = await getAsync('SELECT * FROM orders WHERE id = ?', [req.params.id]);
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
     }
@@ -147,6 +216,31 @@ orderRoutes.get('/:id', async (req, res) => {
       selectedVariants: item.selectedVariants ? JSON.parse(item.selectedVariants) : [],
       dealBreakdown: item.dealBreakdown ? JSON.parse(item.dealBreakdown) : null
     }));
+
+    // Recalculate totals if subtotal is 0 but items exist
+    const itemsTotal = items.reduce((sum: number, item: any) => sum + (item.totalPrice || 0), 0);
+    if (itemsTotal > 0 && (order.subtotal === 0 || order.subtotal === null)) {
+      const deliveryCharge = order.orderType === 'delivery' ? Math.max(0, order.deliveryCharge || 0) : 0;
+      let discountAmount = 0;
+      if (order.discountType === 'percentage') {
+        discountAmount = (itemsTotal * (order.discountValue || 0)) / 100;
+      } else if (order.discountType === 'fixed') {
+        discountAmount = order.discountValue || 0;
+      }
+      const totalBeforeCharges = Math.max(0, itemsTotal - discountAmount);
+      const total = Math.max(0, totalBeforeCharges + deliveryCharge);
+      
+      // Update in memory for response
+      order.subtotal = itemsTotal;
+      order.discountAmount = discountAmount;
+      order.total = total;
+      
+      // Persist the fix
+      await runAsync(
+        'UPDATE orders SET subtotal = ?, discountAmount = ?, total = ? WHERE id = ?',
+        [itemsTotal, discountAmount, total, order.id]
+      );
+    }
 
     res.json(convertBooleans({ ...order, items: parsedItems }));
   } catch (error) {
@@ -405,6 +499,9 @@ orderRoutes.post('/:id/items', async (req, res) => {
       ]
     );
 
+    // Recalculate order totals after adding item
+    await recalculateOrderTotals(orderId);
+
     const item = await getAsync('SELECT * FROM orderItems WHERE id = ?', [itemId]);
     
     // Broadcast to all connected clients
@@ -477,6 +574,9 @@ orderRoutes.put('/:id/items/:itemId', async (req, res) => {
     if (updates.length > 0) {
       values.push(req.params.itemId);
       await runAsync(`UPDATE orderItems SET ${updates.join(', ')} WHERE id = ?`, values);
+      
+      // Recalculate order totals after updating item
+      await recalculateOrderTotals(req.params.id);
     }
 
     const updated = await getAsync('SELECT * FROM orderItems WHERE id = ?', [req.params.itemId]);
@@ -544,6 +644,9 @@ orderRoutes.delete('/:id/items/:itemId', async (req, res) => {
     }
 
     await runAsync('DELETE FROM orderItems WHERE id = ?', [req.params.itemId]);
+    
+    // Recalculate order totals after deleting item
+    await recalculateOrderTotals(req.params.id);
     
     // Broadcast to all connected clients
     broadcastSync('order_items', 'delete', req.params.id);

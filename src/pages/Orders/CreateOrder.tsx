@@ -232,7 +232,9 @@ export const CreateOrder: React.FC = () => {
     }
   }, [selectedOrderType, orderTypeForm]);
 
-  // Real-time sync: auto-refresh order items when changes occur on other terminals
+  // Real-time sync: auto-refresh order when changes occur on other terminals
+  // Note: We don't subscribe to 'order_items' since we do optimistic updates locally
+  // This prevents duplicate items appearing when we add items and the sync triggers
   const refreshCurrentOrder = useCallback(async () => {
     if (currentOrder) {
       try {
@@ -250,7 +252,7 @@ export const CreateOrder: React.FC = () => {
     }
   }, [currentOrder?.id]);
 
-  useSyncRefresh(['orders', 'order_items', 'payments'], refreshCurrentOrder);
+  useSyncRefresh(['orders', 'payments'], refreshCurrentOrder);
 
   const loadInitialData = async () => {
     const session = await getCurrentSession();
