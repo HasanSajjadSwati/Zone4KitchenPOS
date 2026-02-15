@@ -171,8 +171,8 @@ export async function addMenuItemFast(params: AddMenuItemFastParams): Promise<Or
   // Single API call to add item
   await db.orderItems.add(orderItem);
   
-  // Skip recalculateOrderTotal - let caller update locally for speed
-  // The server will recalculate on next sync
+  // Recalculate order totals on backend to persist the changes
+  await recalculateOrderTotal(params.orderId);
 
   return orderItem;
 }
@@ -310,7 +310,8 @@ export async function addDealFast(params: AddDealFastParams): Promise<OrderItem>
   // Single API call to add item
   await db.orderItems.add(orderItem);
   
-  // Skip recalculateOrderTotal - let caller update locally for speed
+  // Recalculate order totals on backend to persist the changes
+  await recalculateOrderTotal(params.orderId);
 
   return orderItem;
 }

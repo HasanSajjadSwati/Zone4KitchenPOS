@@ -239,7 +239,9 @@ export const CreateOrder: React.FC = () => {
         // Single API call - getOrderWithItems returns both order and items
         const result = await getOrderWithItems(currentOrder.id);
         if (result) {
-          setCurrentOrder(result.order);
+          // Recalculate totals from items to ensure accuracy
+          const totals = calculateOrderTotals(result.order, result.items);
+          setCurrentOrder({ ...result.order, ...totals });
           setOrderItems(result.items);
         }
       } catch (error) {
@@ -281,7 +283,9 @@ export const CreateOrder: React.FC = () => {
     if (editOrderId) {
       const result = await getOrderWithItems(editOrderId);
       if (result) {
-        setCurrentOrder(result.order);
+        // Recalculate totals from items to ensure accuracy (backend may have stale data)
+        const totals = calculateOrderTotals(result.order, result.items);
+        setCurrentOrder({ ...result.order, ...totals });
         setOrderItems(result.items);
       } else {
         await dialog.alert('Order not found', 'Error');
@@ -1397,7 +1401,9 @@ export const CreateOrder: React.FC = () => {
     // Single API call - getOrderWithItems returns both order and items
     const result = await getOrderWithItems(currentOrder.id);
     if (result) {
-      setCurrentOrder(result.order);
+      // Recalculate totals from items to ensure accuracy
+      const totals = calculateOrderTotals(result.order, result.items);
+      setCurrentOrder({ ...result.order, ...totals });
       setOrderItems(result.items);
     }
   };
