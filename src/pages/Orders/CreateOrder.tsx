@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   ShoppingCartIcon,
@@ -17,8 +17,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
   createOrder,
-  addMenuItem,
-  addDeal,
+  addMenuItemFast,
+  addDealFast,
   validateVariantSelections,
   updateOrderItemQuantityFast,
   updateOrderItemVariants,
@@ -26,8 +26,8 @@ import {
   applyDiscount,
   removeDiscount,
   completeOrder,
-  getOrder,
-  getOrderItems,
+  getOrderWithItems,
+  calculateOrderTotals,
 } from '@/services/orderService';
 import {
   getAllCategories,
@@ -189,6 +189,9 @@ export const CreateOrder: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [customerStatus, setCustomerStatus] = useState<'new' | 'existing' | null>(null);
   const [editCustomerStatus, setEditCustomerStatus] = useState<'new' | 'existing' | null>(null);
+  
+  // Track items currently being saved to backend (to prevent race conditions)
+  const pendingItemIds = useRef<Set<string>>(new Set());
 
   const orderTypeForm = useForm<OrderTypeFormData>({
     resolver: zodResolver(orderTypeSchema),
@@ -236,13 +239,11 @@ export const CreateOrder: React.FC = () => {
   const refreshCurrentOrder = useCallback(async () => {
     if (currentOrder) {
       try {
-        const [updatedOrder, items] = await Promise.all([
-          getOrder(currentOrder.id),
-          getOrderItems(currentOrder.id),
-        ]);
-        if (updatedOrder) {
-          setCurrentOrder(updatedOrder);
-          setOrderItems(items);
+        // Single API call - getOrderWithItems returns both order and items
+        const result = await getOrderWithItems(currentOrder.id);
+        if (result) {
+          setCurrentOrder(result.order);
+          setOrderItems(result.items);
         }
       } catch (error) {
         console.error('Failed to refresh order:', error);
@@ -279,13 +280,12 @@ export const CreateOrder: React.FC = () => {
     const allTables = await getAllTables();
     setTables(allTables.filter((t) => t.isActive));
 
-    // If editing an existing order, load it
+    // If editing an existing order, load it (single API call)
     if (editOrderId) {
-      const existingOrder = await getOrder(editOrderId);
-      if (existingOrder) {
-        setCurrentOrder(existingOrder);
-        const items = await getOrderItems(editOrderId);
-        setOrderItems(items);
+      const result = await getOrderWithItems(editOrderId);
+      if (result) {
+        setCurrentOrder(result.order);
+        setOrderItems(result.items);
       } else {
         await dialog.alert('Order not found', 'Error');
       }
@@ -469,30 +469,40 @@ export const CreateOrder: React.FC = () => {
 
         // Add item with auto-selected variants
         try {
-          await addMenuItem({
+          const newItem = await addMenuItemFast({
             orderId: currentOrder.id,
-            menuItemId: menuItem.id,
+            menuItem: { id: menuItem.id, name: menuItem.name, price: menuItem.price },
             quantity: 1,
             selectedVariants: autoVariants,
             userId: currentUser.id,
           });
-          await refreshOrder();
+          // Optimistic update - add to state and recalculate locally
+          const newItems = [...orderItems, newItem];
+          setOrderItems(newItems);
+          const totals = calculateOrderTotals(currentOrder, newItems);
+          setCurrentOrder({ ...currentOrder, ...totals, updatedAt: new Date() });
         } catch (error) {
+          await refreshOrder();
           await dialog.alert(error instanceof Error ? error.message : 'Failed to add item', 'Error');
         }
       }
     } else {
       // Add item without variants
       try {
-        await addMenuItem({
+        const newItem = await addMenuItemFast({
           orderId: currentOrder.id,
-          menuItemId: menuItem.id,
+          menuItem: { id: menuItem.id, name: menuItem.name, price: menuItem.price },
           quantity: 1,
           selectedVariants: [],
           userId: currentUser.id,
         });
-        await refreshOrder();
+        // Optimistic update - add to state and recalculate locally
+        const newItems = [...orderItems, newItem];
+        setOrderItems(newItems);
+        const totals = calculateOrderTotals(currentOrder, newItems);
+        setCurrentOrder({ ...currentOrder, ...totals, updatedAt: new Date() });
       } catch (error) {
+        await refreshOrder();
         await dialog.alert(error instanceof Error ? error.message : 'Failed to add item', 'Error');
       }
     }
@@ -805,22 +815,28 @@ export const CreateOrder: React.FC = () => {
 
     setIsLoading(true);
     try {
-      await addMenuItem({
+      const newItem = await addMenuItemFast({
         orderId: currentOrder.id,
-        menuItemId: selectedMenuItem.id,
+        menuItem: { id: selectedMenuItem.id, name: selectedMenuItem.name, price: selectedMenuItem.price },
         quantity: 1,
         selectedVariants,
         notes: variantNotes || undefined,
         userId: currentUser.id,
       });
 
-      await refreshOrder();
+      // Optimistic update - add to state and recalculate locally
+      const newItems = [...orderItems, newItem];
+      setOrderItems(newItems);
+      const totals = calculateOrderTotals(currentOrder, newItems);
+      setCurrentOrder({ ...currentOrder, ...totals, updatedAt: new Date() });
+      
       setIsVariantModalOpen(false);
       setSelectedMenuItem(null);
       setEditingOrderItem(null);
       setSelectedVariants([]);
       setVariantNotes('');
     } catch (error) {
+      await refreshOrder();
       await dialog.alert(error instanceof Error ? error.message : 'Failed to add item', 'Error');
     } finally {
       setIsLoading(false);
@@ -1013,16 +1029,20 @@ export const CreateOrder: React.FC = () => {
         })
       );
 
-      await addDeal({
+      const newItem = await addDealFast({
         orderId: currentOrder.id,
-        dealId: deal.id,
+        deal: { id: deal.id, name: deal.name, price: deal.price },
         quantity: 1,
         dealBreakdown,
         selectedVariants: autoVariants,
         userId: currentUser.id,
       });
 
-      await refreshOrder();
+      // Optimistic update
+      const updatedItems = [...orderItems, newItem];
+      setOrderItems(updatedItems);
+      const totals = calculateOrderTotals(currentOrder, updatedItems);
+      setCurrentOrder({ ...currentOrder, ...totals });
     } catch (error) {
       await dialog.alert(error instanceof Error ? error.message : 'Failed to add deal', 'Error');
     } finally {
@@ -1085,9 +1105,9 @@ export const CreateOrder: React.FC = () => {
         }];
       });
 
-      await addDeal({
+      const newItem = await addDealFast({
         orderId: currentOrder.id,
-        dealId: selectedDeal.id,
+        deal: { id: selectedDeal.id, name: selectedDeal.name, price: selectedDeal.price },
         quantity: 1,
         dealBreakdown,
         selectedVariants: selectedDealVariants,
@@ -1095,7 +1115,12 @@ export const CreateOrder: React.FC = () => {
         userId: currentUser.id,
       });
 
-      await refreshOrder();
+      // Optimistic update
+      const updatedItems = [...orderItems, newItem];
+      setOrderItems(updatedItems);
+      const totals = calculateOrderTotals(currentOrder, updatedItems);
+      setCurrentOrder({ ...currentOrder, ...totals });
+      
       setIsDealVariantModalOpen(false);
       setSelectedDeal(null);
       setDealVariants([]);
@@ -1121,19 +1146,28 @@ export const CreateOrder: React.FC = () => {
     try {
       if (newQuantity <= 0) {
         // Optimistic update: remove from UI immediately
-        setOrderItems(prev => prev.filter(i => i.id !== itemId));
+        const newItems = orderItems.filter(i => i.id !== itemId);
+        setOrderItems(newItems);
+        // Update order totals locally (no API call)
+        if (currentOrder) {
+          const totals = calculateOrderTotals(currentOrder, newItems);
+          setCurrentOrder({ ...currentOrder, ...totals, updatedAt: new Date() });
+        }
         await removeOrderItemFast(item, currentUser.id);
       } else {
         // Optimistic update: update quantity in UI immediately
         const newTotalPrice = (item.totalPrice / item.quantity) * newQuantity;
-        setOrderItems(prev => prev.map(i => 
+        const newItems = orderItems.map(i => 
           i.id === itemId ? { ...i, quantity: newQuantity, totalPrice: newTotalPrice } : i
-        ));
+        );
+        setOrderItems(newItems);
+        // Update order totals locally (no API call)
+        if (currentOrder) {
+          const totals = calculateOrderTotals(currentOrder, newItems);
+          setCurrentOrder({ ...currentOrder, ...totals, updatedAt: new Date() });
+        }
         await updateOrderItemQuantityFast(item, newQuantity, currentUser.id);
       }
-      // Refresh order totals only (faster than full refresh)
-      const updated = await getOrder(item.orderId);
-      if (updated) setCurrentOrder(updated);
     } catch (error) {
       // Revert optimistic update on error
       await refreshOrder();
@@ -1150,11 +1184,14 @@ export const CreateOrder: React.FC = () => {
 
     try {
       // Optimistic update: remove from UI immediately  
-      setOrderItems(prev => prev.filter(i => i.id !== itemId));
+      const newItems = orderItems.filter(i => i.id !== itemId);
+      setOrderItems(newItems);
+      // Update order totals locally (no API call)
+      if (currentOrder) {
+        const totals = calculateOrderTotals(currentOrder, newItems);
+        setCurrentOrder({ ...currentOrder, ...totals, updatedAt: new Date() });
+      }
       await removeOrderItemFast(item, currentUser.id);
-      // Refresh order totals only
-      const updated = await getOrder(item.orderId);
-      if (updated) setCurrentOrder(updated);
     } catch (error) {
       // Revert optimistic update on error
       await refreshOrder();
@@ -1341,10 +1378,12 @@ export const CreateOrder: React.FC = () => {
 
   const refreshOrder = async () => {
     if (!currentOrder) return;
-    const updated = await getOrder(currentOrder.id);
-    if (updated) setCurrentOrder(updated);
-    const items = await getOrderItems(currentOrder.id);
-    setOrderItems(items);
+    // Single API call - getOrderWithItems returns both order and items
+    const result = await getOrderWithItems(currentOrder.id);
+    if (result) {
+      setCurrentOrder(result.order);
+      setOrderItems(result.items);
+    }
   };
 
   const handleCustomerPhoneChange = async (phone: string) => {

@@ -14,9 +14,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
-  getTodaysOrders,
-  getAllOrders,
-  getPastOrders,
+  getOrdersPaginated,
   getOrderItems,
   cancelOrder,
   markOrderAsPaid,
@@ -74,6 +72,11 @@ export const OrderList: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [menuItemNameById, setMenuItemNameById] = useState<Record<string, string>>({});
   const [dealNameById, setDealNameById] = useState<Record<string, string>>({});
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalOrders, setTotalOrders] = useState(0);
+  const pageSize = 50; // Orders per page);
 
   const paymentForm = useForm<PaymentFormData>({
     resolver: zodResolver(paymentSchema),
@@ -87,6 +90,11 @@ export const OrderList: React.FC = () => {
 
   useEffect(() => {
     loadOrders();
+  }, [filterStatus, filterType, filterDate, filterPayment, currentPage]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
   }, [filterStatus, filterType, filterDate, filterPayment]);
 
   useEffect(() => {
@@ -125,36 +133,36 @@ export const OrderList: React.FC = () => {
   };
 
   const loadOrders = useCallback(async () => {
-    let allOrders: Order[] = [];
+    // Build date range based on filter
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const endOfToday = new Date(today);
+    endOfToday.setHours(23, 59, 59, 999);
 
-    if (filterDate === 'past') {
-      allOrders = await getPastOrders();
-    } else if (filterDate === 'all') {
-      allOrders = await getAllOrders();
-    } else {
-      allOrders = await getTodaysOrders();
+    let startDate: string | undefined;
+    let endDate: string | undefined;
+
+    if (filterDate === 'today') {
+      startDate = today.toISOString();
+      endDate = endOfToday.toISOString();
+    } else if (filterDate === 'past') {
+      endDate = today.toISOString(); // Before today
     }
+    // 'all' = no date filter
 
-    if (filterStatus === 'open') {
-      allOrders = allOrders.filter((o) => o.status === 'open');
-    } else if (filterStatus === 'completed') {
-      allOrders = allOrders.filter((o) => o.status === 'completed');
-    } else if (filterStatus === 'cancelled') {
-      allOrders = allOrders.filter((o) => o.status === 'cancelled');
-    }
+    const result = await getOrdersPaginated({
+      status: filterStatus !== 'all' ? filterStatus : undefined,
+      orderType: filterType !== 'all' ? filterType : undefined,
+      isPaid: filterPayment === 'paid' ? true : filterPayment === 'unpaid' ? false : undefined,
+      startDate,
+      endDate,
+      limit: pageSize,
+      offset: (currentPage - 1) * pageSize,
+    });
 
-    if (filterType !== 'all') {
-      allOrders = allOrders.filter((o) => o.orderType === filterType);
-    }
-
-    if (filterPayment === 'paid') {
-      allOrders = allOrders.filter((o) => o.isPaid);
-    } else if (filterPayment === 'unpaid') {
-      allOrders = allOrders.filter((o) => !o.isPaid);
-    }
-
-    setOrders(allOrders);
-  }, [filterDate, filterStatus, filterType, filterPayment]);
+    setOrders(result.orders);
+    setTotalOrders(result.total);
+  }, [filterDate, filterStatus, filterType, filterPayment, currentPage, pageSize]);
 
   // Real-time sync: auto-refresh when orders/payments change on other terminals
   useSyncRefresh(['orders', 'order_items', 'payments'], loadOrders);
@@ -491,6 +499,36 @@ export const OrderList: React.FC = () => {
               <p>No orders found matching your filters</p>
             </div>
           </Card>
+        )}
+
+        {/* Pagination Controls */}
+        {totalOrders > pageSize && (
+          <div className="flex items-center justify-between mt-4 px-2">
+            <div className="text-sm text-gray-600">
+              Showing {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, totalOrders)} of {totalOrders} orders
+            </div>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </Button>
+              <span className="px-3 py-1 text-sm bg-gray-100 rounded">
+                Page {currentPage} of {Math.ceil(totalOrders / pageSize)}
+              </span>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setCurrentPage(p => p + 1)}
+                disabled={currentPage >= Math.ceil(totalOrders / pageSize)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
         )}
       </div>
 

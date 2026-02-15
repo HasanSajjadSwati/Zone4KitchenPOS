@@ -428,5 +428,11 @@ CREATE INDEX IF NOT EXISTS idx_orders_status_createdAt ON orders(status, created
 CREATE INDEX IF NOT EXISTS idx_orderItems_orderId_itemType ON orderItems(orderId, itemType);
 CREATE INDEX IF NOT EXISTS idx_orderItems_menuItemId ON orderItems(menuItemId);
 CREATE INDEX IF NOT EXISTS idx_orderItems_dealId ON orderItems(dealId);
+
+-- Additional indexes for order list pagination and filtering
+CREATE INDEX IF NOT EXISTS idx_orders_orderType ON orders(orderType);
+CREATE INDEX IF NOT EXISTS idx_orders_isPaid ON orders(isPaid);
+CREATE INDEX IF NOT EXISTS idx_orders_createdAt_status ON orders(createdAt DESC, status);
+CREATE INDEX IF NOT EXISTS idx_orders_orderType_status_createdAt ON orders(orderType, status, createdAt DESC);
 CREATE INDEX IF NOT EXISTS idx_payments_orderId_method ON payments(orderId, method);
 `;

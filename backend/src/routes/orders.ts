@@ -100,9 +100,30 @@ orderRoutes.get('/', async (req, res) => {
       params.push(endDate);
     }
 
+    // Handle isPaid filter
+    const { isPaid, limit, offset } = req.query;
+    if (isPaid === 'true') {
+      query += ' AND isPaid = 1';
+    } else if (isPaid === 'false') {
+      query += ' AND isPaid = 0';
+    }
+
+    // Get total count for pagination (before LIMIT)
+    const countQuery = query.replace('SELECT *', 'SELECT COUNT(*) as total');
+    const countResult = await getAsync(countQuery, params);
+    const total = countResult?.total || 0;
+
     query += ` ORDER BY ${resolvedDateField} DESC, createdAt DESC`;
+
+    // Apply pagination if provided
+    if (limit) {
+      const limitNum = parseInt(String(limit), 10);
+      const offsetNum = offset ? parseInt(String(offset), 10) : 0;
+      query += ` LIMIT ${limitNum} OFFSET ${offsetNum}`;
+    }
+
     const orders = await allAsync(query, params);
-    res.json(convertBooleansArray(orders));
+    res.json({ orders: convertBooleansArray(orders), total });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }
@@ -362,14 +383,15 @@ orderRoutes.put('/:id', async (req, res) => {
 // Add item to order
 orderRoutes.post('/:id/items', async (req, res) => {
   try {
-    const { itemType, menuItemId, dealId, quantity, unitPrice, totalPrice, notes, selectedVariants, dealBreakdown } = req.body;
+    const { id: providedId, itemType, menuItemId, dealId, quantity, unitPrice, totalPrice, notes, selectedVariants, dealBreakdown } = req.body;
     const { id: orderId } = req.params;
 
     if (!itemType || !quantity || unitPrice === undefined || totalPrice === undefined) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const itemId = uuidv4();
+    // Use the ID provided by frontend, or generate a new one as fallback
+    const itemId = providedId || uuidv4();
     const now = new Date().toISOString();
 
     await runAsync(

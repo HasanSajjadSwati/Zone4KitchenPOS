@@ -127,6 +127,56 @@ interface AddMenuItemParams {
   userId: string;
 }
 
+// Fast version that uses menuItem directly (no fetch needed)
+interface AddMenuItemFastParams {
+  orderId: string;
+  menuItem: { id: string; name: string; price: number };
+  quantity: number;
+  selectedVariants: VariantSelection[];
+  notes?: string;
+  userId: string;
+}
+
+export async function addMenuItemFast(params: AddMenuItemFastParams): Promise<OrderItem> {
+  // Calculate price with variant modifiers (support both single and multi-select)
+  let variantsTotal = 0;
+  params.selectedVariants.forEach((variant) => {
+    if (variant.selectedOptions && variant.selectedOptions.length > 0) {
+      variantsTotal += variant.selectedOptions.reduce((sum, opt) => sum + opt.priceModifier, 0);
+    } else {
+      variantsTotal += variant.priceModifier;
+    }
+  });
+
+  const unitPrice = params.menuItem.price + variantsTotal;
+  const totalPrice = unitPrice * params.quantity;
+
+  const orderItem: OrderItem = {
+    id: createId(),
+    orderId: params.orderId,
+    itemType: 'menu_item',
+    menuItemId: params.menuItem.id,
+    dealId: null,
+    quantity: params.quantity,
+    unitPrice,
+    totalPrice,
+    notes: params.notes || null,
+    selectedVariants: params.selectedVariants,
+    dealBreakdown: null,
+    addedAt: new Date(),
+    lastPrintedAt: null,
+    createdAt: new Date(),
+  };
+
+  // Single API call to add item
+  await db.orderItems.add(orderItem);
+  
+  // Skip recalculateOrderTotal - let caller update locally for speed
+  // The server will recalculate on next sync
+
+  return orderItem;
+}
+
 export async function addMenuItem(params: AddMenuItemParams): Promise<OrderItem> {
   const menuItem = await db.menuItems.get(params.menuItemId);
   if (!menuItem) throw new Error('Menu item not found');
@@ -222,6 +272,45 @@ export async function addDeal(params: AddDealParams): Promise<OrderItem> {
     description: `Added ${params.quantity}x ${deal.name} deal to order`,
     after: orderItem,
   });
+
+  return orderItem;
+}
+
+// Fast version that uses deal directly (no fetch needed)
+interface AddDealFastParams {
+  orderId: string;
+  deal: { id: string; name: string; price: number };
+  quantity: number;
+  dealBreakdown: DealItemBreakdown[];
+  selectedVariants?: VariantSelection[];
+  notes?: string;
+  userId: string;
+}
+
+export async function addDealFast(params: AddDealFastParams): Promise<OrderItem> {
+  const totalPrice = params.deal.price * params.quantity;
+
+  const orderItem: OrderItem = {
+    id: createId(),
+    orderId: params.orderId,
+    itemType: 'deal',
+    menuItemId: null,
+    dealId: params.deal.id,
+    quantity: params.quantity,
+    unitPrice: params.deal.price,
+    totalPrice,
+    notes: params.notes || null,
+    selectedVariants: params.selectedVariants || [],
+    dealBreakdown: params.dealBreakdown,
+    addedAt: new Date(),
+    lastPrintedAt: null,
+    createdAt: new Date(),
+  };
+
+  // Single API call to add item
+  await db.orderItems.add(orderItem);
+  
+  // Skip recalculateOrderTotal - let caller update locally for speed
 
   return orderItem;
 }
@@ -601,6 +690,19 @@ export async function getOrder(orderId: string): Promise<Order | undefined> {
   return await db.orders.get(orderId);
 }
 
+// Get order with items in a single call (backend returns both)
+export async function getOrderWithItems(orderId: string): Promise<{ order: Order; items: OrderItem[] } | undefined> {
+  const result = await db.orders.get(orderId) as any;
+  if (!result) return undefined;
+  
+  // Backend returns items embedded in order response
+  const items = result.items || [];
+  const order = { ...result };
+  delete order.items;
+  
+  return { order, items };
+}
+
 export async function getOrderItems(orderId: string): Promise<OrderItem[]> {
   return await db.orderItems.where('orderId').equals(orderId).toArray();
 }
@@ -615,6 +717,43 @@ export async function getOrdersByType(orderType: string): Promise<Order[]> {
 
 export async function getAllOrders(): Promise<Order[]> {
   return await db.orders.orderBy('createdAt').reverse().toArray();
+}
+
+export interface OrderQueryParams {
+  status?: 'open' | 'completed' | 'cancelled';
+  orderType?: string;
+  isPaid?: boolean;
+  startDate?: string;
+  endDate?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface PaginatedOrdersResult {
+  orders: Order[];
+  total: number;
+}
+
+// Server-side paginated and filtered orders query
+export async function getOrdersPaginated(params: OrderQueryParams): Promise<PaginatedOrdersResult> {
+  const filters: Record<string, string> = {};
+  
+  if (params.status) filters.status = params.status;
+  if (params.orderType && params.orderType !== 'all') filters.orderType = params.orderType;
+  if (params.isPaid !== undefined) filters.isPaid = String(params.isPaid);
+  if (params.startDate) filters.startDate = params.startDate;
+  if (params.endDate) filters.endDate = params.endDate;
+  if (params.limit) filters.limit = String(params.limit);
+  if (params.offset !== undefined) filters.offset = String(params.offset);
+  
+  const result = await apiClient.getOrders(filters);
+  
+  // Handle both old format (array) and new format ({ orders, total })
+  if (Array.isArray(result)) {
+    return { orders: result as Order[], total: result.length };
+  }
+  
+  return result as PaginatedOrdersResult;
 }
 
 export async function getPastOrders(): Promise<Order[]> {
@@ -707,4 +846,28 @@ async function recalculateOrderTotal(orderId: string): Promise<void> {
     total,
     updatedAt: new Date(),
   });
+}
+
+// Fast local recalculation without API calls - uses provided items
+export function calculateOrderTotals(
+  order: Order,
+  items: OrderItem[]
+): { subtotal: number; discountAmount: number; total: number } {
+  const deliveryCharge = order.orderType === 'delivery'
+    ? Math.max(0, order.deliveryCharge || 0)
+    : 0;
+
+  const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
+
+  let discountAmount = 0;
+  if (order.discountType === 'percentage') {
+    discountAmount = (subtotal * order.discountValue) / 100;
+  } else if (order.discountType === 'fixed') {
+    discountAmount = order.discountValue;
+  }
+
+  const totalBeforeCharges = Math.max(0, subtotal - discountAmount);
+  const total = Math.max(0, totalBeforeCharges + deliveryCharge);
+
+  return { subtotal, discountAmount, total };
 }
