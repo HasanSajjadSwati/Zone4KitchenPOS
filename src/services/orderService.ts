@@ -226,6 +226,32 @@ export async function addDeal(params: AddDealParams): Promise<OrderItem> {
   return orderItem;
 }
 
+// Fast version that uses item data directly (no fetch required)
+export async function updateOrderItemQuantityFast(
+  item: OrderItem,
+  quantity: number,
+  _userId: string
+): Promise<void> {
+  const newTotalPrice = (item.totalPrice / item.quantity) * quantity;
+
+  // Direct API call - no fetch needed since we have the item
+  await apiClient.updateOrderItem(item.orderId, item.id, {
+    quantity,
+    totalPrice: newTotalPrice,
+  });
+
+  await recalculateOrderTotal(item.orderId);
+}
+
+// Fast version that uses item data directly (no fetch required)
+export async function removeOrderItemFast(
+  item: OrderItem,
+  _userId: string
+): Promise<void> {
+  await apiClient.deleteOrderItem(item.orderId, item.id);
+  await recalculateOrderTotal(item.orderId);
+}
+
 export async function updateOrderItemQuantity(
   itemId: string,
   quantity: number,

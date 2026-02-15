@@ -20,9 +20,9 @@ import {
   addMenuItem,
   addDeal,
   validateVariantSelections,
-  updateOrderItemQuantity,
+  updateOrderItemQuantityFast,
   updateOrderItemVariants,
-  removeOrderItem,
+  removeOrderItemFast,
   applyDiscount,
   removeDiscount,
   completeOrder,
@@ -1114,14 +1114,29 @@ export const CreateOrder: React.FC = () => {
   const handleUpdateQuantity = async (itemId: string, newQuantity: number) => {
     if (!currentUser) return;
 
+    // Find the item from state (no API fetch needed)
+    const item = orderItems.find(i => i.id === itemId);
+    if (!item) return;
+
     try {
       if (newQuantity <= 0) {
-        await removeOrderItem(itemId, currentUser.id);
+        // Optimistic update: remove from UI immediately
+        setOrderItems(prev => prev.filter(i => i.id !== itemId));
+        await removeOrderItemFast(item, currentUser.id);
       } else {
-        await updateOrderItemQuantity(itemId, newQuantity, currentUser.id);
+        // Optimistic update: update quantity in UI immediately
+        const newTotalPrice = (item.totalPrice / item.quantity) * newQuantity;
+        setOrderItems(prev => prev.map(i => 
+          i.id === itemId ? { ...i, quantity: newQuantity, totalPrice: newTotalPrice } : i
+        ));
+        await updateOrderItemQuantityFast(item, newQuantity, currentUser.id);
       }
-      await refreshOrder();
+      // Refresh order totals only (faster than full refresh)
+      const updated = await getOrder(item.orderId);
+      if (updated) setCurrentOrder(updated);
     } catch (error) {
+      // Revert optimistic update on error
+      await refreshOrder();
       await dialog.alert(error instanceof Error ? error.message : 'Failed to update quantity', 'Error');
     }
   };
@@ -1129,10 +1144,20 @@ export const CreateOrder: React.FC = () => {
   const handleRemoveItem = async (itemId: string) => {
     if (!currentUser) return;
 
+    // Find the item from state (no API fetch needed)
+    const item = orderItems.find(i => i.id === itemId);
+    if (!item) return;
+
     try {
-      await removeOrderItem(itemId, currentUser.id);
-      await refreshOrder();
+      // Optimistic update: remove from UI immediately  
+      setOrderItems(prev => prev.filter(i => i.id !== itemId));
+      await removeOrderItemFast(item, currentUser.id);
+      // Refresh order totals only
+      const updated = await getOrder(item.orderId);
+      if (updated) setCurrentOrder(updated);
     } catch (error) {
+      // Revert optimistic update on error
+      await refreshOrder();
       await dialog.alert(error instanceof Error ? error.message : 'Failed to remove item', 'Error');
     }
   };
