@@ -340,7 +340,9 @@ class APIClient {
       const params = new URLSearchParams(filters);
       endpoint += `?${params.toString()}`;
     }
-    return this.get(endpoint);
+    const response = await this.get(endpoint);
+    // Backend returns { orders: [...], total: number }, extract the array
+    return Array.isArray(response) ? response : (response?.orders || []);
   }
 
   async getOrder(id: string) {

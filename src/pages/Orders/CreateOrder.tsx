@@ -473,11 +473,13 @@ export const CreateOrder: React.FC = () => {
             selectedVariants: autoVariants,
             userId: currentUser.id,
           });
-          // Optimistic update - add to state and recalculate locally
-          const newItems = [...orderItems, newItem];
-          setOrderItems(newItems);
-          const totals = calculateOrderTotals(currentOrder, newItems);
-          setCurrentOrder({ ...currentOrder, ...totals, updatedAt: new Date() });
+          // Optimistic update using functional update to avoid stale closure
+          setOrderItems(prevItems => {
+            const newItems = [...prevItems, newItem];
+            const totals = calculateOrderTotals(currentOrder, newItems);
+            setCurrentOrder(prev => prev ? { ...prev, ...totals, updatedAt: new Date() } : prev);
+            return newItems;
+          });
         } catch (error) {
           await refreshOrder();
           await dialog.alert(error instanceof Error ? error.message : 'Failed to add item', 'Error');
@@ -493,11 +495,13 @@ export const CreateOrder: React.FC = () => {
           selectedVariants: [],
           userId: currentUser.id,
         });
-        // Optimistic update - add to state and recalculate locally
-        const newItems = [...orderItems, newItem];
-        setOrderItems(newItems);
-        const totals = calculateOrderTotals(currentOrder, newItems);
-        setCurrentOrder({ ...currentOrder, ...totals, updatedAt: new Date() });
+        // Optimistic update using functional update to avoid stale closure
+        setOrderItems(prevItems => {
+          const newItems = [...prevItems, newItem];
+          const totals = calculateOrderTotals(currentOrder, newItems);
+          setCurrentOrder(prev => prev ? { ...prev, ...totals, updatedAt: new Date() } : prev);
+          return newItems;
+        });
       } catch (error) {
         await refreshOrder();
         await dialog.alert(error instanceof Error ? error.message : 'Failed to add item', 'Error');
@@ -821,11 +825,13 @@ export const CreateOrder: React.FC = () => {
         userId: currentUser.id,
       });
 
-      // Optimistic update - add to state and recalculate locally
-      const newItems = [...orderItems, newItem];
-      setOrderItems(newItems);
-      const totals = calculateOrderTotals(currentOrder, newItems);
-      setCurrentOrder({ ...currentOrder, ...totals, updatedAt: new Date() });
+      // Optimistic update using functional update to avoid stale closure
+      setOrderItems(prevItems => {
+        const newItems = [...prevItems, newItem];
+        const totals = calculateOrderTotals(currentOrder, newItems);
+        setCurrentOrder(prev => prev ? { ...prev, ...totals, updatedAt: new Date() } : prev);
+        return newItems;
+      });
       
       setIsVariantModalOpen(false);
       setSelectedMenuItem(null);
@@ -1035,11 +1041,13 @@ export const CreateOrder: React.FC = () => {
         userId: currentUser.id,
       });
 
-      // Optimistic update
-      const updatedItems = [...orderItems, newItem];
-      setOrderItems(updatedItems);
-      const totals = calculateOrderTotals(currentOrder, updatedItems);
-      setCurrentOrder({ ...currentOrder, ...totals });
+      // Optimistic update using functional update to avoid stale closure
+      setOrderItems(prevItems => {
+        const updatedItems = [...prevItems, newItem];
+        const totals = calculateOrderTotals(currentOrder, updatedItems);
+        setCurrentOrder(prev => prev ? { ...prev, ...totals, updatedAt: new Date() } : prev);
+        return updatedItems;
+      });
     } catch (error) {
       await dialog.alert(error instanceof Error ? error.message : 'Failed to add deal', 'Error');
     } finally {
@@ -1112,11 +1120,13 @@ export const CreateOrder: React.FC = () => {
         userId: currentUser.id,
       });
 
-      // Optimistic update
-      const updatedItems = [...orderItems, newItem];
-      setOrderItems(updatedItems);
-      const totals = calculateOrderTotals(currentOrder, updatedItems);
-      setCurrentOrder({ ...currentOrder, ...totals });
+      // Optimistic update using functional update to avoid stale closure
+      setOrderItems(prevItems => {
+        const updatedItems = [...prevItems, newItem];
+        const totals = calculateOrderTotals(currentOrder, updatedItems);
+        setCurrentOrder(prev => prev ? { ...prev, ...totals, updatedAt: new Date() } : prev);
+        return updatedItems;
+      });
       
       setIsDealVariantModalOpen(false);
       setSelectedDeal(null);
@@ -1183,21 +1193,20 @@ export const CreateOrder: React.FC = () => {
   };
 
   const handleRemoveItem = async (itemId: string) => {
-    if (!currentUser) return;
+    if (!currentUser || !currentOrder) return;
 
     // Find the item from state (no API fetch needed)
     const item = orderItems.find(i => i.id === itemId);
     if (!item) return;
 
     try {
-      // Optimistic update: remove from UI immediately  
-      const newItems = orderItems.filter(i => i.id !== itemId);
-      setOrderItems(newItems);
-      // Update order totals locally (no API call)
-      if (currentOrder) {
+      // Optimistic update using functional update to avoid stale closure
+      setOrderItems(prevItems => {
+        const newItems = prevItems.filter(i => i.id !== itemId);
         const totals = calculateOrderTotals(currentOrder, newItems);
-        setCurrentOrder({ ...currentOrder, ...totals, updatedAt: new Date() });
-      }
+        setCurrentOrder(prev => prev ? { ...prev, ...totals, updatedAt: new Date() } : prev);
+        return newItems;
+      });
       await removeOrderItemFast(item, currentUser.id);
     } catch (error) {
       // Revert optimistic update on error
