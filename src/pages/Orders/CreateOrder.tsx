@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   ShoppingCartIcon,
@@ -189,9 +189,6 @@ export const CreateOrder: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [customerStatus, setCustomerStatus] = useState<'new' | 'existing' | null>(null);
   const [editCustomerStatus, setEditCustomerStatus] = useState<'new' | 'existing' | null>(null);
-  
-  // Track items currently being saved to backend (to prevent race conditions)
-  const pendingItemIds = useRef<Set<string>>(new Set());
 
   const orderTypeForm = useForm<OrderTypeFormData>({
     resolver: zodResolver(orderTypeSchema),
