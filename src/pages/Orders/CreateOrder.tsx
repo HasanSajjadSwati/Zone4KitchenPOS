@@ -1638,21 +1638,32 @@ export const CreateOrder: React.FC = () => {
                       .map((item) => (
                       <div
                         key={item.id}
-                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer"
+                        className="flex items-center justify-between p-2 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer gap-3"
                         onClick={() => handleAddItem(item)}
                       >
-                        <div className="flex-1">
+                        {item.imageUrl ? (
+                          <img
+                            src={item.imageUrl}
+                            alt={item.name}
+                            className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-lg bg-gray-200 dark:bg-gray-700 flex items-center justify-center flex-shrink-0">
+                            <span className="text-lg">🍽️</span>
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
                           <div className="flex items-center space-x-2">
-                            <p className="font-semibold text-gray-900">{item.name}</p>
+                            <p className="font-semibold text-gray-900 truncate">{item.name}</p>
                             {item.hasVariants && (
-                              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
+                              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded flex-shrink-0">
                                 Has Options
                               </span>
                             )}
                           </div>
                           <p className="text-sm text-gray-600">{formatCurrency(item.price)}</p>
                         </div>
-                        <PlusIcon className="w-5 h-5 text-primary-600" />
+                        <PlusIcon className="w-5 h-5 text-primary-600 flex-shrink-0" />
                       </div>
                     ))}
                     {menuItems.filter((item) =>
@@ -1679,24 +1690,35 @@ export const CreateOrder: React.FC = () => {
                     {filteredDeals.map((deal) => (
                     <div
                       key={deal.id}
-                      className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg hover:from-green-100 hover:to-blue-100 cursor-pointer border border-green-200 dark:from-emerald-900/40 dark:to-sky-900/40 dark:hover:from-emerald-900/60 dark:hover:to-sky-900/60 dark:border-emerald-700/60"
+                      className="flex items-center p-3 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg hover:from-green-100 hover:to-blue-100 cursor-pointer border border-green-200 dark:from-emerald-900/40 dark:to-sky-900/40 dark:hover:from-emerald-900/60 dark:hover:to-sky-900/60 dark:border-emerald-700/60 gap-3"
                       onClick={() => handleAddDeal(deal)}
                     >
-                      <div className="flex-1">
+                      {deal.imageUrl ? (
+                        <img
+                          src={deal.imageUrl}
+                          alt={deal.name}
+                          className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-14 h-14 rounded-lg bg-green-100 dark:bg-emerald-800/50 flex items-center justify-center flex-shrink-0">
+                          <TagIcon className="w-6 h-6 text-green-600 dark:text-emerald-300" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
                         <div className="flex items-center space-x-2 mb-1">
-                          <p className="font-bold text-gray-900 dark:text-gray-100">{deal.name}</p>
-                          <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded font-medium dark:bg-emerald-900/70 dark:text-emerald-200">
+                          <p className="font-bold text-gray-900 dark:text-gray-100 truncate">{deal.name}</p>
+                          <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded font-medium flex-shrink-0 dark:bg-emerald-900/70 dark:text-emerald-200">
                             DEAL
                           </span>
                         </div>
                         {deal.description && (
-                          <p className="text-xs text-gray-600 mb-2 line-clamp-1 dark:text-gray-300">{deal.description}</p>
+                          <p className="text-xs text-gray-600 mb-1 line-clamp-1 dark:text-gray-300">{deal.description}</p>
                         )}
                         <p className="text-lg font-bold text-primary-600 dark:text-primary-300">
                           {formatCurrency(deal.price)}
                         </p>
                       </div>
-                      <PlusIcon className="w-6 h-6 text-primary-600 dark:text-primary-300" />
+                      <PlusIcon className="w-6 h-6 text-primary-600 dark:text-primary-300 flex-shrink-0" />
                     </div>
                     ))}
                     {filteredDeals.length === 0 && (
@@ -2124,6 +2146,7 @@ export const CreateOrder: React.FC = () => {
                   <Input
                     label="Customer Phone"
                     placeholder="03001234567"
+                    maxLength={13}
                     error={orderTypeForm.formState.errors.customerPhone?.message}
                     {...orderTypeForm.register('customerPhone')}
                     onChange={(e) => {
@@ -2199,6 +2222,7 @@ export const CreateOrder: React.FC = () => {
               <Input
                 label="Customer Phone (Optional)"
                 placeholder="03001234567"
+                maxLength={13}
                 error={orderTypeForm.formState.errors.customerPhone?.message}
                 {...orderTypeForm.register('customerPhone')}
                 onChange={(e) => {
@@ -2263,6 +2287,7 @@ export const CreateOrder: React.FC = () => {
                 <Input
                   label={editOrderType === 'delivery' ? 'Customer Phone' : 'Customer Phone (Optional)'}
                   placeholder="03001234567"
+                  maxLength={13}
                   error={customerEditForm.formState.errors.customerPhone?.message}
                   {...customerEditForm.register('customerPhone')}
                   onChange={(e) => {

@@ -340,6 +340,7 @@ export const EmployeeManagement: React.FC = () => {
             <Input
               label="Phone Number (11 digits)"
               placeholder="03XXXXXXXXX"
+              maxLength={13}
               {...form.register('phone')}
               error={form.formState.errors.phone?.message}
             />

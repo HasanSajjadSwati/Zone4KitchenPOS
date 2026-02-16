@@ -80,7 +80,7 @@ menuItemRoutes.get('/:id', async (req, res) => {
 // Create menu item
 menuItemRoutes.post('/', async (req, res) => {
   try {
-    const { id: providedId, name, categoryId, price, description, isActive, isDealOnly, hasVariants } = req.body;
+    const { id: providedId, name, categoryId, price, description, imageUrl, isActive, isDealOnly, hasVariants } = req.body;
 
     if (!name || !categoryId || price === undefined) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -91,9 +91,9 @@ menuItemRoutes.post('/', async (req, res) => {
     const now = new Date().toISOString();
 
     await runAsync(
-      `INSERT INTO menuItems (id, name, categoryId, price, description, isActive, isDealOnly, hasVariants, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, name, categoryId, price, description || null, isActive !== false ? 1 : 0, isDealOnly ? 1 : 0, hasVariants ? 1 : 0, now, now]
+      `INSERT INTO menuItems (id, name, categoryId, price, description, imageUrl, isActive, isDealOnly, hasVariants, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, name, categoryId, price, description || null, imageUrl || null, isActive !== false ? 1 : 0, isDealOnly ? 1 : 0, hasVariants ? 1 : 0, now, now]
     );
 
     const item = await getAsync('SELECT * FROM menuItems WHERE id = ?', [id]);
@@ -106,7 +106,7 @@ menuItemRoutes.post('/', async (req, res) => {
 // Update menu item
 menuItemRoutes.put('/:id', async (req, res) => {
   try {
-    const { name, categoryId, price, description, isActive, isDealOnly, hasVariants } = req.body;
+    const { name, categoryId, price, description, imageUrl, isActive, isDealOnly, hasVariants } = req.body;
     const now = new Date().toISOString();
 
     const item = await getAsync('SELECT * FROM menuItems WHERE id = ?', [req.params.id]);
@@ -115,12 +115,13 @@ menuItemRoutes.put('/:id', async (req, res) => {
     }
 
     await runAsync(
-      `UPDATE menuItems SET name = ?, categoryId = ?, price = ?, description = ?, isActive = ?, isDealOnly = ?, hasVariants = ?, updatedAt = ? WHERE id = ?`,
+      `UPDATE menuItems SET name = ?, categoryId = ?, price = ?, description = ?, imageUrl = ?, isActive = ?, isDealOnly = ?, hasVariants = ?, updatedAt = ? WHERE id = ?`,
       [
         name || item.name,
         categoryId || item.categoryId,
         price !== undefined ? price : item.price,
         description !== undefined ? description : item.description,
+        imageUrl !== undefined ? imageUrl : item.imageUrl,
         isActive !== undefined ? (isActive ? 1 : 0) : item.isActive,
         isDealOnly !== undefined ? (isDealOnly ? 1 : 0) : item.isDealOnly,
         hasVariants !== undefined ? (hasVariants ? 1 : 0) : item.hasVariants,

@@ -365,6 +365,7 @@ export const StaffManagement: React.FC = () => {
               <Input
                 label="Phone Number"
                 placeholder="03001234567"
+                maxLength={13}
                 error={waiterForm.formState.errors.phone?.message}
                 helperText="11 digits, starts with 03"
                 {...waiterForm.register('phone')}
@@ -393,6 +394,7 @@ export const StaffManagement: React.FC = () => {
               <Input
                 label="Phone Number"
                 placeholder="03001234567"
+                maxLength={13}
                 error={riderForm.formState.errors.phone?.message}
                 helperText="11 digits, starts with 03"
                 {...riderForm.register('phone')}

@@ -250,6 +250,7 @@ export const CustomerManagement: React.FC = () => {
           <Input
             label="Phone Number"
             placeholder="03001234567"
+            maxLength={13}
             error={errors.phone?.message}
             helperText="11 digits, starts with 03"
             {...register('phone')}

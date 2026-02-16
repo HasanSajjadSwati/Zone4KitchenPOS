@@ -40,6 +40,7 @@ export interface MenuItem {
   categoryId: string;
   price: number;
   description: string | null;
+  imageUrl: string | null;
   isActive: boolean;
   isDealOnly: boolean;
   hasVariants: boolean;
@@ -82,6 +83,7 @@ export interface Deal {
   id: string;
   name: string;
   description: string | null;
+  imageUrl: string | null;
   price: number;
   categoryId: string | null;
   isActive: boolean;
@@ -195,6 +197,7 @@ export interface Order {
   orderNumber: string;
   registerSessionId: string;
   orderType: 'dine_in' | 'take_away' | 'delivery';
+  orderSource: 'pos' | 'website';
 
   // Dine In fields
   tableId: string | null;
@@ -322,6 +325,10 @@ export interface Settings {
 
   // Expense categories
   expenseCategories?: string[];
+
+  // Website settings
+  websiteEnabled?: boolean;
+  whatsappNumber?: string;
 
   updatedAt: Date;
   updatedBy: string;

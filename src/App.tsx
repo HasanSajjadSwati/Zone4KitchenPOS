@@ -25,6 +25,7 @@ import { EmployeeManagement } from '@/pages/Employees/EmployeeManagement';
 import { EmployeeLoanManagement } from '@/pages/Employees/EmployeeLoanManagement';
 import { ExpenseManagement } from '@/pages/Expenses/ExpenseManagement';
 import { Settings } from '@/pages/Settings/Settings';
+import { WebsiteMenu } from '@/pages/Website/WebsiteMenu';
 import { DialogProvider } from '@/components/DialogProvider';
 import { SyncProvider } from '@/contexts/SyncContext';
 import { restoreSession } from '@/services/authService';
@@ -71,6 +72,7 @@ function App() {
       <DialogProvider />
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/website" element={<WebsiteMenu />} />
         <Route
           path="/*"
           element={

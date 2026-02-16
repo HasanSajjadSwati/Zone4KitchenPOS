@@ -5,6 +5,7 @@ import {
   UserGroupIcon,
   ClipboardDocumentListIcon,
   ShieldCheckIcon,
+  GlobeAltIcon,
 } from '@heroicons/react/24/outline';
 import { PermissionManagement } from './PermissionManagement';
 import { Button, Card, Input, Modal, Select } from '@/components/ui';
@@ -47,7 +48,7 @@ const userSchema = z.object({
 type BusinessInfoFormData = z.infer<typeof businessInfoSchema>;
 type KOTSettingsFormData = z.infer<typeof kotSettingsSchema>;
 type UserFormData = z.infer<typeof userSchema>;
-type TabType = 'business' | 'kot' | 'users' | 'permissions' | 'audit';
+type TabType = 'business' | 'kot' | 'website' | 'users' | 'permissions' | 'audit';
 
 export const Settings: React.FC = () => {
   const currentUser = useAuthStore((state) => state.currentUser);
@@ -61,6 +62,8 @@ export const Settings: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [websiteEnabled, setWebsiteEnabled] = useState(false);
+  const [whatsappNumber, setWhatsappNumber] = useState('');
 
   const businessForm = useForm<BusinessInfoFormData>({
     resolver: zodResolver(businessInfoSchema),
@@ -99,6 +102,9 @@ export const Settings: React.FC = () => {
         printAllIncludeCounter: currentSettings.printAllIncludeCounter ?? false,
         printAllIncludeRider: currentSettings.printAllIncludeRider ?? false,
       });
+
+      setWebsiteEnabled(!!currentSettings.websiteEnabled);
+      setWhatsappNumber(currentSettings.whatsappNumber || '');
     }
 
     if (activeTab === 'users' && canViewUsers) {
@@ -123,6 +129,21 @@ export const Settings: React.FC = () => {
       await loadData();
     } catch (error) {
       await dialog.alert(error instanceof Error ? error.message : 'Failed to update settings', 'Error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const onSubmitWebsiteSettings = async () => {
+    if (!currentUser) return;
+
+    setIsLoading(true);
+    try {
+      await updateSettings({ websiteEnabled, whatsappNumber: whatsappNumber || undefined }, currentUser.id);
+      await dialog.alert('Website settings updated successfully', 'Success');
+      await loadData();
+    } catch (error) {
+      await dialog.alert(error instanceof Error ? error.message : 'Failed to update website settings', 'Error');
     } finally {
       setIsLoading(false);
     }
@@ -295,6 +316,7 @@ export const Settings: React.FC = () => {
   const tabs = [
     { id: 'business' as TabType, name: 'Business Info', icon: BuildingStorefrontIcon },
     { id: 'kot' as TabType, name: 'KOT/Printing', icon: PrinterIcon },
+    { id: 'website' as TabType, name: 'Website', icon: GlobeAltIcon },
     ...(canViewUsers ? [{ id: 'users' as TabType, name: 'Users', icon: UserGroupIcon }] : []),
     ...(isAdmin ? [{ id: 'permissions' as TabType, name: 'Permissions', icon: ShieldCheckIcon }] : []),
     ...(canViewAudit ? [{ id: 'audit' as TabType, name: 'Audit Logs', icon: ClipboardDocumentListIcon }] : []),
@@ -354,6 +376,7 @@ export const Settings: React.FC = () => {
                 label="Restaurant Phone"
                 type="tel"
                 placeholder="03001234567"
+                maxLength={13}
                 error={businessForm.formState.errors.restaurantPhone?.message}
                 {...businessForm.register('restaurantPhone')}
               />
@@ -488,6 +511,69 @@ export const Settings: React.FC = () => {
                 </Button>
               </div>
             </form>
+          </Card>
+        )}
+
+        {activeTab === 'website' && (
+          <Card padding="lg">
+            <h2 className="text-xl font-semibold text-gray-900 mb-6">Website Settings</h2>
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Enable Customer Website</label>
+                  <p className="text-xs text-gray-500 mt-1">Allow customers to browse your menu and place orders online</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setWebsiteEnabled(!websiteEnabled)}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${
+                    websiteEnabled ? 'bg-primary-600' : 'bg-gray-200'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      websiteEnabled ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              <div>
+                <Input
+                  label="WhatsApp Number"
+                  type="tel"
+                  placeholder="923001234567"
+                  maxLength={13}
+                  value={whatsappNumber}
+                  onChange={(e) => setWhatsappNumber(e.target.value)}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Country code without + sign (e.g., 923001234567). Used for the "Send via WhatsApp" feature on the website.
+                </p>
+              </div>
+
+              {websiteEnabled && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <p className="text-sm text-green-800">
+                    Your website is live! Customers can access it at:{' '}
+                    <a
+                      href="/website"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold underline hover:text-green-900"
+                    >
+                      {window.location.origin}/website
+                    </a>
+                  </p>
+                </div>
+              )}
+
+              <div className="flex justify-end pt-4">
+                <Button onClick={onSubmitWebsiteSettings} isLoading={isLoading}>
+                  Save Website Settings
+                </Button>
+              </div>
+            </div>
           </Card>
         )}
 

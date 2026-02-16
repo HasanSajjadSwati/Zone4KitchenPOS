@@ -254,6 +254,7 @@ orderRoutes.post('/', async (req, res) => {
     const {
       registerSessionId,
       orderType,
+      orderSource,
       tableId,
       waiterId,
       customerName,
@@ -320,13 +321,13 @@ orderRoutes.post('/', async (req, res) => {
 
     await runAsync(
       `INSERT INTO orders (
-        id, orderNumber, registerSessionId, orderType, tableId, waiterId,
+        id, orderNumber, registerSessionId, orderType, orderSource, tableId, waiterId,
         customerName, customerPhone, customerId, riderId, deliveryAddress, deliveryCharge,
         subtotal, discountType, discountValue, discountAmount, total,
         status, deliveryStatus, isPaid, createdBy, createdAt, updatedAt, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        id, orderNumber, registerSessionId, orderType, tableId || null, waiterId || null,
+        id, orderNumber, registerSessionId, orderType, orderSource || 'pos', tableId || null, waiterId || null,
         customerName || null, customerPhone || null, customerId || null, riderId || null, deliveryAddress || null, normalizedDeliveryCharge,
         subtotal, discountType || null, discountValue || 0, discountAmount || 0, total,
         'open', initialDeliveryStatus, 0, createdBy, now, now, notes || null

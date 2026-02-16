@@ -47,6 +47,8 @@ settingsRoutes.put('/', async (req, res) => {
       printAllIncludeCounter,
       printAllIncludeRider,
       expenseCategories,
+      websiteEnabled,
+      whatsappNumber,
       updatedBy
     } = req.body;
 
@@ -112,6 +114,14 @@ settingsRoutes.put('/', async (req, res) => {
     if (expenseCategories !== undefined) {
       updates.push('expenseCategories = ?');
       values.push(JSON.stringify(expenseCategories));
+    }
+    if (websiteEnabled !== undefined) {
+      updates.push('websiteEnabled = ?');
+      values.push(websiteEnabled ? 1 : 0);
+    }
+    if (whatsappNumber !== undefined) {
+      updates.push('whatsappNumber = ?');
+      values.push(whatsappNumber);
     }
 
     if (updates.length > 0) {

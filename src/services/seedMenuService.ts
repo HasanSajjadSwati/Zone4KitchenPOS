@@ -117,6 +117,7 @@ export async function seedZoneKitchenMenu(userId: string) {
     return {
       id, name, categoryId: cat, price,
       description: opts?.desc ?? null,
+      imageUrl: null,
       isActive: true,
       isDealOnly: opts?.dealOnly ?? false,
       hasVariants: opts?.variants ?? false,
@@ -391,6 +392,7 @@ export async function seedZoneKitchenMenu(userId: string) {
     const dealId = createId();
     deals.push({
       id: dealId, name, description, price,
+      imageUrl: null,
       categoryId: null, isActive: true, hasVariants: false,
       createdAt: now, updatedAt: now,
     });

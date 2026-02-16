@@ -30,6 +30,14 @@ export async function initializeDatabase() {
     await runAsync('UPDATE orders SET deliveryCharge = 0 WHERE deliveryCharge IS NULL');
     await runAsync("UPDATE orders SET completedAt = createdAt WHERE completedAt IS NULL AND status = 'completed'");
 
+    // Website integration: add imageUrl to menuItems and deals, orderSource to orders
+    await runAsync('ALTER TABLE menuItems ADD COLUMN IF NOT EXISTS imageUrl TEXT');
+    await runAsync('ALTER TABLE deals ADD COLUMN IF NOT EXISTS imageUrl TEXT');
+    await runAsync("ALTER TABLE orders ADD COLUMN IF NOT EXISTS orderSource TEXT DEFAULT 'pos'");
+    // Add website settings columns
+    await runAsync('ALTER TABLE settings ADD COLUMN IF NOT EXISTS websiteEnabled BOOLEAN DEFAULT FALSE');
+    await runAsync('ALTER TABLE settings ADD COLUMN IF NOT EXISTS whatsappNumber TEXT');
+
     // Create composite indexes for report performance (safe to run on existing databases)
     await runAsync('CREATE INDEX IF NOT EXISTS idx_orders_status_completedAt ON orders(status, completedAt)');
     await runAsync('CREATE INDEX IF NOT EXISTS idx_orders_status_createdAt ON orders(status, createdAt)');

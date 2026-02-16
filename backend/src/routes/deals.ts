@@ -51,7 +51,7 @@ dealRoutes.get('/:id', async (req, res) => {
 // Create deal
 dealRoutes.post('/', async (req, res) => {
   try {
-    const { id: providedId, name, description, price, categoryId, isActive, hasVariants } = req.body;
+    const { id: providedId, name, description, imageUrl, price, categoryId, isActive, hasVariants } = req.body;
 
     if (!name || price === undefined) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -62,9 +62,9 @@ dealRoutes.post('/', async (req, res) => {
     const now = new Date().toISOString();
 
     await runAsync(
-      `INSERT INTO deals (id, name, description, price, categoryId, isActive, hasVariants, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, name, description || null, price, categoryId || null, isActive !== false ? 1 : 0, hasVariants ? 1 : 0, now, now]
+      `INSERT INTO deals (id, name, description, imageUrl, price, categoryId, isActive, hasVariants, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, name, description || null, imageUrl || null, price, categoryId || null, isActive !== false ? 1 : 0, hasVariants ? 1 : 0, now, now]
     );
 
     const deal = await getAsync('SELECT * FROM deals WHERE id = ?', [id]);
@@ -77,7 +77,7 @@ dealRoutes.post('/', async (req, res) => {
 // Update deal
 dealRoutes.put('/:id', async (req, res) => {
   try {
-    const { name, description, price, categoryId, isActive, hasVariants } = req.body;
+    const { name, description, imageUrl, price, categoryId, isActive, hasVariants } = req.body;
     const now = new Date().toISOString();
 
     const deal = await getAsync('SELECT * FROM deals WHERE id = ?', [req.params.id]);
@@ -86,10 +86,11 @@ dealRoutes.put('/:id', async (req, res) => {
     }
 
     await runAsync(
-      `UPDATE deals SET name = ?, description = ?, price = ?, categoryId = ?, isActive = ?, hasVariants = ?, updatedAt = ? WHERE id = ?`,
+      `UPDATE deals SET name = ?, description = ?, imageUrl = ?, price = ?, categoryId = ?, isActive = ?, hasVariants = ?, updatedAt = ? WHERE id = ?`,
       [
         name || deal.name,
         description !== undefined ? description : deal.description,
+        imageUrl !== undefined ? imageUrl : deal.imageUrl,
         price !== undefined ? price : deal.price,
         categoryId !== undefined ? categoryId : deal.categoryId,
         isActive !== undefined ? (isActive ? 1 : 0) : deal.isActive,

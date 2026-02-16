@@ -386,6 +386,11 @@ export const OrderList: React.FC = () => {
                       {getDeliveryStatusInfo(order.deliveryStatus).label}
                     </span>
                   )}
+                  {order.orderSource === 'website' && (
+                    <span className="px-2 py-1 text-xs font-medium rounded bg-purple-100 text-purple-800">
+                      WEBSITE
+                    </span>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">

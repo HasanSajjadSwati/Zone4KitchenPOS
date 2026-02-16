@@ -36,6 +36,7 @@ class SyncService {
   private listeners: Map<SyncEventType | '*', Set<SyncListener>> = new Map();
   private isConnecting = false;
   private shouldReconnect = true;
+  private visibilityHandler: (() => void) | null = null;
 
   /**
    * Get the WebSocket URL based on API URL or current page location
@@ -77,7 +78,22 @@ class SyncService {
 
     this.isConnecting = true;
     this.shouldReconnect = true;
+    this.reconnectAttempts = 0;
     const url = this.getWebSocketUrl();
+
+    // Reconnect when tab becomes visible again
+    if (!this.visibilityHandler) {
+      this.visibilityHandler = () => {
+        if (document.visibilityState === 'visible' && this.shouldReconnect) {
+          if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+            console.log('[Sync] Tab became visible, reconnecting...');
+            this.reconnectAttempts = 0;
+            this.connect();
+          }
+        }
+      };
+      document.addEventListener('visibilitychange', this.visibilityHandler);
+    }
     
     console.log('[Sync] Connecting to:', url);
 
@@ -98,6 +114,9 @@ class SyncService {
           if (data.type === 'sync') {
             console.log('[Sync] Received sync event:', data.resource, data.action);
             this.notifyListeners(data as SyncEvent);
+          } else if (data.type === 'website_order') {
+            console.log('[Sync] Website order received:', data.orderNumber);
+            this.notifyWebsiteOrder(data);
           } else if (data.type === 'connected') {
             console.log('[Sync] Server acknowledged connection');
           }
@@ -133,6 +152,11 @@ class SyncService {
   disconnect(): void {
     this.shouldReconnect = false;
     this.stopPing();
+    
+    if (this.visibilityHandler) {
+      document.removeEventListener('visibilitychange', this.visibilityHandler);
+      this.visibilityHandler = null;
+    }
     
     if (this.ws) {
       this.ws.close();
@@ -225,12 +249,38 @@ class SyncService {
     });
   }
 
+  // ─── Website Order Notification ──────────────────────────────────
+  private websiteOrderListeners: Set<(order: WebsiteOrderEvent) => void> = new Set();
+
+  onWebsiteOrder(listener: (order: WebsiteOrderEvent) => void): () => void {
+    this.websiteOrderListeners.add(listener);
+    return () => { this.websiteOrderListeners.delete(listener); };
+  }
+
+  private notifyWebsiteOrder(order: WebsiteOrderEvent): void {
+    this.websiteOrderListeners.forEach((listener) => {
+      try { listener(order); } catch (e) { console.error('[Sync] Website order listener error:', e); }
+    });
+  }
+
   /**
    * Check if connected
    */
   isConnected(): boolean {
     return this.ws?.readyState === WebSocket.OPEN;
   }
+}
+
+export interface WebsiteOrderEvent {
+  type: 'website_order';
+  orderId: string;
+  orderNumber: string;
+  customerName: string;
+  customerPhone: string;
+  orderType: string;
+  total: number;
+  itemCount: number;
+  timestamp: string;
 }
 
 // Singleton instance

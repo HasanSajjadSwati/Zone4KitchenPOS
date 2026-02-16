@@ -1,5 +1,5 @@
 // API Service for backend communication
-const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:3001/api' : '/api');
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 class APIClient {
   private baseUrl: string;
@@ -719,3 +719,4 @@ class APIClient {
 }
 
 export const apiClient = new APIClient();
+export const api = apiClient;

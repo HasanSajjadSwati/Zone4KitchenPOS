@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
+import React, { useEffect, useState, useRef } from 'react';
+import { PlusIcon, PencilIcon, TrashIcon, PhotoIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { Button, Card, Modal, Input, Select, Badge, CategoryFilter } from '@/components/ui';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -19,6 +19,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useDialog } from '@/hooks/useDialog';
 import { formatCurrency } from '@/utils/validation';
 import type { MenuItem, Category, Variant } from '@/db/types';
+import { api } from '@/services/api';
 
 const menuItemSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -107,6 +108,10 @@ export const MenuItems: React.FC = () => {
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
   const [selectedVariants, setSelectedVariants] = useState<{ variantId: string; isRequired: boolean; selectionMode: 'single' | 'multiple' | 'all'; availableOptionIds: string[] }[]>([]);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<string | null>(null); // base64 data URL
+  const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
     register,
@@ -149,12 +154,24 @@ export const MenuItems: React.FC = () => {
 
     setIsLoading(true);
     try {
+      // Handle image upload
+      let imageUrl: string | null | undefined = undefined;
+      if (imageFile) {
+        const uploadRes = await api.post('/uploads', { image: imageFile });
+        imageUrl = uploadRes.imageUrl;
+      } else if (existingImageUrl === null && editingItem?.imageUrl) {
+        // Image was removed
+        imageUrl = null;
+        // Delete old image file
+        await api.post('/uploads/delete', { imageUrl: editingItem.imageUrl }).catch(() => {});
+      }
+
       let itemId: string;
       if (editingItem) {
-        await updateMenuItem(editingItem.id, data, currentUser.id);
+        await updateMenuItem(editingItem.id, { ...data, imageUrl: imageUrl !== undefined ? imageUrl : editingItem.imageUrl } as any, currentUser.id);
         itemId = editingItem.id;
       } else {
-        const newItem = await createMenuItem(data, currentUser.id);
+        const newItem = await createMenuItem({ ...data, imageUrl: imageUrl || null } as any, currentUser.id);
         itemId = newItem.id;
       }
 
@@ -229,6 +246,9 @@ export const MenuItems: React.FC = () => {
     setIsModalOpen(false);
     setEditingItem(null);
     setSelectedVariants([]);
+    setImagePreview(null);
+    setImageFile(null);
+    setExistingImageUrl(null);
     reset({
       name: '',
       categoryId: '',
@@ -238,6 +258,29 @@ export const MenuItems: React.FC = () => {
       isDealOnly: false,
       hasVariants: false,
     });
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      dialog.alert('Image must be less than 5MB', 'Error');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      setImageFile(result);
+      setImagePreview(result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    setExistingImageUrl(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const toggleVariantSelection = (variantId: string) => {
@@ -356,6 +399,15 @@ export const MenuItems: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredItems.map((item) => (
           <Card key={item.id} padding="none" hoverable>
+            {item.imageUrl && (
+              <div className="h-40 bg-gray-100 overflow-hidden">
+                <img
+                  src={item.imageUrl}
+                  alt={item.name}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            )}
             <div className="p-4">
               <div className="flex items-start justify-between mb-2">
                 <div className="flex-1">
@@ -470,6 +522,47 @@ export const MenuItems: React.FC = () => {
             {errors.description && (
               <p className="mt-1 text-sm text-danger-600">{errors.description.message}</p>
             )}
+          </div>
+
+          {/* Image Upload */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Image (Optional) — Shown on website
+            </label>
+            {imagePreview ? (
+              <div className="relative inline-block">
+                <img
+                  src={imagePreview}
+                  alt="Preview"
+                  className="w-32 h-32 object-cover rounded-lg border border-gray-200"
+                />
+                <button
+                  type="button"
+                  onClick={removeImage}
+                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                >
+                  <XMarkIcon className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center justify-center w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg hover:border-primary-500 hover:bg-gray-50 transition-colors"
+              >
+                <div className="text-center">
+                  <PhotoIcon className="w-8 h-8 text-gray-400 mx-auto" />
+                  <span className="text-xs text-gray-500 mt-1">Upload</span>
+                </div>
+              </button>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageSelect}
+              className="hidden"
+            />
           </div>
 
           <div className="space-y-2">
