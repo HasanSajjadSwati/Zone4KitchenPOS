@@ -36,14 +36,26 @@ async function recalculateOrderTotals(orderId: string): Promise<void> {
   );
 }
 
+// Shared column list for orders / pastOrders UNION (pastOrders has extra migratedAt)
+const ORDERS_COLS = `id, orderNumber, registerSessionId, orderType, tableId, waiterId,
+  customerName, customerPhone, customerId, riderId, deliveryAddress,
+  deliveryCharge, subtotal, discountType, discountValue, discountReference,
+  discountAmount, total, status, deliveryStatus, isPaid, notes,
+  lastKotPrintedAt, kotPrintCount, createdBy, completedBy,
+  cancellationReason, createdAt, completedAt, updatedAt`;
+
 export const orderRoutes = express.Router();
 
 // Helper function to generate next order number
 async function generateNextOrderNumber(): Promise<string> {
   try {
-    // Get the highest order number from database
+    // Get the highest order number from both active and past orders
     const result = await getAsync(`
-      SELECT orderNumber FROM orders
+      SELECT orderNumber FROM (
+        SELECT orderNumber FROM orders
+        UNION ALL
+        SELECT orderNumber FROM pastOrders
+      ) combined
       ORDER BY CAST(SUBSTR(orderNumber, 5) AS INTEGER) DESC
       LIMIT 1
     `);
@@ -76,8 +88,15 @@ orderRoutes.get('/', async (req, res) => {
       startDate,
       endDate,
       dateField,
+      includePast,
     } = req.query;
-    let query = 'SELECT * FROM orders WHERE 1=1';
+
+    // When includePast is set, query both active and archived orders
+    const sourceTable = includePast === 'true'
+      ? `(SELECT ${ORDERS_COLS} FROM orders UNION ALL SELECT ${ORDERS_COLS} FROM pastOrders)`
+      : 'orders';
+
+    let query = `SELECT * FROM ${sourceTable} AS o WHERE 1=1`;
     const params: any[] = [];
     const resolvedDateField = dateField === 'completedAt' ? 'completedAt' : 'createdAt';
 

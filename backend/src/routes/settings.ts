@@ -47,6 +47,7 @@ settingsRoutes.put('/', async (req, res) => {
       printAllIncludeCounter,
       printAllIncludeRider,
       expenseCategories,
+      dayCountByRegister,
       updatedBy
     } = req.body;
 
@@ -112,6 +113,10 @@ settingsRoutes.put('/', async (req, res) => {
     if (expenseCategories !== undefined) {
       updates.push('expenseCategories = ?');
       values.push(JSON.stringify(expenseCategories));
+    }
+    if (dayCountByRegister !== undefined) {
+      updates.push('dayCountByRegister = ?');
+      values.push(dayCountByRegister ? 1 : 0);
     }
 
     if (updates.length > 0) {

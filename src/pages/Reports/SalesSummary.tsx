@@ -11,6 +11,7 @@ import {
   type DailySales,
 } from '@/services/reportService';
 import { useDialog } from '@/hooks/useDialog';
+import { useDayRange } from '@/hooks/useDayRange';
 import { formatCurrency } from '@/utils/validation';
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays } from 'date-fns';
 
@@ -18,6 +19,7 @@ type DateRangePreset = 'today' | 'yesterday' | 'this_week' | 'this_month' | 'cus
 
 export const SalesSummary: React.FC = () => {
   const dialog = useDialog();
+  const { getTodayRange } = useDayRange();
   const [datePreset, setDatePreset] = useState<DateRangePreset>('today');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customStartTime, setCustomStartTime] = useState('00:00');
@@ -49,11 +51,11 @@ export const SalesSummary: React.FC = () => {
     return date;
   };
 
-  const getDateRange = (): DateRange => {
+  const getDateRange = async (): Promise<DateRange> => {
     const now = new Date();
     switch (datePreset) {
       case 'today':
-        return { startDate: startOfDay(now), endDate: endOfDay(now) };
+        return await getTodayRange();
       case 'yesterday':
         const yesterday = subDays(now, 1);
         return { startDate: startOfDay(yesterday), endDate: endOfDay(yesterday) };
@@ -78,7 +80,7 @@ export const SalesSummary: React.FC = () => {
   const loadReportData = async () => {
     setIsLoading(true);
     try {
-      const range = getDateRange();
+      const range = await getDateRange();
       const [summaryResult, dailyResult] = await Promise.allSettled([
         getSalesSummary(range),
         getDailySales(range),

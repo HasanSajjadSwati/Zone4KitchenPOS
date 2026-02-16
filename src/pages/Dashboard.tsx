@@ -9,7 +9,7 @@ import {
 import { Card, Button } from '@/components/ui';
 import { db } from '@/db';
 import { formatCurrency } from '@/utils/validation';
-import { startOfToday, endOfToday } from 'date-fns';
+import { useDayRange } from '@/hooks/useDayRange';
 
 interface DashboardStats {
   todayOrders: number;
@@ -26,14 +26,14 @@ export const Dashboard: React.FC = () => {
     completedToday: 0,
   });
   const [activeSession, setActiveSession] = useState<any>(null);
+  const { getTodayRange, ready } = useDayRange();
 
   useEffect(() => {
-    loadDashboardData();
-  }, []);
+    if (ready) loadDashboardData();
+  }, [ready]);
 
   const loadDashboardData = async () => {
-    const today = startOfToday();
-    const todayEnd = endOfToday();
+    const { startDate: today, endDate: todayEnd } = await getTodayRange();
 
     // Get today's orders
     const todayOrders = await db.orders

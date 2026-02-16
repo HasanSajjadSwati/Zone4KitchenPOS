@@ -24,6 +24,7 @@ import { printKOT, printCustomerReceipt } from '@/services/printService';
 import { useAuthStore } from '@/stores/authStore';
 import { useDialog } from '@/hooks/useDialog';
 import { useSyncRefresh } from '@/contexts/SyncContext';
+import { useDayRange } from '@/hooks/useDayRange';
 import { formatCurrency, formatDateTime } from '@/utils/validation';
 import type { Order, OrderItem, MenuItem, Deal } from '@/db/types';
 import { db } from '@/db';
@@ -58,10 +59,10 @@ export const OrderList: React.FC = () => {
   const navigate = useNavigate();
   const currentUser = useAuthStore((state) => state.currentUser);
   const dialog = useDialog();
+  const { getTodayRange, ready: dayRangeReady } = useDayRange();
   const [orders, setOrders] = useState<Order[]>([]);
   const [filterStatus, setFilterStatus] = useState<'all' | 'open' | 'completed' | 'cancelled'>('all');
   const [filterType, setFilterType] = useState<string>('all');
-  const [filterDate, setFilterDate] = useState<'today' | 'past' | 'all'>('today');
   const [filterPayment, setFilterPayment] = useState<'all' | 'paid' | 'unpaid'>('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [selectedOrderItems, setSelectedOrderItems] = useState<OrderItem[]>([]);
@@ -89,13 +90,13 @@ export const OrderList: React.FC = () => {
   });
 
   useEffect(() => {
-    loadOrders();
-  }, [filterStatus, filterType, filterDate, filterPayment, currentPage]);
+    if (dayRangeReady) loadOrders();
+  }, [filterStatus, filterType, filterPayment, currentPage, dayRangeReady]);
 
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [filterStatus, filterType, filterDate, filterPayment]);
+  }, [filterStatus, filterType, filterPayment]);
 
   useEffect(() => {
     const loadItemLookups = async () => {
@@ -133,22 +134,11 @@ export const OrderList: React.FC = () => {
   };
 
   const loadOrders = useCallback(async () => {
-    // Build date range based on filter
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const endOfToday = new Date(today);
-    endOfToday.setHours(23, 59, 59, 999);
+    // Use day range based on setting (register session or calendar day)
+    const { startDate: rangeStart, endDate: rangeEnd } = await getTodayRange();
 
-    let startDate: string | undefined;
-    let endDate: string | undefined;
-
-    if (filterDate === 'today') {
-      startDate = today.toISOString();
-      endDate = endOfToday.toISOString();
-    } else if (filterDate === 'past') {
-      endDate = today.toISOString(); // Before today
-    }
-    // 'all' = no date filter
+    const startDate = rangeStart.toISOString();
+    const endDate = rangeEnd.toISOString();
 
     const result = await getOrdersPaginated({
       status: filterStatus !== 'all' ? filterStatus : undefined,
@@ -162,7 +152,7 @@ export const OrderList: React.FC = () => {
 
     setOrders(result.orders);
     setTotalOrders(result.total);
-  }, [filterDate, filterStatus, filterType, filterPayment, currentPage, pageSize]);
+  }, [filterStatus, filterType, filterPayment, currentPage, pageSize, getTodayRange]);
 
   // Real-time sync: auto-refresh when orders/payments change on other terminals
   useSyncRefresh(['orders', 'order_items', 'payments'], loadOrders);
@@ -282,7 +272,7 @@ export const OrderList: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900">Orders</h1>
+        <h1 className="text-3xl font-bold text-gray-900">Today's Orders</h1>
         <Button onClick={() => navigate('/orders/new')} variant="primary">
           New Order
         </Button>
@@ -290,17 +280,7 @@ export const OrderList: React.FC = () => {
 
       {/* Filters */}
       <Card padding="md">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <Select
-            label="Date"
-            value={filterDate}
-            onChange={(e) => setFilterDate(e.target.value as any)}
-          >
-            <option value="today">Today</option>
-            <option value="past">Past Orders</option>
-            <option value="all">All Orders</option>
-          </Select>
-
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Select
             label="Status"
             value={filterStatus}

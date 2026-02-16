@@ -311,6 +311,7 @@ CREATE TABLE IF NOT EXISTS settings (
   printAllIncludeCounter BOOLEAN DEFAULT 0,
   printAllIncludeRider BOOLEAN DEFAULT 0,
   expenseCategories TEXT,
+  dayCountByRegister BOOLEAN DEFAULT 0,
   updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
   updatedBy TEXT
 );
@@ -393,6 +394,74 @@ CREATE TABLE IF NOT EXISTS riderReceipts (
   FOREIGN KEY (printedBy) REFERENCES users(id)
 );
 
+-- Past Orders Table (archived orders for performance)
+CREATE TABLE IF NOT EXISTS pastOrders (
+  id TEXT PRIMARY KEY,
+  orderNumber TEXT NOT NULL,
+  registerSessionId TEXT NOT NULL,
+  orderType TEXT NOT NULL CHECK(orderType IN ('dine_in', 'take_away', 'delivery')),
+  tableId TEXT,
+  waiterId TEXT,
+  customerName TEXT,
+  customerPhone TEXT,
+  customerId TEXT,
+  riderId TEXT,
+  deliveryAddress TEXT,
+  deliveryCharge REAL DEFAULT 0,
+  subtotal REAL NOT NULL,
+  discountType TEXT CHECK(discountType IN ('percentage', 'fixed', NULL)),
+  discountValue REAL DEFAULT 0,
+  discountReference TEXT,
+  discountAmount REAL DEFAULT 0,
+  total REAL NOT NULL,
+  status TEXT NOT NULL CHECK(status IN ('open', 'completed', 'cancelled')),
+  deliveryStatus TEXT CHECK(deliveryStatus IN ('pending', 'preparing', 'ready', 'out_for_delivery', 'delivered', NULL)),
+  isPaid BOOLEAN DEFAULT 0,
+  notes TEXT,
+  lastKotPrintedAt DATETIME,
+  kotPrintCount INTEGER DEFAULT 0,
+  createdBy TEXT NOT NULL,
+  completedBy TEXT,
+  cancellationReason TEXT,
+  createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+  completedAt DATETIME,
+  updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+  migratedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Past Order Items Table (archived order items for performance)
+CREATE TABLE IF NOT EXISTS pastOrderItems (
+  id TEXT PRIMARY KEY,
+  orderId TEXT NOT NULL,
+  itemType TEXT NOT NULL CHECK(itemType IN ('menu_item', 'deal')),
+  menuItemId TEXT,
+  dealId TEXT,
+  quantity INTEGER NOT NULL,
+  unitPrice REAL NOT NULL,
+  totalPrice REAL NOT NULL,
+  notes TEXT,
+  selectedVariants TEXT,
+  dealBreakdown TEXT,
+  addedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+  lastPrintedAt DATETIME,
+  createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (orderId) REFERENCES pastOrders(id)
+);
+
+-- Past Payments Table (archived payments for performance)
+CREATE TABLE IF NOT EXISTS pastPayments (
+  id TEXT PRIMARY KEY,
+  orderId TEXT NOT NULL,
+  amount REAL NOT NULL,
+  method TEXT NOT NULL CHECK(method IN ('cash', 'card', 'online', 'other')),
+  reference TEXT,
+  paidAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+  receivedBy TEXT NOT NULL,
+  notes TEXT,
+  createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (orderId) REFERENCES pastOrders(id)
+);
+
 -- Create indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 CREATE INDEX IF NOT EXISTS idx_users_roleId ON users(roleId);
@@ -435,4 +504,15 @@ CREATE INDEX IF NOT EXISTS idx_orders_isPaid ON orders(isPaid);
 CREATE INDEX IF NOT EXISTS idx_orders_createdAt_status ON orders(createdAt DESC, status);
 CREATE INDEX IF NOT EXISTS idx_orders_orderType_status_createdAt ON orders(orderType, status, createdAt DESC);
 CREATE INDEX IF NOT EXISTS idx_payments_orderId_method ON payments(orderId, method);
+
+-- Past orders indexes
+CREATE INDEX IF NOT EXISTS idx_pastOrders_orderNumber ON pastOrders(orderNumber);
+CREATE INDEX IF NOT EXISTS idx_pastOrders_status ON pastOrders(status);
+CREATE INDEX IF NOT EXISTS idx_pastOrders_createdAt ON pastOrders(createdAt);
+CREATE INDEX IF NOT EXISTS idx_pastOrders_completedAt ON pastOrders(completedAt);
+CREATE INDEX IF NOT EXISTS idx_pastOrders_customerId ON pastOrders(customerId);
+CREATE INDEX IF NOT EXISTS idx_pastOrders_orderType ON pastOrders(orderType);
+CREATE INDEX IF NOT EXISTS idx_pastOrders_migratedAt ON pastOrders(migratedAt);
+CREATE INDEX IF NOT EXISTS idx_pastOrderItems_orderId ON pastOrderItems(orderId);
+CREATE INDEX IF NOT EXISTS idx_pastPayments_orderId ON pastPayments(orderId);
 `;

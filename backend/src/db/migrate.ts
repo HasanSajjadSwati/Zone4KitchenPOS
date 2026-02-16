@@ -21,6 +21,7 @@ export async function initializeDatabase() {
     await runAsync('ALTER TABLE settings ADD COLUMN IF NOT EXISTS printAllIncludeCounter BOOLEAN DEFAULT FALSE');
     await runAsync('ALTER TABLE settings ADD COLUMN IF NOT EXISTS printAllIncludeRider BOOLEAN DEFAULT FALSE');
     await runAsync('ALTER TABLE settings ADD COLUMN IF NOT EXISTS deliveryCharge REAL DEFAULT 0');
+    await runAsync('ALTER TABLE settings ADD COLUMN IF NOT EXISTS dayCountByRegister BOOLEAN DEFAULT FALSE');
     await runAsync('ALTER TABLE orders ADD COLUMN IF NOT EXISTS deliveryCharge REAL DEFAULT 0');
     await runAsync('UPDATE settings SET printAllIncludeKOT = TRUE WHERE printAllIncludeKOT IS NULL');
     await runAsync('UPDATE settings SET printAllIncludeCustomer = TRUE WHERE printAllIncludeCustomer IS NULL');
@@ -39,6 +40,21 @@ export async function initializeDatabase() {
     await runAsync('CREATE INDEX IF NOT EXISTS idx_payments_orderId_method ON payments(orderId, method)');
     logger.info('Report performance indexes created/verified');
 
+    // Ensure existing Admin role has past_orders permission
+    const adminRows = await allAsync("SELECT id, permissions FROM roles WHERE name = 'Admin'") as any[];
+    if (adminRows.length > 0) {
+      const admin = adminRows[0];
+      try {
+        const perms = JSON.parse(admin.permissions || '[]');
+        const hasPastOrders = perms.some((p: any) => p.resource === 'past_orders');
+        if (!hasPastOrders) {
+          perms.push({ resource: 'past_orders', actions: ['read'] });
+          await runAsync('UPDATE roles SET permissions = ? WHERE id = ?', [JSON.stringify(perms), admin.id]);
+          console.log('✓ Added past_orders permission to Admin role');
+        }
+      } catch (_e) { /* skip if permissions JSON is corrupt */ }
+    }
+
     // Check if roles exist
     const rolesCount = await allAsync('SELECT COUNT(*) as count FROM roles');
     const existingRoles = Number(rolesCount[0]?.count ?? 0);
@@ -52,6 +68,7 @@ export async function initializeDatabase() {
 
       const adminPermissions = JSON.stringify([
         { resource: 'orders', actions: ['create', 'read', 'update', 'delete'] },
+        { resource: 'past_orders', actions: ['read'] },
         { resource: 'menu', actions: ['create', 'read', 'update', 'delete'] },
         { resource: 'reports', actions: ['read', 'export'] },
         { resource: 'users', actions: ['create', 'read', 'update', 'delete'] },

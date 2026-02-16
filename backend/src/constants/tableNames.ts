@@ -3,10 +3,14 @@ export const TABLES = [
   'menuItemVariants', 'deals', 'dealItems', 'dealVariants', 'customers',
   'waiters', 'riders', 'diningTables', 'registerSessions', 'orders',
   'orderItems', 'payments', 'kotPrints', 'auditLogs', 'settings',
-  'uploadQueue', 'employees', 'employeeLoans', 'expenses', 'riderReceipts'
+  'uploadQueue', 'employees', 'employeeLoans', 'expenses', 'riderReceipts',
+  'pastOrders', 'pastOrderItems', 'pastPayments'
 ];
 
 export const WIPE_TABLE_SEQUENCE = [
+  'pastOrderItems',
+  'pastPayments',
+  'pastOrders',
   'orderItems',
   'payments',
   'kotPrints',

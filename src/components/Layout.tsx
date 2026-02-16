@@ -24,6 +24,7 @@ import {
   ChevronRightIcon,
   SunIcon,
   MoonIcon,
+  ArchiveBoxIcon,
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/stores/authStore';
 import { logout } from '@/services/authService';
@@ -84,6 +85,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       items: [
         { name: 'New Order', href: '/orders/new', icon: PlusCircleIcon, resource: 'orders', action: 'create' },
         { name: 'Order List', href: '/orders', icon: ListBulletIcon, resource: 'orders', action: 'read' },
+        { name: 'Past Orders', href: '/past-orders', icon: ArchiveBoxIcon, resource: 'past_orders', action: 'read' },
       ],
     },
     {

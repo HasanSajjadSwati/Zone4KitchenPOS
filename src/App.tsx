@@ -13,6 +13,7 @@ import { RegisterManagement } from '@/pages/Register/RegisterManagement';
 import { CustomerManagement } from '@/pages/Customers/CustomerManagement';
 import { CreateOrder } from '@/pages/Orders/CreateOrder';
 import { OrderList } from '@/pages/Orders/OrderList';
+import { PastOrders } from '@/pages/Orders/PastOrders';
 import { SalesSummary } from '@/pages/Reports/SalesSummary';
 import { ItemSales } from '@/pages/Reports/ItemSales';
 import { CancelledOrdersReport } from '@/pages/Reports/CancelledOrdersReport';
@@ -172,6 +173,14 @@ function App() {
                     element={
                       <RequirePermission resource="orders">
                         <OrderList />
+                      </RequirePermission>
+                    }
+                  />
+                  <Route
+                    path="/past-orders"
+                    element={
+                      <RequirePermission resource="past_orders">
+                        <PastOrders />
                       </RequirePermission>
                     }
                   />

@@ -5,6 +5,7 @@ import {
   UserGroupIcon,
   ClipboardDocumentListIcon,
   ShieldCheckIcon,
+  ArchiveBoxIcon,
 } from '@heroicons/react/24/outline';
 import { PermissionManagement } from './PermissionManagement';
 import { Button, Card, Input, Modal, Select } from '@/components/ui';
@@ -13,6 +14,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { getSettings, updateSettings, getAllUsers, getAuditLogs, getAllRoles } from '@/services/settingsService';
 import { createUser, updateUser, deleteUser, resetUserPassword } from '@/services/userService';
+import { getMigrationPreview, migrateOrdersToPast } from '@/services/pastOrderService';
+import type { MigrationPreview } from '@/services/pastOrderService';
 import { useAuthStore } from '@/stores/authStore';
 import { useDialog } from '@/hooks/useDialog';
 import { formatDateTime, phoneSchema } from '@/utils/validation';
@@ -24,6 +27,7 @@ const businessInfoSchema = z.object({
   restaurantPhone: phoneSchema,
   taxRate: z.number().min(0).max(100),
   receiptFooter: z.string().nullable(),
+  dayCountByRegister: z.boolean(),
 });
 
 const kotSettingsSchema = z.object({
@@ -47,7 +51,7 @@ const userSchema = z.object({
 type BusinessInfoFormData = z.infer<typeof businessInfoSchema>;
 type KOTSettingsFormData = z.infer<typeof kotSettingsSchema>;
 type UserFormData = z.infer<typeof userSchema>;
-type TabType = 'business' | 'kot' | 'users' | 'permissions' | 'audit';
+type TabType = 'business' | 'kot' | 'users' | 'permissions' | 'audit' | 'data';
 
 export const Settings: React.FC = () => {
   const currentUser = useAuthStore((state) => state.currentUser);
@@ -61,6 +65,9 @@ export const Settings: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [migrationDays, setMigrationDays] = useState(7);
+  const [migrationPreview, setMigrationPreview] = useState<MigrationPreview | null>(null);
+  const [isMigrating, setIsMigrating] = useState(false);
 
   const businessForm = useForm<BusinessInfoFormData>({
     resolver: zodResolver(businessInfoSchema),
@@ -88,6 +95,7 @@ export const Settings: React.FC = () => {
         restaurantPhone: currentSettings.restaurantPhone,
         taxRate: currentSettings.taxRate,
         receiptFooter: currentSettings.receiptFooter,
+        dayCountByRegister: !!currentSettings.dayCountByRegister,
       });
 
       kotForm.reset({
@@ -297,6 +305,7 @@ export const Settings: React.FC = () => {
     { id: 'kot' as TabType, name: 'KOT/Printing', icon: PrinterIcon },
     ...(canViewUsers ? [{ id: 'users' as TabType, name: 'Users', icon: UserGroupIcon }] : []),
     ...(isAdmin ? [{ id: 'permissions' as TabType, name: 'Permissions', icon: ShieldCheckIcon }] : []),
+    ...(isAdmin ? [{ id: 'data' as TabType, name: 'Data Management', icon: ArchiveBoxIcon }] : []),
     ...(canViewAudit ? [{ id: 'audit' as TabType, name: 'Audit Logs', icon: ClipboardDocumentListIcon }] : []),
   ];
 
@@ -376,6 +385,26 @@ export const Settings: React.FC = () => {
                   placeholder="Thank you for your visit!"
                   {...businessForm.register('receiptFooter')}
                 />
+              </div>
+
+              {/* Day Count Mode */}
+              <div className="border-t pt-4 mt-4">
+                <h3 className="text-sm font-semibold text-gray-800 mb-2">Day Counting Mode</h3>
+                <div className="flex items-start space-x-2">
+                  <input
+                    type="checkbox"
+                    id="dayCountByRegister"
+                    className="w-4 h-4 mt-0.5 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                    {...businessForm.register('dayCountByRegister')}
+                  />
+                  <label htmlFor="dayCountByRegister" className="text-sm text-gray-700">
+                    <span className="font-medium">Day = Register Session</span>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      When enabled, "Today" in reports, dashboard, and order list will be based on the
+                      current register session (open → close) instead of calendar day (12 AM → 12 AM).
+                    </p>
+                  </label>
+                </div>
               </div>
 
               <div className="flex justify-end pt-4">
@@ -577,6 +606,130 @@ export const Settings: React.FC = () => {
 
         {activeTab === 'permissions' && isAdmin && (
           <PermissionManagement />
+        )}
+
+        {activeTab === 'data' && isAdmin && (
+          <Card padding="lg">
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Migrate Orders to Past Orders</h2>
+            <p className="text-sm text-gray-600 mb-6">
+              Move completed and cancelled orders to the Past Orders archive. This improves performance
+              by keeping the active orders table lean. Only completed/cancelled orders will be migrated.
+              Open orders are never affected.
+            </p>
+
+            <div className="space-y-6">
+              <div className="flex items-end gap-4">
+                <div className="flex-1 max-w-xs">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Migrate orders older than (days)
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={migrationDays}
+                    onChange={(e) => setMigrationDays(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Orders created more than {migrationDays} day{migrationDays !== 1 ? 's' : ''} ago will be migrated
+                  </p>
+                </div>
+                <Button
+                  className="mb-5"
+                  variant="secondary"
+                  onClick={async () => {
+                    try {
+                      const preview = await getMigrationPreview(migrationDays);
+                      setMigrationPreview(preview);
+                    } catch (error) {
+                      await dialog.alert(
+                        error instanceof Error ? error.message : 'Failed to get migration preview',
+                        'Error'
+                      );
+                    }
+                  }}
+                >
+                  Preview
+                </Button>
+              </div>
+
+              {migrationPreview && (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
+                  <h3 className="font-semibold text-gray-800">Migration Preview</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <p className="text-gray-600">Orders to Migrate</p>
+                      <p className="text-2xl font-bold text-primary-600">{migrationPreview.ordersToMigrate}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600">Active Orders (current)</p>
+                      <p className="text-2xl font-bold text-gray-900">{migrationPreview.currentActiveOrders}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600">Past Orders (archived)</p>
+                      <p className="text-2xl font-bold text-gray-900">{migrationPreview.currentPastOrders}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600">Cutoff Date</p>
+                      <p className="font-semibold">{formatDateTime(migrationPreview.cutoffDate)}</p>
+                    </div>
+                  </div>
+
+                  {migrationPreview.ordersToMigrate > 0 && (
+                    <div className="pt-3 border-t border-gray-200">
+                      <Button
+                        variant="primary"
+                        isLoading={isMigrating}
+                        onClick={async () => {
+                          const confirmed = await dialog.confirm({
+                            title: 'Confirm Migration',
+                            message: `Are you sure you want to migrate ${migrationPreview.ordersToMigrate} orders to Past Orders?\n\nThis will move them out of the active orders table. They will still be accessible from the Past Orders section.`,
+                            variant: 'warning',
+                            confirmLabel: 'Migrate Orders',
+                            cancelLabel: 'Cancel',
+                          });
+
+                          if (!confirmed) return;
+
+                          setIsMigrating(true);
+                          try {
+                            const result = await migrateOrdersToPast(migrationDays);
+                            await dialog.alert(
+                              `Successfully migrated ${result.migratedCount} orders to Past Orders.${
+                                result.errors && result.errors.length > 0
+                                  ? `\n\n${result.errors.length} errors occurred.`
+                                  : ''
+                              }`,
+                              'Migration Complete'
+                            );
+                            // Refresh preview
+                            const preview = await getMigrationPreview(migrationDays);
+                            setMigrationPreview(preview);
+                          } catch (error) {
+                            await dialog.alert(
+                              error instanceof Error ? error.message : 'Migration failed',
+                              'Error'
+                            );
+                          } finally {
+                            setIsMigrating(false);
+                          }
+                        }}
+                      >
+                        Migrate {migrationPreview.ordersToMigrate} Orders
+                      </Button>
+                    </div>
+                  )}
+
+                  {migrationPreview.ordersToMigrate === 0 && (
+                    <p className="text-sm text-green-600 font-medium">
+                      No orders to migrate for the selected time period.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          </Card>
         )}
 
         {activeTab === 'audit' && canViewAudit && (

@@ -235,20 +235,22 @@ const filterOrdersInRange = (orders: Order[], range: DateRange): Order[] => {
   });
 };
 
-async function fetchPaymentsByOrderIds(orderIds: string[]): Promise<Payment[]> {
+async function fetchPaymentsByOrderIds(orderIds: string[], includePast = true): Promise<Payment[]> {
   if (orderIds.length === 0) return [];
   const chunks = chunkArray(orderIds, BULK_QUERY_CHUNK_SIZE);
+  const extra: Record<string, string> = includePast ? { includePast: 'true' } : {};
   const results = await Promise.all(
-    chunks.map((ids) => apiClient.getPayments({ orderIds: ids.join(',') }))
+    chunks.map((ids) => apiClient.getPayments({ orderIds: ids.join(','), ...extra }))
   );
   return results.flat();
 }
 
-async function fetchOrderItemsByOrderIds(orderIds: string[]): Promise<OrderItem[]> {
+async function fetchOrderItemsByOrderIds(orderIds: string[], includePast = true): Promise<OrderItem[]> {
   if (orderIds.length === 0) return [];
   const chunks = chunkArray(orderIds, BULK_QUERY_CHUNK_SIZE);
+  const extra: Record<string, string> = includePast ? { includePast: 'true' } : {};
   const results = await Promise.all(
-    chunks.map((ids) => apiClient.getOrderItemsBulk({ orderIds: ids.join(',') }))
+    chunks.map((ids) => apiClient.getOrderItemsBulk({ orderIds: ids.join(','), ...extra }))
   );
   return results.flat();
 }
@@ -355,7 +357,7 @@ export async function getSalesSummary(range: DateRange): Promise<SalesSummary> {
   }
 
   const orders = filterOrdersInRange(
-    await apiClient.getOrders({ ...rangeFilters, status: 'completed' }),
+    await apiClient.getOrders({ ...rangeFilters, status: 'completed', includePast: 'true' }),
     range
   );
 
@@ -471,7 +473,7 @@ export async function getCategorySales(range: DateRange): Promise<CategorySales[
   }
 
   const orders = filterOrdersInRange(
-    await apiClient.getOrders({ ...rangeFilters, status: 'completed' }),
+    await apiClient.getOrders({ ...rangeFilters, status: 'completed', includePast: 'true' }),
     range
   );
   const orderIds = orders.map((order: Order) => order.id);
@@ -544,7 +546,7 @@ export async function getItemSales(range: DateRange): Promise<ItemSales[]> {
   }
 
   const orders = filterOrdersInRange(
-    await apiClient.getOrders({ ...rangeFilters, status: 'completed' }),
+    await apiClient.getOrders({ ...rangeFilters, status: 'completed', includePast: 'true' }),
     range
   );
   const orderIds = orders.map((order: Order) => order.id);
@@ -617,7 +619,7 @@ export async function getDealSales(range: DateRange): Promise<DealSales[]> {
   }
 
   const orders = filterOrdersInRange(
-    await apiClient.getOrders({ ...rangeFilters, status: 'completed' }),
+    await apiClient.getOrders({ ...rangeFilters, status: 'completed', includePast: 'true' }),
     range
   );
   const orderIds = orders.map((order: Order) => order.id);
@@ -673,7 +675,7 @@ export async function getDealSales(range: DateRange): Promise<DealSales[]> {
  */
 export async function getWaiterPerformance(range: DateRange): Promise<WaiterPerformance[]> {
   const rangeFilters = buildRangeFilters(range);
-  const orders = await apiClient.getOrders({ ...rangeFilters, status: 'completed', orderType: 'dine_in' });
+  const orders = await apiClient.getOrders({ ...rangeFilters, status: 'completed', orderType: 'dine_in', includePast: 'true' });
   const dineInOrders = orders.filter((o: Order) => o.waiterId);
 
   const waiters = await db.waiters.toArray();
@@ -727,7 +729,7 @@ export async function getWaiterPerformance(range: DateRange): Promise<WaiterPerf
  */
 export async function getRiderPerformance(range: DateRange): Promise<RiderPerformance[]> {
   const rangeFilters = buildRangeFilters(range);
-  const orders = await apiClient.getOrders({ ...rangeFilters, status: 'completed', orderType: 'delivery' });
+  const orders = await apiClient.getOrders({ ...rangeFilters, status: 'completed', orderType: 'delivery', includePast: 'true' });
   const deliveryOrders = orders.filter((o: Order) => o.riderId);
 
   const riders = await db.riders.toArray();
@@ -786,7 +788,7 @@ export async function getRegisterSessions(range: DateRange): Promise<RegisterSes
 
   const sessionIds = sessions.map((session: RegisterSession) => session.id);
   const orders = sessionIds.length > 0
-    ? await apiClient.getOrders({ registerSessionIds: sessionIds.join(','), status: 'completed' })
+    ? await apiClient.getOrders({ registerSessionIds: sessionIds.join(','), status: 'completed', includePast: 'true' })
     : [];
 
   const ordersBySession = new Map<string, Order[]>();
@@ -864,7 +866,7 @@ export async function getDailySales(range: DateRange): Promise<DailySales[]> {
   }
 
   const orders = filterOrdersInRange(
-    await apiClient.getOrders({ ...rangeFilters, status: 'completed' }),
+    await apiClient.getOrders({ ...rangeFilters, status: 'completed', includePast: 'true' }),
     range
   );
 
@@ -916,6 +918,7 @@ export async function getHourlySales(): Promise<HourlySales[]> {
     startDate: today.toISOString(),
     endDate: tomorrow.toISOString(),
     status: 'completed',
+    includePast: 'true',
   });
 
   // Group by hour
@@ -973,7 +976,7 @@ export async function getOrderDetailedReport(
     orderFilters.orderType = filters.orderType;
   }
 
-  const orders = (await apiClient.getOrders(orderFilters)) as Order[];
+  const orders = (await apiClient.getOrders({ ...orderFilters, includePast: 'true' })) as Order[];
   let filteredOrders = orders;
 
   if (filters.paymentStatus === 'paid') {
@@ -1093,7 +1096,7 @@ export async function getOrderDetailedReport(
  */
 export async function getCancelledOrders(range: DateRange): Promise<CancelledOrder[]> {
   const rangeFilters = buildRangeFilters(range);
-  const cancelledOrders = await apiClient.getOrders({ ...rangeFilters, status: 'cancelled' });
+  const cancelledOrders = await apiClient.getOrders({ ...rangeFilters, status: 'cancelled', includePast: 'true' });
 
   const users = (await db.users.toArray()) as User[];
   const userMap = new Map<string, string>(users.map((u: User) => [u.id, u.fullName]));
@@ -1125,7 +1128,7 @@ export async function getCancelledOrders(range: DateRange): Promise<CancelledOrd
  */
 export async function getDailyExpenseReport(range: DateRange): Promise<DailyExpenseReport[]> {
   const rangeFilters = buildRangeFilters(range);
-  const completedOrders = await apiClient.getOrders({ ...rangeFilters, status: 'completed' });
+  const completedOrders = await apiClient.getOrders({ ...rangeFilters, status: 'completed', includePast: 'true' });
 
   const allExpenses = await db.expenses.toArray();
   const expenses = allExpenses.filter((expense: Expense) => {
@@ -1181,7 +1184,7 @@ export async function getDailyExpenseReport(range: DateRange): Promise<DailyExpe
  */
 export async function getDiscountedOrders(range: DateRange): Promise<DiscountReportItem[]> {
   const rangeFilters = buildRangeFilters(range);
-  const orders = (await apiClient.getOrders({ ...rangeFilters, status: 'completed' }))
+  const orders = (await apiClient.getOrders({ ...rangeFilters, status: 'completed', includePast: 'true' }))
     .filter((o: Order) => o.discountAmount > 0);
 
   return orders
@@ -1214,7 +1217,7 @@ export async function getCustomerDetailedReport(customerId: string): Promise<Cus
   const customer = await db.customers.get(customerId);
   if (!customer) return null;
 
-  const allOrders = (await apiClient.getOrders({ customerId })) as Order[];
+  const allOrders = (await apiClient.getOrders({ customerId, includePast: 'true' })) as Order[];
 
   return buildCustomerReport(customer, allOrders);
 }
@@ -1237,7 +1240,7 @@ export async function searchCustomerReports(query: string): Promise<CustomerDeta
   }
 
   const customerIds = matchingCustomers.map((customer) => customer.id);
-  const orders = (await apiClient.getOrders({ customerIds: customerIds.join(',') })) as Order[];
+  const orders = (await apiClient.getOrders({ customerIds: customerIds.join(','), includePast: 'true' })) as Order[];
 
   const ordersByCustomer = new Map<string, Order[]>();
   for (const order of orders) {

@@ -432,6 +432,32 @@ class APIClient {
     return this.put(`/orders/${orderId}/delivery-status`, { deliveryStatus });
   }
 
+  // Past Orders
+  async getPastOrders(filters?: Record<string, string>) {
+    let endpoint = '/past-orders';
+    if (filters) {
+      const params = new URLSearchParams(filters);
+      endpoint += `?${params.toString()}`;
+    }
+    return this.get(endpoint);
+  }
+
+  async getPastOrder(id: string) {
+    return this.get(`/past-orders/${id}`);
+  }
+
+  async getPastOrderItems(orderId: string) {
+    return this.get(`/past-orders/${orderId}/items`);
+  }
+
+  async migrateOrdersToPast(olderThanDays: number) {
+    return this.post('/past-orders/migrate', { olderThanDays });
+  }
+
+  async getMigrationPreview(olderThanDays: number) {
+    return this.get(`/past-orders/migrate/preview?olderThanDays=${olderThanDays}`);
+  }
+
   // Settings
   async getSettings() {
     return this.get('/settings');

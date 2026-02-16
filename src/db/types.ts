@@ -323,6 +323,9 @@ export interface Settings {
   // Expense categories
   expenseCategories?: string[];
 
+  // Day counting mode
+  dayCountByRegister?: boolean;
+
   updatedAt: Date;
   updatedBy: string;
 }

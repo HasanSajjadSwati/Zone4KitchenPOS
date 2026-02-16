@@ -4,6 +4,19 @@ import { logger } from '../utils/logger.js';
 
 export const reportRoutes = express.Router();
 
+// ----- Combined table expressions (active + archived/past data) -----
+// pastOrders has an extra migratedAt column, so we select only the shared columns.
+const ORDERS_COLS = `id, orderNumber, registerSessionId, orderType, tableId, waiterId,
+  customerName, customerPhone, customerId, riderId, deliveryAddress,
+  deliveryCharge, subtotal, discountType, discountValue, discountReference,
+  discountAmount, total, status, deliveryStatus, isPaid, notes,
+  lastKotPrintedAt, kotPrintCount, createdBy, completedBy,
+  cancellationReason, createdAt, completedAt, updatedAt`;
+
+const ALL_ORDERS = `(SELECT ${ORDERS_COLS} FROM orders UNION ALL SELECT ${ORDERS_COLS} FROM pastOrders)`;
+const ALL_ORDER_ITEMS = `(SELECT * FROM orderItems UNION ALL SELECT * FROM pastOrderItems)`;
+const ALL_PAYMENTS = `(SELECT * FROM payments UNION ALL SELECT * FROM pastPayments)`;
+
 type DateBoundary = 'start' | 'end';
 
 const toNumber = (value: any): number => {
@@ -87,7 +100,7 @@ reportRoutes.get('/sales-summary', async (req, res) => {
           SUM(CASE WHEN o.isPaid = false OR o.isPaid IS NULL THEN 1 ELSE 0 END) AS "unpaidOrders",
           COALESCE(SUM(CASE WHEN o.isPaid = true THEN o.total ELSE 0 END), 0) AS "paidAmount",
           COALESCE(SUM(CASE WHEN o.isPaid = false OR o.isPaid IS NULL THEN o.total ELSE 0 END), 0) AS "unpaidAmount"
-        FROM orders o
+        FROM ${ALL_ORDERS} o
         ${whereClause}
       `,
       params
@@ -96,8 +109,8 @@ reportRoutes.get('/sales-summary', async (req, res) => {
     const itemsRow = await getAsync(
       `
         SELECT COALESCE(SUM(oi.quantity), 0) AS "totalItems"
-        FROM orderItems oi
-        JOIN orders o ON o.id = oi.orderId
+        FROM ${ALL_ORDER_ITEMS} oi
+        JOIN ${ALL_ORDERS} o ON o.id = oi.orderId
         ${whereClause}
       `,
       params
@@ -107,7 +120,7 @@ reportRoutes.get('/sales-summary', async (req, res) => {
       `
         WITH filtered_orders AS (
           SELECT o.id, o.total
-          FROM orders o
+          FROM ${ALL_ORDERS} o
           ${whereClause}
         ),
         ranked_payments AS (
@@ -124,7 +137,7 @@ reportRoutes.get('/sales-summary', async (req, res) => {
               ),
               0
             ) AS "paidBefore"
-          FROM payments p
+          FROM ${ALL_PAYMENTS} p
           JOIN filtered_orders fo ON fo.id = p.orderId
         ),
         applied_payments AS (
@@ -210,7 +223,7 @@ reportRoutes.get('/daily-sales', async (req, res) => {
           TO_CHAR(DATE_TRUNC('day', ${dateExpr}), 'YYYY-MM-DD') AS "date",
           COALESCE(SUM(o.total), 0) AS "totalSales",
           COUNT(*) AS "totalOrders"
-        FROM orders o
+        FROM ${ALL_ORDERS} o
         ${whereClause}
         GROUP BY DATE_TRUNC('day', ${dateExpr})
         ORDER BY "date"
@@ -261,8 +274,8 @@ reportRoutes.get('/item-sales', async (req, res) => {
             THEN COALESCE(SUM(oi.totalPrice), 0) / COALESCE(SUM(oi.quantity), 0)
             ELSE 0
           END AS "averagePrice"
-        FROM orderItems oi
-        JOIN orders o ON o.id = oi.orderId
+        FROM ${ALL_ORDER_ITEMS} oi
+        JOIN ${ALL_ORDERS} o ON o.id = oi.orderId
         JOIN menuItems m ON m.id = oi.menuItemId
         LEFT JOIN categories c ON c.id = m.categoryId
         ${whereClause}
@@ -313,8 +326,8 @@ reportRoutes.get('/deal-sales', async (req, res) => {
             THEN COALESCE(SUM(oi.totalPrice), 0) / COALESCE(SUM(oi.quantity), 0)
             ELSE 0
           END AS "averagePrice"
-        FROM orderItems oi
-        JOIN orders o ON o.id = oi.orderId
+        FROM ${ALL_ORDER_ITEMS} oi
+        JOIN ${ALL_ORDERS} o ON o.id = oi.orderId
         JOIN deals d ON d.id = oi.dealId
         ${whereClause}
         GROUP BY oi.dealId, d.name
@@ -362,8 +375,8 @@ reportRoutes.get('/category-sales', async (req, res) => {
             THEN COALESCE(SUM(oi.totalPrice), 0) / COALESCE(SUM(oi.quantity), 0)
             ELSE 0
           END AS "averagePrice"
-        FROM orderItems oi
-        JOIN orders o ON o.id = oi.orderId
+        FROM ${ALL_ORDER_ITEMS} oi
+        JOIN ${ALL_ORDERS} o ON o.id = oi.orderId
         JOIN menuItems m ON m.id = oi.menuItemId
         JOIN categories c ON c.id = m.categoryId
         ${whereClause}

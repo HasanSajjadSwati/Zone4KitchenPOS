@@ -27,20 +27,32 @@ orderItemRoutes.get('/', async (req, res) => {
       orderType,
       registerSessionId,
       customerId,
+      includePast,
     } = req.query;
 
     const ids = parseIdList(orderIds);
     const conditions: string[] = [];
     const params: any[] = [];
 
-    let query = 'SELECT oi.* FROM orderItems oi';
+    // When includePast is set, query both active and archived order items
+    const itemsTable = includePast === 'true'
+      ? '(SELECT * FROM orderItems UNION ALL SELECT * FROM pastOrderItems)'
+      : 'orderItems';
+
+    let query = `SELECT oi.* FROM ${itemsTable} oi`;
 
     const requiresOrderJoin = Boolean(
       startDate || endDate || status || orderType || registerSessionId || customerId
     );
 
     if (requiresOrderJoin) {
-      query += ' JOIN orders o ON oi.orderId = o.id';
+      // When including past, also join against the combined orders table
+      const ordersTable = includePast === 'true'
+        ? `(SELECT id, status, orderType, registerSessionId, customerId, createdAt FROM orders
+            UNION ALL
+            SELECT id, status, orderType, registerSessionId, customerId, createdAt FROM pastOrders)`
+        : 'orders';
+      query += ` JOIN ${ordersTable} o ON oi.orderId = o.id`;
 
       if (status) {
         conditions.push('o.status = ?');

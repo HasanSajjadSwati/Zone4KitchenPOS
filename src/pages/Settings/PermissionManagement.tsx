@@ -9,6 +9,7 @@ import type { Role, Permission } from '@/db/types';
 // Define all available resources and their display names
 const AVAILABLE_RESOURCES = [
   { id: 'orders', name: 'Orders', description: 'Create, view, edit, and delete orders' },
+  { id: 'past_orders', name: 'Past Orders', description: 'View and manage archived/past orders' },
   { id: 'menu', name: 'Menu Management', description: 'Manage categories, items, variants, and deals' },
   { id: 'reports', name: 'Reports', description: 'View and export reports' },
   { id: 'users', name: 'Users', description: 'Manage system users' },
@@ -34,6 +35,7 @@ const AVAILABLE_ACTIONS: { id: 'create' | 'read' | 'update' | 'delete' | 'export
 // Define which actions are typically available for each resource
 const RESOURCE_ACTIONS: Record<string, ('create' | 'read' | 'update' | 'delete' | 'export')[]> = {
   orders: ['create', 'read', 'update', 'delete'],
+  past_orders: ['read'],
   menu: ['create', 'read', 'update', 'delete'],
   reports: ['read', 'export'],
   users: ['create', 'read', 'update', 'delete'],
@@ -96,6 +98,11 @@ export const PermissionManagement: React.FC = () => {
   };
 
   const hasPermission = (resource: string, action: 'create' | 'read' | 'update' | 'delete' | 'export'): boolean => {
+    // Admin always has full access — show all available actions as granted
+    if (selectedRole?.name === 'Admin') {
+      const availableActions = RESOURCE_ACTIONS[resource] || [];
+      return availableActions.includes(action);
+    }
     const perm = permissions.find(p => p.resource === resource);
     return perm?.actions.includes(action) ?? false;
   };
@@ -305,7 +312,7 @@ export const PermissionManagement: React.FC = () => {
                               <button
                                 onClick={() => togglePermission(resource.id, action.id)}
                                 disabled={isAdminRole}
-                                className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                                className={`w-8 h-8 ml-7 rounded-lg flex items-center justify-center transition-colors ${
                                   isEnabled
                                     ? 'bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-800'
                                     : 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-600'

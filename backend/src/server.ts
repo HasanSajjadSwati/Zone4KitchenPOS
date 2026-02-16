@@ -26,6 +26,7 @@ import { paymentRoutes } from './routes/payments.js';
 import { reportRoutes } from './routes/reports.js';
 import { maintenanceRoutes } from './routes/maintenance.js';
 import { auditLogRoutes } from './routes/auditLogs.js';
+import { pastOrderRoutes } from './routes/pastOrders.js';
 import { initializeDatabase } from './db/migrate.js';
 import { logger } from './utils/logger.js';
 
@@ -77,6 +78,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/maintenance', maintenanceRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
+app.use('/api/past-orders', pastOrderRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

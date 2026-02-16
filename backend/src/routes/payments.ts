@@ -8,8 +8,14 @@ export const paymentRoutes = express.Router();
 // Get all payments
 paymentRoutes.get('/', async (req, res) => {
   try {
-    const { startDate, endDate, orderId, orderIds, method } = req.query;
-    let query = 'SELECT * FROM payments WHERE 1=1';
+    const { startDate, endDate, orderId, orderIds, method, includePast } = req.query;
+
+    // When includePast is set, query both active and archived payments
+    const paymentsTable = includePast === 'true'
+      ? '(SELECT * FROM payments UNION ALL SELECT * FROM pastPayments)'
+      : 'payments';
+
+    let query = `SELECT * FROM ${paymentsTable} AS p WHERE 1=1`;
     const params: any[] = [];
 
     if (orderId) {

@@ -54,6 +54,9 @@ export const useAuthStore = create<AuthStore>()(
         const { currentRole } = get();
         if (!currentRole) return false;
 
+        // Admin always has full access to everything
+        if (currentRole.name === 'Admin') return true;
+
         return currentRole.permissions.some(
           (p) => p.resource === resource && p.actions.includes(action as any)
         );

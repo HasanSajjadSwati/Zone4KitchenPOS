@@ -3,12 +3,14 @@ import { Card, Button, TimePicker } from '@/components/ui';
 import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import { getDiscountedOrders, exportToCSV, exportToPDF, type DiscountReportItem, type DateRange } from '@/services/reportService';
 import { formatCurrency, formatDate } from '@/utils/validation';
+import { useDayRange } from '@/hooks/useDayRange';
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays } from 'date-fns';
 
 type DateRangePreset = 'today' | 'yesterday' | 'this_week' | 'this_month' | 'custom';
 type DiscountTypeFilter = 'all' | 'percentage' | 'fixed';
 
 export const DiscountReport: React.FC = () => {
+  const { getTodayRange } = useDayRange();
   const [datePreset, setDatePreset] = useState<DateRangePreset>('today');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customStartTime, setCustomStartTime] = useState('00:00');
@@ -41,11 +43,11 @@ export const DiscountReport: React.FC = () => {
     return date;
   };
 
-  const getDateRange = (): DateRange => {
+  const getDateRange = async (): Promise<DateRange> => {
     const now = new Date();
     switch (datePreset) {
       case 'today':
-        return { startDate: startOfDay(now), endDate: endOfDay(now) };
+        return await getTodayRange();
       case 'yesterday':
         const yesterday = subDays(now, 1);
         return { startDate: startOfDay(yesterday), endDate: endOfDay(yesterday) };
@@ -74,7 +76,7 @@ export const DiscountReport: React.FC = () => {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const range = getDateRange();
+      const range = await getDateRange();
       const data = await getDiscountedOrders(range);
       setReportData(data);
     } catch (error) {
