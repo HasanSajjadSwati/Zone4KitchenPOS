@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>WebSocket Test</title>
+  <style>
+    body { font-family: Arial; padding: 20px; background: #111; color: #fff; }
+    #log { background: #222; padding: 10px; margin: 10px 0; border-radius: 5px; white-space: pre-wrap; font-family: monospace; max-height: 400px; overflow-y: auto; }
+    button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+    .success { color: #4f4; }
+    .error { color: #f44; }
+    .info { color: #4af; }
+  </style>
+</head>
+<body>
+  <h1>WebSocket Test</h1>
+  <p>Testing connection to backend WebSocket server</p>
+  
+  <button onclick="testWS('ws://127.0.0.1:3033/api/ws')">Test 127.0.0.1:3033</button>
+  <button onclick="testWS('ws://localhost:3033/api/ws')">Test localhost:3033</button>
+  <button onclick="testWS('ws://[::1]:3033/api/ws')">Test [::1]:3033 (IPv6)</button>
+  
+  <div id="log"></div>
+
+  <script>
+    const log = document.getElementById('log');
+    
+    function addLog(msg, type = 'info') {
+      const time = new Date().toLocaleTimeString();
+      log.innerHTML += `<span class="${type}">[${time}] ${msg}</span>\n`;
+      log.scrollTop = log.scrollHeight;
+    }
+    
+    function testWS(url) {
+      addLog(`\n--- Testing ${url} ---`, 'info');
+      
+      try {
+        const ws = new WebSocket(url);
+        addLog(`WebSocket object created`, 'info');
+        
+        ws.onopen = () => {
+          addLog(`CONNECTED!`, 'success');
+          ws.send(JSON.stringify({ type: 'ping' }));
+        };
+        
+        ws.onmessage = (e) => {
+          addLog(`Message: ${e.data}`, 'success');
+        };
+        
+        ws.onerror = (e) => {
+          addLog(`Error event fired (no details available in browser)`, 'error');
+          console.error('WebSocket error:', e);
+        };
+        
+        ws.onclose = (e) => {
+          addLog(`Closed - code: ${e.code}, reason: "${e.reason}", wasClean: ${e.wasClean}`, e.code === 1000 ? 'success' : 'error');
+        };
+        
+        // Auto close after 5 seconds
+        setTimeout(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.close(1000, 'Test complete');
+          }
+        }, 5000);
+        
+      } catch (err) {
+        addLog(`Exception: ${err.message}`, 'error');
+      }
+    }
+    
+    // Auto-test on load
+    setTimeout(() => testWS('ws://127.0.0.1:3033/api/ws'), 500);
+  </script>
+</body>
+</html>

@@ -1,7 +1,10 @@
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import { runAsync, getAsync, allAsync } from '../db/database.js';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'zone4kitchen-secret-key-change-in-production';
 
 export const userRoutes = express.Router();
 
@@ -244,6 +247,66 @@ userRoutes.delete('/:id', async (req, res) => {
 
     await runAsync('DELETE FROM users WHERE id = ?', [req.params.id]);
     res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// Login endpoint for website admin panel
+userRoutes.post('/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password are required' });
+    }
+
+    // Find user by username
+    const user = await getAsync(`
+      SELECT u.id, u.username, u.passwordHash, u.fullName, u.roleId, u.isActive, r.name as roleName
+      FROM users u
+      JOIN roles r ON u.roleId = r.id
+      WHERE u.username = ?
+    `, [username]);
+
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    if (!user.isActive) {
+      return res.status(401).json({ error: 'Account is disabled' });
+    }
+
+    // Verify password
+    const isValid = await bcrypt.compare(password, user.passwordHash);
+    if (!isValid) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    // Generate JWT token
+    const token = jwt.sign(
+      {
+        id: user.id,
+        username: user.username,
+        roleId: user.roleId,
+        roleName: user.roleName,
+      },
+      JWT_SECRET,
+      { expiresIn: '8h' }
+    );
+
+    // Return user info and token
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        fullName: user.fullName,
+        roleId: user.roleId,
+        role: user.roleName,
+        name: user.fullName,
+      },
+    });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }

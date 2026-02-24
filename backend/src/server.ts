@@ -27,6 +27,7 @@ import { reportRoutes } from './routes/reports.js';
 import { maintenanceRoutes } from './routes/maintenance.js';
 import { auditLogRoutes } from './routes/auditLogs.js';
 import { pastOrderRoutes } from './routes/pastOrders.js';
+import { websiteRoutes } from './routes/website.js';
 import { initializeDatabase } from './db/migrate.js';
 import { logger } from './utils/logger.js';
 
@@ -40,7 +41,12 @@ const DEBUG = process.env.DEBUG === 'true';
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: true, // Allow all origins in development
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Admin-User-Id'],
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -79,6 +85,10 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/maintenance', maintenanceRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
 app.use('/api/past-orders', pastOrderRoutes);
+app.use('/api/website', websiteRoutes);
+
+// Serve uploaded files
+app.use('/uploads', express.static(path.resolve(__dirname, '../uploads')));
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -115,8 +125,8 @@ if (shouldServeFrontend) {
 const server = createServer(app);
 initWebSocket(server);
 
-// Start server
-server.listen(PORT, () => {
+// Start server - bind to 0.0.0.0 for local network access
+server.listen(Number(PORT), '0.0.0.0', () => {
   console.log(`\n🚀 POS Backend running on http://localhost:${PORT}`);
   console.log(`⚙️  Environment: ${NODE_ENV.toUpperCase()}`);
   console.log('📦 Database: PostgreSQL (DATABASE_URL)');

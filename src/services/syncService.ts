@@ -27,6 +27,19 @@ export interface SyncEvent {
 
 type SyncListener = (event: SyncEvent) => void;
 
+export interface WebsiteOrderEvent {
+  type: 'website_order';
+  orderId: string;
+  orderNumber: string;
+  customerName: string;
+  customerPhone: string;
+  orderType: string;
+  total: number;
+  timestamp: string;
+}
+
+type WebsiteOrderCallback = (event: WebsiteOrderEvent) => void;
+
 class SyncService {
   private ws: WebSocket | null = null;
   private reconnectAttempts = 0;
@@ -34,6 +47,7 @@ class SyncService {
   private reconnectDelay = 2000;
   private pingInterval: ReturnType<typeof setInterval> | null = null;
   private listeners: Map<SyncEventType | '*', Set<SyncListener>> = new Map();
+  private websiteOrderCallback: WebsiteOrderCallback | null = null;
   private isConnecting = false;
   private shouldReconnect = true;
 
@@ -41,14 +55,8 @@ class SyncService {
    * Get the WebSocket URL based on API URL or current page location
    */
   private getWebSocketUrl(): string {
-    // In development with Vite, use the proxy path
-    if (import.meta.env.DEV) {
-      // Vite proxy will forward /api/ws to the backend
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      return `${protocol}//${window.location.host}/api/ws`;
-    }
-    
-    // Check if VITE_API_URL is set (e.g., http://192.168.1.100:3033/api)
+    // Always use direct connection to backend for WebSocket
+    // This avoids proxy issues with WebSocket upgrade
     const apiUrl = import.meta.env.VITE_API_URL;
     
     if (apiUrl) {
@@ -56,13 +64,14 @@ class SyncService {
       try {
         const url = new URL(apiUrl);
         const wsProtocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+        console.log(`[Sync] Using WebSocket URL from VITE_API_URL: ${wsProtocol}//${url.host}/api/ws`);
         return `${wsProtocol}//${url.host}/api/ws`;
       } catch {
         console.warn('[Sync] Invalid VITE_API_URL, falling back to default');
       }
     }
     
-    // In production, use same host as page (frontend served by backend)
+    // Fallback: use same host as page (works when frontend served by backend)
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     return `${protocol}//${window.location.host}/api/ws`;
   }
@@ -98,6 +107,11 @@ class SyncService {
           if (data.type === 'sync') {
             console.log('[Sync] Received sync event:', data.resource, data.action);
             this.notifyListeners(data as SyncEvent);
+          } else if (data.type === 'website_order') {
+            console.log('[Sync] Received website order:', data.orderNumber);
+            if (this.websiteOrderCallback) {
+              this.websiteOrderCallback(data as WebsiteOrderEvent);
+            }
           } else if (data.type === 'connected') {
             console.log('[Sync] Server acknowledged connection');
           }
@@ -223,6 +237,13 @@ class SyncService {
         console.error('[Sync] Listener error:', error);
       }
     });
+  }
+
+  /**
+   * Set callback for website order notifications
+   */
+  setWebsiteOrderCallback(callback: WebsiteOrderCallback | null): void {
+    this.websiteOrderCallback = callback;
   }
 
   /**

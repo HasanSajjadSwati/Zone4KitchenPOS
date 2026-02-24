@@ -25,10 +25,12 @@ import {
   SunIcon,
   MoonIcon,
   ArchiveBoxIcon,
+  GlobeAltIcon,
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '@/stores/authStore';
 import { logout } from '@/services/authService';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useSyncContext } from '@/contexts/SyncContext';
 import logo from '@/assets/logo.svg';
 
 interface LayoutProps {
@@ -63,6 +65,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const currentUser = useAuthStore((state) => state.currentUser);
   const hasPermission = useAuthStore((state) => state.hasPermission);
   const { isDark, toggleTheme } = useTheme();
+  const { websiteOrderNotification, clearWebsiteOrderNotification } = useSyncContext();
 
   const canAccess = (resource: string, action: string = 'read') => hasPermission(resource, action);
 
@@ -311,6 +314,53 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
         </main>
       </div>
+
+      {/* Website Order Notification Popup */}
+      {websiteOrderNotification && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl p-6 max-w-md w-full mx-4 animate-bounce-in">
+            <div className="flex items-center justify-center mb-4">
+              <div className="w-16 h-16 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
+                <GlobeAltIcon className="w-10 h-10 text-green-600 dark:text-green-400" />
+              </div>
+            </div>
+            <h2 className="text-xl font-bold text-center text-gray-900 dark:text-white mb-2">
+              🛒 New Website Order!
+            </h2>
+            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-4">
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="text-gray-500 dark:text-gray-400">Order #:</div>
+                <div className="font-semibold text-gray-900 dark:text-white">{websiteOrderNotification.orderNumber}</div>
+                <div className="text-gray-500 dark:text-gray-400">Customer:</div>
+                <div className="font-semibold text-gray-900 dark:text-white">{websiteOrderNotification.customerName}</div>
+                <div className="text-gray-500 dark:text-gray-400">Phone:</div>
+                <div className="font-semibold text-gray-900 dark:text-white">{websiteOrderNotification.customerPhone}</div>
+                <div className="text-gray-500 dark:text-gray-400">Type:</div>
+                <div className="font-semibold text-gray-900 dark:text-white capitalize">{websiteOrderNotification.orderType.replace('_', ' ')}</div>
+                <div className="text-gray-500 dark:text-gray-400">Total:</div>
+                <div className="font-bold text-lg text-green-600 dark:text-green-400">Rs. {websiteOrderNotification.total.toLocaleString()}</div>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  clearWebsiteOrderNotification();
+                  navigate('/orders');
+                }}
+                className="flex-1 bg-primary-600 hover:bg-primary-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+              >
+                View Orders
+              </button>
+              <button
+                onClick={clearWebsiteOrderNotification}
+                className="flex-1 bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 text-gray-800 dark:text-white font-medium py-2 px-4 rounded-lg transition-colors"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

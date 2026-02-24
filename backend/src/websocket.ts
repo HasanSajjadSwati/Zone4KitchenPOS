@@ -109,6 +109,41 @@ export function broadcastSync(resource: SyncEventType, action: SyncEvent['action
 }
 
 /**
+ * Broadcast a website order notification to all connected POS clients
+ */
+export function broadcastWebsiteOrder(orderData: {
+  orderId: string;
+  orderNumber: string;
+  customerName: string;
+  customerPhone: string;
+  orderType: string;
+  total: number;
+}): void {
+  if (!wss) {
+    logger.debug('WebSocket server not initialized, skipping website order broadcast');
+    return;
+  }
+
+  const event = {
+    type: 'website_order',
+    ...orderData,
+    timestamp: new Date().toISOString(),
+  };
+
+  const message = JSON.stringify(event);
+  let sentCount = 0;
+
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(message);
+      sentCount++;
+    }
+  });
+
+  logger.info(`Broadcast website order notification: ${orderData.orderNumber}`, { sentCount });
+}
+
+/**
  * Get the current WebSocket server instance
  */
 export function getWebSocketServer(): WebSocketServer | null {

@@ -515,4 +515,29 @@ CREATE INDEX IF NOT EXISTS idx_pastOrders_orderType ON pastOrders(orderType);
 CREATE INDEX IF NOT EXISTS idx_pastOrders_migratedAt ON pastOrders(migratedAt);
 CREATE INDEX IF NOT EXISTS idx_pastOrderItems_orderId ON pastOrderItems(orderId);
 CREATE INDEX IF NOT EXISTS idx_pastPayments_orderId ON pastPayments(orderId);
+
+-- Website Settings Table for CMS content
+CREATE TABLE IF NOT EXISTS websiteSettings (
+  id TEXT PRIMARY KEY,
+  key TEXT NOT NULL UNIQUE,
+  value TEXT NOT NULL,
+  updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Website Online Orders Table for tracking
+CREATE TABLE IF NOT EXISTS websiteOrders (
+  id TEXT PRIMARY KEY,
+  orderId TEXT NOT NULL,
+  paymentMethod TEXT NOT NULL CHECK(paymentMethod IN ('cod', 'bank_transfer')),
+  paymentScreenshot TEXT,
+  paymentVerified BOOLEAN DEFAULT 0,
+  verifiedBy TEXT,
+  verifiedAt DATETIME,
+  createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (orderId) REFERENCES orders(id),
+  FOREIGN KEY (verifiedBy) REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_websiteOrders_orderId ON websiteOrders(orderId);
+CREATE INDEX IF NOT EXISTS idx_websiteSettings_key ON websiteSettings(key);
 `;

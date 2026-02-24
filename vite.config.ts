@@ -13,11 +13,17 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      // Proxy API requests (including WebSocket at /api/ws) to backend
-      '/api': {
-        target: 'http://localhost:3033',
-        changeOrigin: true,
+      // WebSocket endpoint - must be listed first for proper matching
+      '/api/ws': {
+        target: 'http://127.0.0.1:3033',
         ws: true,
+        changeOrigin: true,
+        rewrite: (path) => path,
+      },
+      // Proxy API requests to backend
+      '/api': {
+        target: 'http://127.0.0.1:3033',
+        changeOrigin: true,
       },
     },
   },
