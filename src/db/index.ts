@@ -1032,7 +1032,10 @@ export const db = {
 
   // Register Sessions proxy
   registerSessions: {
-    toArray: async () => apiClient.getRegisterSessions(),
+    toArray: async () => {
+      const result = await apiClient.getRegisterSessions();
+      return result?.sessions || result || [];
+    },
     get: async (id: string) => apiClient.getRegisterSession(id),
     add: async (session: any) => apiClient.createRegisterSession(session),
     put: async (session: any) => apiClient.updateRegisterSession(session.id, session),
@@ -1040,8 +1043,14 @@ export const db = {
     bulkPut: async (items: any[]) => {
       return Promise.all(items.map(item => apiClient.createRegisterSession(item)));
     },
-    where: createWhereEquals(() => apiClient.getRegisterSessions()),
-    orderBy: createOrderBy(() => apiClient.getRegisterSessions()),
+    where: createWhereEquals(async () => {
+      const result = await apiClient.getRegisterSessions();
+      return result?.sessions || result || [];
+    }),
+    orderBy: createOrderBy(async () => {
+      const result = await apiClient.getRegisterSessions();
+      return result?.sessions || result || [];
+    }),
   },
 
   // Orders table proxy

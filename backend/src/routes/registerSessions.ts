@@ -65,11 +65,52 @@ async function getSessionFinancials(sessionId: string): Promise<{
 
 export const registerSessionRoutes = express.Router();
 
-// Get all register sessions
+// Get all register sessions (paginated)
 registerSessionRoutes.get('/', async (req, res) => {
   try {
-    const sessions = await allAsync('SELECT * FROM registerSessions ORDER BY openedAt DESC');
-    res.json(sessions);
+    const { limit, offset, status, startDate, endDate } = req.query;
+
+    let query = 'SELECT * FROM registerSessions WHERE 1=1';
+    let countQuery = 'SELECT COUNT(*) as total FROM registerSessions WHERE 1=1';
+    const params: any[] = [];
+    const countParams: any[] = [];
+
+    if (status) {
+      query += ' AND status = ?';
+      countQuery += ' AND status = ?';
+      params.push(status);
+      countParams.push(status);
+    }
+
+    if (startDate) {
+      query += ' AND openedAt >= ?';
+      countQuery += ' AND openedAt >= ?';
+      params.push(startDate);
+      countParams.push(startDate);
+    }
+
+    if (endDate) {
+      query += ' AND openedAt <= ?';
+      countQuery += ' AND openedAt <= ?';
+      params.push(endDate);
+      countParams.push(endDate);
+    }
+
+    // Get total count for pagination
+    const countResult = await getAsync(countQuery, countParams);
+    const total = countResult?.total || 0;
+
+    query += ' ORDER BY openedAt DESC';
+
+    // Apply pagination if limit is provided
+    if (limit) {
+      const limitNum = parseInt(String(limit), 10);
+      const offsetNum = offset ? parseInt(String(offset), 10) : 0;
+      query += ` LIMIT ${limitNum} OFFSET ${offsetNum}`;
+    }
+
+    const sessions = await allAsync(query, params);
+    res.json({ sessions, total });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }

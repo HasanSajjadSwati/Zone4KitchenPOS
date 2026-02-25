@@ -234,6 +234,22 @@ export async function getRecentSessions(limit: number = 10): Promise<RegisterSes
   });
 }
 
+export interface PaginatedSessionsResult {
+  sessions: RegisterSession[];
+  total: number;
+}
+
+export async function getAllSessions(
+  limit: number = 20,
+  offset: number = 0
+): Promise<PaginatedSessionsResult> {
+  const result = await apiClient.getRegisterSessions({ limit, offset });
+  const sessions = result?.sessions || [];
+  const total = result?.total || 0;
+
+  return { sessions, total };
+}
+
 export async function getSessionStats(sessionId: string) {
   const session = await db.registerSessions.get(sessionId);
   if (!session) return null;

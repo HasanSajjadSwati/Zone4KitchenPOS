@@ -15,7 +15,7 @@ export const WIPE_TABLE_SEQUENCE = [
   'payments',
   'kotPrints',
   'orders',
-  'registerSessions',
+  // Note: registerSessions is intentionally excluded from wipe to preserve historical register data
   'menuItemVariants',
   'variantOptions',
   'dealVariants',

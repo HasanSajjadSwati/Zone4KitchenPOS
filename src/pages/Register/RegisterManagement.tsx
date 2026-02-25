@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { BanknotesIcon, ClockIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+import { BanknotesIcon, ClockIcon, CheckCircleIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import { Button, Card, Modal, Input } from '@/components/ui';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -8,13 +8,15 @@ import {
   openRegister,
   closeRegister,
   getCurrentSession,
-  getRecentSessions,
+  getAllSessions,
   getSessionStats,
 } from '@/services/registerService';
 import { useAuthStore } from '@/stores/authStore';
 import { useDialog } from '@/hooks/useDialog';
 import { formatCurrency, formatDateTime } from '@/utils/validation';
 import type { RegisterSession } from '@/db/types';
+
+const SESSIONS_PER_PAGE = 10;
 
 const openRegisterSchema = z.object({
   openingCash: z.number().min(0, 'Opening cash must be positive'),
@@ -33,12 +35,16 @@ export const RegisterManagement: React.FC = () => {
   const dialog = useDialog();
   const [currentSession, setCurrentSession] = useState<RegisterSession | null>(null);
   const [sessionStats, setSessionStats] = useState<any>(null);
-  const [recentSessions, setRecentSessions] = useState<RegisterSession[]>([]);
+  const [allSessions, setAllSessions] = useState<RegisterSession[]>([]);
+  const [totalSessions, setTotalSessions] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [isOpenModalOpen, setIsOpenModalOpen] = useState(false);
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isDataLoading, setIsDataLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const totalPages = Math.ceil(totalSessions / SESSIONS_PER_PAGE);
 
   const openForm = useForm<OpenRegisterFormData>({
     resolver: zodResolver(openRegisterSchema),
@@ -52,7 +58,7 @@ export const RegisterManagement: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [currentPage]);
 
   const loadData = async () => {
     try {
@@ -67,8 +73,10 @@ export const RegisterManagement: React.FC = () => {
         setSessionStats(stats);
       }
 
-      const recent = await getRecentSessions(10);
-      setRecentSessions(recent);
+      const offset = (currentPage - 1) * SESSIONS_PER_PAGE;
+      const { sessions, total } = await getAllSessions(SESSIONS_PER_PAGE, offset);
+      setAllSessions(sessions);
+      setTotalSessions(total);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load register data';
       console.error('LoadData error:', err);
@@ -269,11 +277,15 @@ export const RegisterManagement: React.FC = () => {
         </Card>
       )}
 
-      {/* Recent Sessions */}
+      {/* All Sessions */}
       <div>
-        <h2 className="text-xl font-bold text-gray-900 mb-4">Recent Sessions</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold text-gray-900">
+            All Sessions {totalSessions > 0 && <span className="text-gray-500 font-normal text-base">({totalSessions})</span>}
+          </h2>
+        </div>
         <div className="space-y-3">
-          {recentSessions.map((session) => (
+          {allSessions.map((session) => (
             <Card key={session.id} padding="md">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
@@ -345,12 +357,44 @@ export const RegisterManagement: React.FC = () => {
             </Card>
           ))}
 
-          {recentSessions.length === 0 && (
+          {allSessions.length === 0 && (
             <Card padding="lg">
               <p className="text-center text-gray-500">No register sessions yet</p>
             </Card>
           )}
         </div>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
+            <p className="text-sm text-gray-600">
+              Showing {((currentPage - 1) * SESSIONS_PER_PAGE) + 1} - {Math.min(currentPage * SESSIONS_PER_PAGE, totalSessions)} of {totalSessions} sessions
+            </p>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                leftIcon={<ChevronLeftIcon className="w-4 h-4" />}
+              >
+                Previous
+              </Button>
+              <span className="text-sm text-gray-600 px-2">
+                Page {currentPage} of {totalPages}
+              </span>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                rightIcon={<ChevronRightIcon className="w-4 h-4" />}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Open Register Modal */}

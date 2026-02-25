@@ -473,8 +473,25 @@ class APIClient {
   }
 
   // Register Sessions
-  async getRegisterSessions() {
-    return this.get('/register-sessions');
+  async getRegisterSessions(filters?: {
+    limit?: number;
+    offset?: number;
+    status?: string;
+    startDate?: string;
+    endDate?: string;
+  }) {
+    let endpoint = '/register-sessions';
+    if (filters) {
+      const params = new URLSearchParams();
+      if (filters.limit !== undefined) params.set('limit', String(filters.limit));
+      if (filters.offset !== undefined) params.set('offset', String(filters.offset));
+      if (filters.status) params.set('status', filters.status);
+      if (filters.startDate) params.set('startDate', filters.startDate);
+      if (filters.endDate) params.set('endDate', filters.endDate);
+      const qs = params.toString();
+      if (qs) endpoint += `?${qs}`;
+    }
+    return this.get(endpoint);
   }
 
   async getRegisterSession(id: string) {
