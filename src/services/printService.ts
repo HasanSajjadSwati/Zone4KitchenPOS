@@ -863,7 +863,7 @@ async function renderRiderReceiptTemplate(
     <div class="footer">
       <div style="font-weight: bold; margin-bottom: 5px;">Handle with care!</div>
       <div style="font-size: 9pt;">This is a rider copy for delivery reference</div>
-      <div style="margin-top: 8px;">Powered by Zone4Kitchen POS</div>
+      <div style="margin-top: 8px;">Powered By Strativ</div>
     </div>
   
   </body>
@@ -1064,7 +1064,7 @@ async function renderReceiptTemplate(
 
     <div class="footer">
       <div style="margin: 10px 0;">${settings.receiptFooter || 'Thank you for your visit!'}</div>
-      <div>Powered by Zone4Kitchen POS</div>
+      <div>Powered By Strativ</div>
     </div>
   
   </body>

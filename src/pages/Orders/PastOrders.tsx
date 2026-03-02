@@ -48,11 +48,27 @@ export const PastOrders: React.FC = () => {
   const [totalOrders, setTotalOrders] = useState(0);
   const pageSize = 50;
 
+  const loadOrders = useCallback(async () => {
+    const result = await getPastOrdersPaginated({
+      status: filterStatus !== 'all' ? filterStatus as any : undefined,
+      orderType: filterType !== 'all' ? filterType : undefined,
+      isPaid: filterPayment === 'paid' ? true : filterPayment === 'unpaid' ? false : undefined,
+      startDate: startDate ? new Date(startDate).toISOString() : undefined,
+      endDate: endDate ? new Date(endDate + 'T23:59:59.999Z').toISOString() : undefined,
+      search: searchText || undefined,
+      limit: pageSize,
+      offset: (currentPage - 1) * pageSize,
+    });
+
+    setOrders(result.orders);
+    setTotalOrders(result.total);
+  }, [filterStatus, filterType, filterPayment, searchText, startDate, endDate, currentPage, pageSize]);
+
   useEffect(() => {
     loadOrders();
-  }, [filterStatus, filterType, filterPayment, currentPage]);
+  }, [loadOrders]);
 
-  // Reset to page 1 when filters change
+  // Reset to page 1 when filters change (not when page changes)
   useEffect(() => {
     setCurrentPage(1);
   }, [filterStatus, filterType, filterPayment, searchText, startDate, endDate]);
@@ -91,22 +107,6 @@ export const PastOrders: React.FC = () => {
     }
     return item.dealId ? dealNameById[item.dealId] || 'Unknown Deal' : 'Unknown Deal';
   };
-
-  const loadOrders = useCallback(async () => {
-    const result = await getPastOrdersPaginated({
-      status: filterStatus !== 'all' ? filterStatus as any : undefined,
-      orderType: filterType !== 'all' ? filterType : undefined,
-      isPaid: filterPayment === 'paid' ? true : filterPayment === 'unpaid' ? false : undefined,
-      startDate: startDate ? new Date(startDate).toISOString() : undefined,
-      endDate: endDate ? new Date(endDate + 'T23:59:59.999Z').toISOString() : undefined,
-      search: searchText || undefined,
-      limit: pageSize,
-      offset: (currentPage - 1) * pageSize,
-    });
-
-    setOrders(result.orders);
-    setTotalOrders(result.total);
-  }, [filterStatus, filterType, filterPayment, searchText, startDate, endDate, currentPage, pageSize]);
 
   const handleViewDetails = async (order: Order) => {
     setSelectedOrder(order);
