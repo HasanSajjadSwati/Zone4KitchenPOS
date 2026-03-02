@@ -148,9 +148,9 @@ orderRoutes.get('/', async (req, res) => {
     // Handle isPaid filter
     const { isPaid, limit, offset } = req.query;
     if (isPaid === 'true') {
-      query += ' AND isPaid = 1';
+      query += ' AND ispaid = true';
     } else if (isPaid === 'false') {
-      query += ' AND isPaid = 0';
+      query += ' AND ispaid = false';
     }
 
     // Get total count for pagination (before LIMIT)

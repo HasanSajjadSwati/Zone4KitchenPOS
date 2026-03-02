@@ -42,9 +42,9 @@ pastOrderRoutes.get('/', async (req, res) => {
       params.push(endDate);
     }
     if (isPaid === 'true') {
-      query += ' AND isPaid = 1';
+      query += ' AND ispaid = true';
     } else if (isPaid === 'false') {
-      query += ' AND isPaid = 0';
+      query += ' AND ispaid = false';
     }
     if (search) {
       query += ' AND (orderNumber LIKE ? OR customerName LIKE ? OR customerPhone LIKE ?)';

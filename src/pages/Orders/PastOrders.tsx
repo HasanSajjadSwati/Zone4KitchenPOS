@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   MagnifyingGlassIcon,
   EyeIcon,
@@ -47,31 +47,51 @@ export const PastOrders: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalOrders, setTotalOrders] = useState(0);
   const pageSize = 50;
+  
+  // Track previous filter values to detect changes (only for auto-apply filters)
+  const prevFiltersRef = useRef({ filterStatus, filterType, filterPayment });
+  // Track search params separately - these only apply on Search button click
+  const appliedSearchRef = useRef({ searchText: '', startDate: '', endDate: '' });
 
-  const loadOrders = useCallback(async () => {
+  const loadOrders = useCallback(async (page: number, searchParams?: { search?: string; startDate?: string; endDate?: string }) => {
+    const search = searchParams?.search ?? appliedSearchRef.current.searchText;
+    const start = searchParams?.startDate ?? appliedSearchRef.current.startDate;
+    const end = searchParams?.endDate ?? appliedSearchRef.current.endDate;
+    
     const result = await getPastOrdersPaginated({
       status: filterStatus !== 'all' ? filterStatus as any : undefined,
       orderType: filterType !== 'all' ? filterType : undefined,
       isPaid: filterPayment === 'paid' ? true : filterPayment === 'unpaid' ? false : undefined,
-      startDate: startDate ? new Date(startDate).toISOString() : undefined,
-      endDate: endDate ? new Date(endDate + 'T23:59:59.999Z').toISOString() : undefined,
-      search: searchText || undefined,
+      startDate: start ? new Date(start).toISOString() : undefined,
+      endDate: end ? new Date(end + 'T23:59:59.999Z').toISOString() : undefined,
+      search: search || undefined,
       limit: pageSize,
-      offset: (currentPage - 1) * pageSize,
+      offset: (page - 1) * pageSize,
     });
 
     setOrders(result.orders);
     setTotalOrders(result.total);
-  }, [filterStatus, filterType, filterPayment, searchText, startDate, endDate, currentPage, pageSize]);
+  }, [filterStatus, filterType, filterPayment, pageSize]);
 
+  // Effect for auto-apply filters (status, type, payment) and page changes
   useEffect(() => {
-    loadOrders();
-  }, [loadOrders]);
-
-  // Reset to page 1 when filters change (not when page changes)
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filterStatus, filterType, filterPayment, searchText, startDate, endDate]);
+    const prevFilters = prevFiltersRef.current;
+    const filtersChanged = 
+      prevFilters.filterStatus !== filterStatus ||
+      prevFilters.filterType !== filterType ||
+      prevFilters.filterPayment !== filterPayment;
+    
+    // Update ref with current values
+    prevFiltersRef.current = { filterStatus, filterType, filterPayment };
+    
+    if (filtersChanged && currentPage !== 1) {
+      // Reset to page 1 when filters change - this will trigger another effect run
+      setCurrentPage(1);
+    } else {
+      // Load with current page (or page 1 if we just reset)
+      loadOrders(filtersChanged ? 1 : currentPage);
+    }
+  }, [filterStatus, filterType, filterPayment, currentPage, loadOrders]);
 
   useEffect(() => {
     const loadItemLookups = async () => {
@@ -127,8 +147,10 @@ export const PastOrders: React.FC = () => {
   };
 
   const handleSearch = () => {
+    // Store the search params for future pagination
+    appliedSearchRef.current = { searchText, startDate, endDate };
     setCurrentPage(1);
-    loadOrders();
+    loadOrders(1, { search: searchText, startDate, endDate });
   };
 
   return (
