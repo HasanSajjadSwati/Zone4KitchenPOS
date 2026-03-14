@@ -12,7 +12,6 @@ interface ModalProps {
   showCloseButton?: boolean;
   preventBackdropClose?: boolean;
   zIndex?: 'z-50' | 'z-[60]' | 'z-[70]';
-  nested?: boolean;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -24,7 +23,6 @@ export const Modal: React.FC<ModalProps> = ({
   showCloseButton = true,
   preventBackdropClose = false,
   zIndex = 'z-50',
-  nested = false,
 }) => {
   const sizeClasses = {
     sm: 'max-w-sm',
@@ -48,7 +46,6 @@ export const Modal: React.FC<ModalProps> = ({
         className="relative" 
         style={{ zIndex: zIndex === 'z-[70]' ? 70 : zIndex === 'z-[60]' ? 60 : 50 }} 
         onClose={handleClose}
-        static={nested}
       >
         <Transition.Child
           as={Fragment}

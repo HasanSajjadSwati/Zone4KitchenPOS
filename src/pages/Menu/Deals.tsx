@@ -1038,7 +1038,6 @@ export const Deals: React.FC = () => {
         title="Create New Variant"
         size="md"
         zIndex="z-[60]"
-        nested
       >
         <div className="space-y-4">
           <div>
