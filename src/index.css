@@ -20,6 +20,16 @@
   html.dark body {
     @apply bg-gray-900 text-gray-100;
   }
+
+  /* Prevent caret/cursor from appearing on non-editable elements */
+  h1, h2, h3, h4, h5, h6, p, span, div, label, button, a {
+    caret-color: transparent;
+  }
+
+  /* Allow caret in input elements */
+  input, textarea, [contenteditable="true"] {
+    caret-color: auto;
+  }
 }
 
 @layer utilities {
