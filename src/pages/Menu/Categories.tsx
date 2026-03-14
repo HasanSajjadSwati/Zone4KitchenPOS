@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilIcon, TrashIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { Button, Card, Modal, Input, Select, Badge } from '@/components/ui';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -34,6 +34,7 @@ export const Categories: React.FC = () => {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const {
     register,
@@ -129,10 +130,30 @@ export const Categories: React.FC = () => {
     });
   };
 
-  const filteredMajorCategories = majorCategories.filter((cat) => {
+  // Helper function to check if a sub-category matches filters
+  const subCategoryMatches = (cat: Category) => {
+    if (searchQuery && !cat.name.toLowerCase().includes(searchQuery.toLowerCase())) {
+      return false;
+    }
     if (filterStatus === 'all') return true;
     if (filterStatus === 'active') return cat.isActive;
     if (filterStatus === 'inactive') return !cat.isActive;
+    return true;
+  };
+
+  const filteredMajorCategories = majorCategories.filter((cat) => {
+    // Status filter
+    if (filterStatus === 'active' && !cat.isActive) return false;
+    if (filterStatus === 'inactive' && cat.isActive) return false;
+    
+    // Search filter - show major if it matches OR if any sub-category matches
+    if (searchQuery) {
+      const majorMatches = cat.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const hasMatchingSub = categories.some(
+        (sub) => sub.parentId === cat.id && sub.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      return majorMatches || hasMatchingSub;
+    }
     return true;
   });
 
@@ -141,10 +162,7 @@ export const Categories: React.FC = () => {
     subs: categories.filter((cat) => {
       const isChild = cat.parentId === major.id;
       if (!isChild) return false;
-      if (filterStatus === 'all') return true;
-      if (filterStatus === 'active') return cat.isActive;
-      if (filterStatus === 'inactive') return !cat.isActive;
-      return true;
+      return subCategoryMatches(cat);
     }),
   }));
 
@@ -162,7 +180,22 @@ export const Categories: React.FC = () => {
 
       {/* Filter */}
       <Card padding="md">
-        <div className="max-w-xs">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Search
+            </label>
+            <div className="relative">
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search categories..."
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+              />
+            </div>
+          </div>
           <Select
             label="Filter by Status"
             value={filterStatus}
