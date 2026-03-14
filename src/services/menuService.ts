@@ -149,6 +149,13 @@ export async function updateMenuItem(
 export async function deleteMenuItem(id: string, userId: string): Promise<void> {
   const item = await db.menuItems.get(id);
 
+  // Clear menuItemId reference in order items (itemName is preserved for display)
+  // This allows safe deletion without breaking historical orders
+  const orderItemsWithItem = await db.orderItems.where('menuItemId').equals(id).toArray();
+  for (const orderItem of orderItemsWithItem) {
+    await db.orderItems.update(orderItem.id, { menuItemId: null });
+  }
+
   // Delete associated variant links
   await db.menuItemVariants.where('menuItemId').equals(id).delete();
 
@@ -434,6 +441,13 @@ export async function updateDeal(
 
 export async function deleteDeal(id: string, userId: string): Promise<void> {
   const deal = await db.deals.get(id);
+
+  // Clear dealId reference in order items (itemName is preserved for display)
+  // This allows safe deletion without breaking historical orders
+  const orderItemsWithDeal = await db.orderItems.where('dealId').equals(id).toArray();
+  for (const item of orderItemsWithDeal) {
+    await db.orderItems.update(item.id, { dealId: null });
+  }
 
   // Delete associated items
   await db.dealItems.where('dealId').equals(id).delete();

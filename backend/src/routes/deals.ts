@@ -114,15 +114,10 @@ dealRoutes.delete('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Deal not found' });
     }
 
-    const orderUsage = await getAsync(
-      'SELECT COUNT(*) as count FROM orderItems WHERE dealId = ?',
-      [req.params.id]
-    );
-    if (orderUsage && orderUsage.count > 0) {
-      return res.status(409).json({
-        error: 'Deal is referenced by historical order items. Remove or replace those orders before deleting this deal.',
-      });
-    }
+    // Clear dealId reference in order items (itemName is preserved for display)
+    // This allows safe deletion without breaking historical orders
+    await runAsync('UPDATE orderItems SET dealId = NULL WHERE dealId = ?', [req.params.id]);
+    await runAsync('UPDATE pastOrderItems SET dealId = NULL WHERE dealId = ?', [req.params.id]);
 
     await runAsync('DELETE FROM dealItems WHERE dealId = ?', [req.params.id]);
     await runAsync('DELETE FROM dealVariants WHERE dealId = ?', [req.params.id]);

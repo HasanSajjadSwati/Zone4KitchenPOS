@@ -144,16 +144,6 @@ menuItemRoutes.delete('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Menu item not found' });
     }
 
-    const orderUsage = await getAsync(
-      'SELECT COUNT(*) as count FROM orderItems WHERE menuItemId = ?',
-      [req.params.id]
-    );
-    if (orderUsage && orderUsage.count > 0) {
-      return res.status(409).json({
-        error: 'Menu item is referenced by existing order items. Remove those order items (or archive the item) before deleting.',
-      });
-    }
-
     const dealUsage = await getAsync(
       'SELECT COUNT(*) as count FROM dealItems WHERE menuItemId = ?',
       [req.params.id]
@@ -163,6 +153,11 @@ menuItemRoutes.delete('/:id', async (req, res) => {
         error: 'Menu item is part of one or more deals. Remove it from those deals before deleting.',
       });
     }
+
+    // Clear menuItemId reference in order items (itemName is preserved for display)
+    // This allows safe deletion without breaking historical orders
+    await runAsync('UPDATE orderItems SET menuItemId = NULL WHERE menuItemId = ?', [req.params.id]);
+    await runAsync('UPDATE pastOrderItems SET menuItemId = NULL WHERE menuItemId = ?', [req.params.id]);
 
     await runAsync('DELETE FROM menuItemVariants WHERE menuItemId = ?', [req.params.id]);
     await runAsync('DELETE FROM menuItems WHERE id = ?', [req.params.id]);
