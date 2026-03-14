@@ -11,6 +11,7 @@ interface ModalProps {
   size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full';
   showCloseButton?: boolean;
   preventBackdropClose?: boolean;
+  zIndex?: 'z-50' | 'z-[60]' | 'z-[70]';
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -21,6 +22,7 @@ export const Modal: React.FC<ModalProps> = ({
   size = 'md',
   showCloseButton = true,
   preventBackdropClose = false,
+  zIndex = 'z-50',
 }) => {
   const sizeClasses = {
     sm: 'max-w-sm',
@@ -39,7 +41,7 @@ export const Modal: React.FC<ModalProps> = ({
 
   return (
     <Transition appear show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-50" onClose={handleClose}>
+      <Dialog as="div" className={clsx('relative', zIndex)} onClose={handleClose}>
         <Transition.Child
           as={Fragment}
           enter="ease-out duration-300"
@@ -65,7 +67,6 @@ export const Modal: React.FC<ModalProps> = ({
             >
               <Dialog.Panel 
                 className={clsx('w-full transform overflow-hidden rounded-lg bg-white dark:bg-gray-800 shadow-xl transition-all', sizeClasses[size])}
-                onClick={(e) => e.stopPropagation()}
               >
                 {title && (
                   <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 px-6 py-4">

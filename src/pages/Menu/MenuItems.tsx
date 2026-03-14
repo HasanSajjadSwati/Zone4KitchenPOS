@@ -790,14 +790,21 @@ export const MenuItems: React.FC = () => {
         }}
         title="Create New Variant"
         size="md"
+        zIndex="z-[60]"
       >
         <div className="space-y-4">
-          <Input
-            label="Variant Name"
-            value={newVariantName}
-            onChange={(e) => setNewVariantName(e.target.value)}
-            placeholder="e.g., Size, Flavor, Crust Type"
-          />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Variant Name
+            </label>
+            <input
+              type="text"
+              value={newVariantName}
+              onChange={(e) => setNewVariantName(e.target.value)}
+              placeholder="e.g., Size, Flavor, Crust Type"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+            />
+          </div>
           <Select
             label="Variant Type"
             value={newVariantType}
@@ -818,33 +825,38 @@ export const MenuItems: React.FC = () => {
             </p>
 
             {/* Add Option Form */}
-            <div className="flex gap-2 mb-3">
-              <div className="flex-1">
+            <div className="grid grid-cols-12 gap-2 mb-3">
+              <div className="col-span-5">
+                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Option Name</label>
                 <input
                   type="text"
                   value={newOptionName}
                   onChange={(e) => setNewOptionName(e.target.value)}
-                  placeholder="Option name (e.g., Large)"
+                  placeholder="e.g., Large"
                   className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                 />
               </div>
-              <div className="w-28">
+              <div className="col-span-4">
+                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Price Modifier (Rs)</label>
                 <input
                   type="number"
                   value={newOptionPrice}
                   onChange={(e) => setNewOptionPrice(Number(e.target.value))}
-                  placeholder="Price +/-"
+                  placeholder="0"
                   className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                 />
               </div>
-              <Button
-                type="button"
-                size="sm"
-                onClick={handleAddNewOption}
-                disabled={!newOptionName.trim()}
-              >
-                Add
-              </Button>
+              <div className="col-span-3 flex items-end">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleAddNewOption}
+                  disabled={!newOptionName.trim()}
+                  className="w-full"
+                >
+                  Add
+                </Button>
+              </div>
             </div>
 
             {/* Options List */}
