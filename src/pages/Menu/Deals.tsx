@@ -482,12 +482,22 @@ export const Deals: React.FC = () => {
         currentUser.id
       );
 
-      // Reload menu items and auto-add to the deal
+      // Reload menu items
       const items = await getAllMenuItems();
       setMenuItems(items.filter((i) => i.isActive));
       
-      // Auto-add the new item to the deal
-      handleAddItemToDeal(newItem.id);
+      // Directly add the new item to selectedDealItems (don't use handleAddItemToDeal 
+      // since menuItems state hasn't updated yet)
+      setSelectedDealItems((prev) => [
+        ...prev,
+        {
+          menuItemId: newItem.id,
+          menuItemName: newItem.name,
+          quantity: 1,
+          sortOrder: prev.length,
+          hasVariants: false,
+        },
+      ]);
       
       // Close modal and reset form
       setIsNewItemModalOpen(false);
