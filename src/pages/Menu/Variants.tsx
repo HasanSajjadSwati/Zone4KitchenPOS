@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilIcon, TrashIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { Button, Card, Modal, Input, Select, Badge } from '@/components/ui';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -49,6 +49,8 @@ export const Variants: React.FC = () => {
   const [editingOption, setEditingOption] = useState<VariantOption | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
+  const [variantSearchQuery, setVariantSearchQuery] = useState('');
+  const [optionSearchQuery, setOptionSearchQuery] = useState('');
 
   const variantForm = useForm<VariantFormData>({
     resolver: zodResolver(variantSchema),
@@ -240,6 +242,14 @@ export const Variants: React.FC = () => {
   };
 
   const filteredVariants = variants.filter((variant) => {
+    // Search filter
+    if (variantSearchQuery) {
+      const query = variantSearchQuery.toLowerCase();
+      if (!variant.name.toLowerCase().includes(query) && !variant.type.toLowerCase().includes(query)) {
+        return false;
+      }
+    }
+    // Status filter
     if (filterStatus === 'all') return true;
     if (filterStatus === 'active') return variant.isActive;
     if (filterStatus === 'inactive') return !variant.isActive;
@@ -247,6 +257,14 @@ export const Variants: React.FC = () => {
   });
 
   const filteredOptions = variantOptions.filter((option) => {
+    // Search filter
+    if (optionSearchQuery) {
+      const query = optionSearchQuery.toLowerCase();
+      if (!option.name.toLowerCase().includes(query)) {
+        return false;
+      }
+    }
+    // Status filter
     if (filterStatus === 'all') return true;
     if (filterStatus === 'active') return option.isActive;
     if (filterStatus === 'inactive') return !option.isActive;
@@ -283,22 +301,35 @@ export const Variants: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: Variant List */}
         <Card padding="none">
-          <div className="p-4 bg-gray-50 border-b border-gray-200">
-            <h2 className="font-semibold text-gray-900">Variant Types</h2>
+          <div className="p-4 bg-gray-50 border-b border-gray-200 dark:bg-gray-800 dark:border-gray-700">
+            <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">Variant Types</h2>
+            <div className="relative">
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                value={variantSearchQuery}
+                onChange={(e) => setVariantSearchQuery(e.target.value)}
+                placeholder="Search variants..."
+                className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+              />
+            </div>
           </div>
-          <div className="divide-y divide-gray-200">
+          <div className="divide-y divide-gray-200 dark:divide-gray-700">
             {filteredVariants.map((variant) => (
               <div
                 key={variant.id}
-                className={`p-4 cursor-pointer hover:bg-gray-50 transition ${
+                className={`p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition ${
                   selectedVariant?.id === variant.id
                     ? 'bg-primary-50 border-l-4 border-primary-600 dark:bg-primary-900/40 dark:border-primary-400 dark:hover:bg-primary-900/50'
                     : ''
                 }`}
-                onClick={() => setSelectedVariant(variant)}
+                onClick={() => {
+                  setSelectedVariant(variant);
+                  setOptionSearchQuery('');
+                }}
               >
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-medium text-gray-900">{variant.name}</h3>
+                  <h3 className="font-medium text-gray-900 dark:text-gray-100">{variant.name}</h3>
                   <Badge
                     variant={variant.isActive ? 'success' : 'default'}
                     size="sm"
@@ -346,22 +377,34 @@ export const Variants: React.FC = () => {
         <div className="lg:col-span-2">
           {selectedVariant ? (
             <Card padding="none">
-              <div className="p-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-                <div>
-                  <h2 className="font-semibold text-gray-900">
-                    Options for: {selectedVariant.name}
-                  </h2>
-                  <p className="text-sm text-gray-600 mt-1">
-                    Define the available options and their price modifiers
-                  </p>
+              <div className="p-4 bg-gray-50 border-b border-gray-200 dark:bg-gray-800 dark:border-gray-700">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h2 className="font-semibold text-gray-900 dark:text-gray-100">
+                      Options for: {selectedVariant.name}
+                    </h2>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                      Define the available options and their price modifiers
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={openAddOption}
+                    leftIcon={<PlusIcon className="w-5 h-5" />}
+                  >
+                    Add Option
+                  </Button>
                 </div>
-                <Button
-                  size="sm"
-                  onClick={openAddOption}
-                  leftIcon={<PlusIcon className="w-5 h-5" />}
-                >
-                  Add Option
-                </Button>
+                <div className="relative">
+                  <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={optionSearchQuery}
+                    onChange={(e) => setOptionSearchQuery(e.target.value)}
+                    placeholder="Search options..."
+                    className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                  />
+                </div>
               </div>
 
               <div className="p-4">
