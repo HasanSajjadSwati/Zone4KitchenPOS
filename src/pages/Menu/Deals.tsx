@@ -17,6 +17,7 @@ import {
   setDealVariants,
   getVariantOptions,
   createVariant,
+  createVariantOption,
 } from '@/services/menuService';
 import { useAuthStore } from '@/stores/authStore';
 import { useDialog } from '@/hooks/useDialog';
@@ -133,6 +134,9 @@ export const Deals: React.FC = () => {
   const [newVariantName, setNewVariantName] = useState('');
   const [newVariantType, setNewVariantType] = useState<'size' | 'flavour' | 'custom'>('custom');
   const [isCreatingVariant, setIsCreatingVariant] = useState(false);
+  const [newVariantOptions, setNewVariantOptions] = useState<{ name: string; priceModifier: number }[]>([]);
+  const [newOptionName, setNewOptionName] = useState('');
+  const [newOptionPrice, setNewOptionPrice] = useState(0);
 
   const {
     register,
@@ -403,6 +407,22 @@ export const Deals: React.FC = () => {
         },
         currentUser.id
       );
+
+      // Create variant options if any were added
+      for (let i = 0; i < newVariantOptions.length; i++) {
+        const opt = newVariantOptions[i];
+        await createVariantOption(
+          {
+            variantId: newVariant.id,
+            name: opt.name,
+            priceModifier: opt.priceModifier,
+            sortOrder: i,
+            isActive: true,
+          },
+          currentUser.id
+        );
+      }
+
       // Reload variants and auto-select the new one
       const vars = await getAllVariants();
       setVariants(vars);
@@ -413,11 +433,25 @@ export const Deals: React.FC = () => {
       setIsNewVariantModalOpen(false);
       setNewVariantName('');
       setNewVariantType('custom');
+      setNewVariantOptions([]);
+      setNewOptionName('');
+      setNewOptionPrice(0);
     } catch (error) {
       await dialog.alert(error instanceof Error ? error.message : 'Failed to create variant', 'Error');
     } finally {
       setIsCreatingVariant(false);
     }
+  };
+
+  const handleAddNewOption = () => {
+    if (!newOptionName.trim()) return;
+    setNewVariantOptions([...newVariantOptions, { name: newOptionName.trim(), priceModifier: newOptionPrice }]);
+    setNewOptionName('');
+    setNewOptionPrice(0);
+  };
+
+  const handleRemoveNewOption = (index: number) => {
+    setNewVariantOptions(newVariantOptions.filter((_, i) => i !== index));
   };
 
   const toggleDealVariantSelection = (variantId: string) => {
@@ -595,6 +629,7 @@ export const Deals: React.FC = () => {
         onClose={closeModal}
         title={editingDeal ? 'Edit Deal' : 'Add Deal'}
         size="lg"
+        preventBackdropClose={isNewVariantModalOpen}
       >
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <Input
@@ -996,9 +1031,12 @@ export const Deals: React.FC = () => {
           setIsNewVariantModalOpen(false);
           setNewVariantName('');
           setNewVariantType('custom');
+          setNewVariantOptions([]);
+          setNewOptionName('');
+          setNewOptionPrice(0);
         }}
         title="Create New Variant"
-        size="sm"
+        size="md"
       >
         <div className="space-y-4">
           <Input
@@ -1016,9 +1054,81 @@ export const Deals: React.FC = () => {
             <option value="flavour">Flavour</option>
             <option value="custom">Custom</option>
           </Select>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            Note: You can add options to this variant later in the Variants section.
-          </p>
+
+          {/* Variant Options Section */}
+          <div className="border-t border-gray-200 dark:border-gray-600 pt-4">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Variant Options (Optional)
+            </label>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+              Add options for this variant (e.g., Small, Medium, Large for Size)
+            </p>
+
+            {/* Add Option Form */}
+            <div className="flex gap-2 mb-3">
+              <div className="flex-1">
+                <input
+                  type="text"
+                  value={newOptionName}
+                  onChange={(e) => setNewOptionName(e.target.value)}
+                  placeholder="Option name (e.g., Large)"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                />
+              </div>
+              <div className="w-28">
+                <input
+                  type="number"
+                  value={newOptionPrice}
+                  onChange={(e) => setNewOptionPrice(Number(e.target.value))}
+                  placeholder="Price +/-"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                />
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleAddNewOption}
+                disabled={!newOptionName.trim()}
+              >
+                Add
+              </Button>
+            </div>
+
+            {/* Options List */}
+            {newVariantOptions.length > 0 && (
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {newVariantOptions.map((opt, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="font-medium text-gray-900 dark:text-gray-100">{opt.name}</span>
+                      {opt.priceModifier !== 0 && (
+                        <span className={`text-sm ${opt.priceModifier > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                          {opt.priceModifier > 0 ? '+' : ''}{formatCurrency(opt.priceModifier)}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveNewOption(index)}
+                      className="p-1 text-red-500 hover:text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded"
+                    >
+                      <XMarkIcon className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {newVariantOptions.length === 0 && (
+              <p className="text-xs text-gray-400 dark:text-gray-500 italic text-center py-2">
+                No options added yet. You can add them now or later.
+              </p>
+            )}
+          </div>
+
           <div className="flex justify-end space-x-3 pt-2">
             <Button
               type="button"
@@ -1027,6 +1137,9 @@ export const Deals: React.FC = () => {
                 setIsNewVariantModalOpen(false);
                 setNewVariantName('');
                 setNewVariantType('custom');
+                setNewVariantOptions([]);
+                setNewOptionName('');
+                setNewOptionPrice(0);
               }}
             >
               Cancel
@@ -1044,4 +1157,3 @@ export const Deals: React.FC = () => {
     </div>
   );
 };
-

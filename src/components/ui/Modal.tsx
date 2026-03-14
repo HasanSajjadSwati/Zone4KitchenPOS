@@ -10,6 +10,7 @@ interface ModalProps {
   children: React.ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full';
   showCloseButton?: boolean;
+  preventBackdropClose?: boolean;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -19,6 +20,7 @@ export const Modal: React.FC<ModalProps> = ({
   children,
   size = 'md',
   showCloseButton = true,
+  preventBackdropClose = false,
 }) => {
   const sizeClasses = {
     sm: 'max-w-sm',
@@ -29,9 +31,15 @@ export const Modal: React.FC<ModalProps> = ({
     full: 'max-w-7xl',
   };
 
+  const handleClose = () => {
+    if (!preventBackdropClose) {
+      onClose();
+    }
+  };
+
   return (
     <Transition appear show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-50" onClose={onClose}>
+      <Dialog as="div" className="relative z-50" onClose={handleClose}>
         <Transition.Child
           as={Fragment}
           enter="ease-out duration-300"
@@ -55,7 +63,10 @@ export const Modal: React.FC<ModalProps> = ({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <Dialog.Panel className={clsx('w-full transform overflow-hidden rounded-lg bg-white dark:bg-gray-800 shadow-xl transition-all', sizeClasses[size])}>
+              <Dialog.Panel 
+                className={clsx('w-full transform overflow-hidden rounded-lg bg-white dark:bg-gray-800 shadow-xl transition-all', sizeClasses[size])}
+                onClick={(e) => e.stopPropagation()}
+              >
                 {title && (
                   <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 px-6 py-4">
                     <Dialog.Title className="text-xl font-bold text-gray-900 dark:text-gray-100">
@@ -63,6 +74,7 @@ export const Modal: React.FC<ModalProps> = ({
                     </Dialog.Title>
                     {showCloseButton && (
                       <button
+                        type="button"
                         onClick={onClose}
                         className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
                       >
