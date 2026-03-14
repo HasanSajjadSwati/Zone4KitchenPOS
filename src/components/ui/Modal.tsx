@@ -12,6 +12,7 @@ interface ModalProps {
   showCloseButton?: boolean;
   preventBackdropClose?: boolean;
   zIndex?: 'z-50' | 'z-[60]' | 'z-[70]';
+  nested?: boolean;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -23,6 +24,7 @@ export const Modal: React.FC<ModalProps> = ({
   showCloseButton = true,
   preventBackdropClose = false,
   zIndex = 'z-50',
+  nested = false,
 }) => {
   const sizeClasses = {
     sm: 'max-w-sm',
@@ -41,7 +43,13 @@ export const Modal: React.FC<ModalProps> = ({
 
   return (
     <Transition appear show={isOpen} as={Fragment}>
-      <Dialog as="div" className={clsx('relative', zIndex)} onClose={handleClose}>
+      <Dialog 
+        as="div" 
+        className="relative" 
+        style={{ zIndex: zIndex === 'z-[70]' ? 70 : zIndex === 'z-[60]' ? 60 : 50 }} 
+        onClose={handleClose}
+        static={nested}
+      >
         <Transition.Child
           as={Fragment}
           enter="ease-out duration-300"
@@ -51,7 +59,7 @@ export const Modal: React.FC<ModalProps> = ({
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 bg-black bg-opacity-50" />
+          <div className="fixed inset-0 bg-black bg-opacity-50" aria-hidden="true" />
         </Transition.Child>
 
         <div className="fixed inset-0 overflow-y-auto">
