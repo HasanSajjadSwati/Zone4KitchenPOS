@@ -243,6 +243,7 @@ export interface OrderItem {
   itemType: 'menu_item' | 'deal';
   menuItemId: string | null;
   dealId: string | null;
+  itemName: string; // Snapshot of item/deal name at time of order
   quantity: number;
   unitPrice: number;
   totalPrice: number;

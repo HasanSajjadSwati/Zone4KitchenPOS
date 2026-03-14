@@ -40,6 +40,11 @@ export async function initializeDatabase() {
     await runAsync('CREATE INDEX IF NOT EXISTS idx_payments_orderId_method ON payments(orderId, method)');
     logger.info('Report performance indexes created/verified');
 
+    // Add itemName column to order items (safe for existing databases)
+    await runAsync('ALTER TABLE orderItems ADD COLUMN IF NOT EXISTS itemName TEXT NOT NULL DEFAULT \'\'');
+    await runAsync('ALTER TABLE pastOrderItems ADD COLUMN IF NOT EXISTS itemName TEXT NOT NULL DEFAULT \'\'');
+    logger.info('Added itemName column to order items tables');
+
     // Ensure existing Admin role has past_orders permission
     const adminRows = await allAsync("SELECT id, permissions FROM roles WHERE name = 'Admin'") as any[];
     if (adminRows.length > 0) {

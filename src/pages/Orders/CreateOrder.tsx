@@ -1733,9 +1733,9 @@ export const CreateOrder: React.FC = () => {
                       <div className="flex-1">
                         <div className="flex items-center space-x-2">
                           <p className="font-semibold text-gray-900">
-                            {item.itemType === 'menu_item'
+                            {item.itemName || (item.itemType === 'menu_item'
                               ? menuItems.find((m) => m.id === item.menuItemId)?.name
-                              : deals.find((d) => d.id === item.dealId)?.name || 'Deal'}
+                              : deals.find((d) => d.id === item.dealId)?.name) || 'Unknown Item'}
                           </p>
                           {item.itemType === 'deal' && (
                             <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded font-medium dark:bg-emerald-900/70 dark:text-emerald-200">
