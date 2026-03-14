@@ -16,6 +16,7 @@ import {
   getDealVariants,
   setDealVariants,
   getVariantOptions,
+  createVariant,
 } from '@/services/menuService';
 import { useAuthStore } from '@/stores/authStore';
 import { useDialog } from '@/hooks/useDialog';
@@ -125,6 +126,13 @@ export const Deals: React.FC = () => {
   const [itemSearchQuery, setItemSearchQuery] = useState('');
   const [isItemDropdownOpen, setIsItemDropdownOpen] = useState(false);
   const itemSearchRef = useRef<HTMLDivElement>(null);
+  const [variantSearchQuery, setVariantSearchQuery] = useState('');
+  const [isVariantDropdownOpen, setIsVariantDropdownOpen] = useState(false);
+  const variantSearchRef = useRef<HTMLDivElement>(null);
+  const [isNewVariantModalOpen, setIsNewVariantModalOpen] = useState(false);
+  const [newVariantName, setNewVariantName] = useState('');
+  const [newVariantType, setNewVariantType] = useState<'size' | 'flavour' | 'custom'>('custom');
+  const [isCreatingVariant, setIsCreatingVariant] = useState(false);
 
   const {
     register,
@@ -150,11 +158,14 @@ export const Deals: React.FC = () => {
     loadData();
   }, []);
 
-  // Close dropdown when clicking outside
+  // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (itemSearchRef.current && !itemSearchRef.current.contains(event.target as Node)) {
         setIsItemDropdownOpen(false);
+      }
+      if (variantSearchRef.current && !variantSearchRef.current.contains(event.target as Node)) {
+        setIsVariantDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -367,6 +378,8 @@ export const Deals: React.FC = () => {
     setSelectedDealVariants([]);
     setItemSearchQuery('');
     setIsItemDropdownOpen(false);
+    setVariantSearchQuery('');
+    setIsVariantDropdownOpen(false);
     reset({
       name: '',
       description: null,
@@ -374,6 +387,37 @@ export const Deals: React.FC = () => {
       categoryId: null,
       isActive: true,
     });
+  };
+
+  const handleCreateNewVariant = async () => {
+    if (!currentUser || !newVariantName.trim()) return;
+
+    setIsCreatingVariant(true);
+    try {
+      const newVariant = await createVariant(
+        {
+          name: newVariantName.trim(),
+          type: newVariantType,
+          sortOrder: variants.length,
+          isActive: true,
+        },
+        currentUser.id
+      );
+      // Reload variants and auto-select the new one
+      const vars = await getAllVariants();
+      setVariants(vars);
+      setSelectedDealVariants((prev) => [
+        ...prev,
+        { variantId: newVariant.id, isRequired: false, selectionMode: 'single', availableOptionIds: [] },
+      ]);
+      setIsNewVariantModalOpen(false);
+      setNewVariantName('');
+      setNewVariantType('custom');
+    } catch (error) {
+      await dialog.alert(error instanceof Error ? error.message : 'Failed to create variant', 'Error');
+    } finally {
+      setIsCreatingVariant(false);
+    }
   };
 
   const toggleDealVariantSelection = (variantId: string) => {
@@ -729,98 +773,171 @@ export const Deals: React.FC = () => {
           </div>
 
           {/* Deal Variants Section */}
-          {variants.length > 0 && (
-            <div className="border-t border-gray-200 pt-4">
-              <label className="block text-sm font-medium text-gray-900 mb-2">
+          <div className="border-t border-gray-200 pt-4">
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-900 dark:text-gray-100">
                 Deal Variants (Optional)
               </label>
-              <p className="text-xs text-gray-500 mb-3">
-                Choose variants that apply to the entire deal. Customers will select these when ordering the deal.
-              </p>
-              <div className="space-y-3">
-                {variants.map((variant) => {
-                  const selected = selectedDealVariants.find((v) => v.variantId === variant.id);
-                  const isSelected = !!selected;
-                  const isRequired = selected?.isRequired || false;
-                  const selectionMode = selected?.selectionMode || 'single';
-                  return (
-                    <div
-                      key={variant.id}
-                      className={`border rounded-lg p-3 space-y-2 ${
-                        isSelected
-                          ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/40 dark:border-primary-400'
-                          : 'border-gray-200'
-                      }`}
-                    >
-                      {/* Variant checkbox */}
-                      <div className="flex items-center space-x-3">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleDealVariantSelection(variant.id)}
-                          className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                        />
-                        <div>
-                          <span className="font-medium text-gray-900">{variant.name}</span>
-                          <span className="ml-2 text-xs text-gray-500 capitalize">({variant.type})</span>
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                {selectedDealVariants.length} selected
+              </span>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+              Choose variants that apply to the entire deal. Customers will select these when ordering the deal.
+            </p>
+
+            {/* Search and Add Variant */}
+            <div className="flex gap-2 mb-3">
+              <div className="flex-1 relative" ref={variantSearchRef}>
+                <div className="relative">
+                  <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={variantSearchQuery}
+                    onChange={(e) => {
+                      setVariantSearchQuery(e.target.value);
+                      setIsVariantDropdownOpen(true);
+                    }}
+                    onFocus={() => setIsVariantDropdownOpen(true)}
+                    placeholder="Search variants to add..."
+                    className="block w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm"
+                  />
+                </div>
+                {isVariantDropdownOpen && (
+                  <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                    {variants
+                      .filter((v) => v.isActive)
+                      .filter((v) => {
+                        const query = variantSearchQuery.toLowerCase();
+                        return (
+                          v.name.toLowerCase().includes(query) &&
+                          !selectedDealVariants.find((sv) => sv.variantId === v.id)
+                        );
+                      })
+                      .map((variant, index, arr) => (
+                        <button
+                          key={variant.id}
+                          type="button"
+                          onClick={() => {
+                            toggleDealVariantSelection(variant.id);
+                            setVariantSearchQuery('');
+                            setIsVariantDropdownOpen(false);
+                          }}
+                          className={`w-full px-4 py-2.5 text-left hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-colors flex items-center justify-between ${
+                            index !== arr.length - 1 ? 'border-b border-gray-100 dark:border-gray-700' : ''
+                          }`}
+                        >
+                          <span className="font-medium text-gray-900 dark:text-gray-100">{variant.name}</span>
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 capitalize">
+                            {variant.type}
+                          </span>
+                        </button>
+                      ))}
+                    {variants
+                      .filter((v) => v.isActive)
+                      .filter((v) => {
+                        const query = variantSearchQuery.toLowerCase();
+                        return (
+                          v.name.toLowerCase().includes(query) &&
+                          !selectedDealVariants.find((sv) => sv.variantId === v.id)
+                        );
+                      }).length === 0 && (
+                      <div className="px-4 py-3 text-gray-500 dark:text-gray-400 text-center text-sm">
+                        {variantSearchQuery ? 'No variants found' : 'All variants already added'}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={() => setIsNewVariantModalOpen(true)}
+                leftIcon={<PlusIcon className="w-4 h-4" />}
+              >
+                New
+              </Button>
+            </div>
+
+            {/* Selected Variants List */}
+            <div className="space-y-3 max-h-60 overflow-y-auto">
+              {selectedDealVariants.map((sv) => {
+                const variant = variants.find((v) => v.id === sv.variantId);
+                if (!variant) return null;
+                return (
+                  <div
+                    key={variant.id}
+                    className="border rounded-lg p-3 space-y-2 border-primary-500 bg-primary-50 dark:bg-primary-900/40 dark:border-primary-400"
+                  >
+                    {/* Variant header */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <span className="font-medium text-gray-900 dark:text-gray-100">{variant.name}</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-primary-100 dark:bg-primary-800 text-primary-700 dark:text-primary-300 capitalize">
+                          {variant.type}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => toggleDealVariantSelection(variant.id)}
+                        className="p-1 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                      >
+                        <XMarkIcon className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* Selection Mode and Required options */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-4 flex-wrap">
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id={`deal-required-${variant.id}`}
+                            checked={sv.isRequired}
+                            onChange={() => toggleDealVariantRequired(variant.id)}
+                            className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                          />
+                          <label htmlFor={`deal-required-${variant.id}`} className="text-sm text-gray-600 dark:text-gray-300">
+                            Required
+                          </label>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <label className="text-xs text-gray-600 dark:text-gray-400 font-medium">Mode:</label>
+                          <select
+                            value={sv.selectionMode}
+                            onChange={(e) => updateDealVariantSelectionMode(
+                              variant.id,
+                              e.target.value as 'single' | 'multiple' | 'all'
+                            )}
+                            className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 focus:ring-primary-500 focus:border-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                          >
+                            <option value="single">Select One</option>
+                            <option value="multiple">Select Multiple</option>
+                            <option value="all">Select All</option>
+                          </select>
                         </div>
                       </div>
 
-                      {/* Selection Mode and Required options */}
-                      {isSelected && (
-                        <div className="ml-7 space-y-2">
-                          <div className="flex items-center gap-4">
-                            <div className="flex items-center space-x-2">
-                              <input
-                                type="checkbox"
-                                id={`deal-required-${variant.id}`}
-                                checked={isRequired}
-                                onChange={() => toggleDealVariantRequired(variant.id)}
-                                className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                              />
-                              <label htmlFor={`deal-required-${variant.id}`} className="text-sm text-gray-600">
-                                Required
-                              </label>
-                            </div>
-
-                            <div className="flex items-center space-x-2">
-                              <label className="text-xs text-gray-600 font-medium">Selection Mode:</label>
-                              <select
-                                value={selectionMode}
-                                onChange={(e) => updateDealVariantSelectionMode(
-                                  variant.id,
-                                  e.target.value as 'single' | 'multiple' | 'all'
-                                )}
-                                className="text-xs border border-gray-300 rounded px-2 py-1 focus:ring-primary-500 focus:border-primary-500"
-                              >
-                                <option value="single">Select One (Radio)</option>
-                                <option value="multiple">Select Multiple (Checkbox)</option>
-                                <option value="all">Select All (Pre-selected)</option>
-                              </select>
-                            </div>
-                          </div>
-
-                          {/* Helper text */}
-                          <p className="text-xs text-gray-500">
-                            {selectionMode === 'single' && 'Customer picks exactly one option'}
-                            {selectionMode === 'multiple' && 'Customer can pick multiple options'}
-                            {selectionMode === 'all' && 'All options are pre-selected (customer can unselect)'}
-                          </p>
-
-                          {/* Variant Options Selection */}
-                          <VariantOptionsSelector
-                            variant={variant}
-                            availableOptionIds={selected?.availableOptionIds || []}
-                            onToggleOption={(optionId) => toggleDealVariantOption(variant.id, optionId)}
-                          />
-                        </div>
-                      )}
+                      {/* Variant Options Selection */}
+                      <VariantOptionsSelector
+                        variant={variant}
+                        availableOptionIds={sv.availableOptionIds || []}
+                        onToggleOption={(optionId) => toggleDealVariantOption(variant.id, optionId)}
+                      />
                     </div>
-                  );
-                })}
-              </div>
+                  </div>
+                );
+              })}
+
+              {selectedDealVariants.length === 0 && (
+                <div className="text-center py-4 text-gray-500 dark:text-gray-400 text-sm border border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
+                  No variants added. Search above to add variants.
+                </div>
+              )}
             </div>
-          )}
+          </div>
 
           <div className="flex justify-end space-x-3 pt-4">
             <Button type="button" variant="secondary" onClick={closeModal}>
@@ -870,6 +987,59 @@ export const Deals: React.FC = () => {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Create New Variant Modal */}
+      <Modal
+        isOpen={isNewVariantModalOpen}
+        onClose={() => {
+          setIsNewVariantModalOpen(false);
+          setNewVariantName('');
+          setNewVariantType('custom');
+        }}
+        title="Create New Variant"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <Input
+            label="Variant Name"
+            value={newVariantName}
+            onChange={(e) => setNewVariantName(e.target.value)}
+            placeholder="e.g., Size, Flavor, Crust Type"
+          />
+          <Select
+            label="Variant Type"
+            value={newVariantType}
+            onChange={(e) => setNewVariantType(e.target.value as 'size' | 'flavour' | 'custom')}
+          >
+            <option value="size">Size</option>
+            <option value="flavour">Flavour</option>
+            <option value="custom">Custom</option>
+          </Select>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Note: You can add options to this variant later in the Variants section.
+          </p>
+          <div className="flex justify-end space-x-3 pt-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                setIsNewVariantModalOpen(false);
+                setNewVariantName('');
+                setNewVariantType('custom');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateNewVariant}
+              isLoading={isCreatingVariant}
+              disabled={!newVariantName.trim()}
+            >
+              Create & Add
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );
