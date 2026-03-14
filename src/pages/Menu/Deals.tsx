@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { PlusIcon, PencilIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import React, { useEffect, useState, useRef } from 'react';
+import { PlusIcon, PencilIcon, TrashIcon, XMarkIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { Button, Card, Modal, Input, Select, CategoryFilter } from '@/components/ui';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -122,6 +122,9 @@ export const Deals: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [itemSearchQuery, setItemSearchQuery] = useState('');
+  const [isItemDropdownOpen, setIsItemDropdownOpen] = useState(false);
+  const itemSearchRef = useRef<HTMLDivElement>(null);
 
   const {
     register,
@@ -145,6 +148,17 @@ export const Deals: React.FC = () => {
 
   useEffect(() => {
     loadData();
+  }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (itemSearchRef.current && !itemSearchRef.current.contains(event.target as Node)) {
+        setIsItemDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const loadData = async () => {
@@ -351,6 +365,8 @@ export const Deals: React.FC = () => {
     setEditingDeal(null);
     setSelectedDealItems([]);
     setSelectedDealVariants([]);
+    setItemSearchQuery('');
+    setIsItemDropdownOpen(false);
     reset({
       name: '',
       description: null,
@@ -601,25 +617,69 @@ export const Deals: React.FC = () => {
               </span>
             </div>
 
-            {/* Add Item Selector */}
-            <div className="mb-3">
-              <Select
-                label="Add Menu Item"
-                value=""
-                onChange={(e) => {
-                  if (e.target.value) {
-                    handleAddItemToDeal(e.target.value);
-                    e.target.value = '';
-                  }
-                }}
-              >
-                <option value="">Select item to add...</option>
-                {menuItems.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name} - {formatCurrency(item.price)}
-                  </option>
-                ))}
-              </Select>
+            {/* Add Item Selector with Search */}
+            <div className="mb-3" ref={itemSearchRef}>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Add Menu Item
+              </label>
+              <div className="relative">
+                <div className="relative">
+                  <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={itemSearchQuery}
+                    onChange={(e) => {
+                      setItemSearchQuery(e.target.value);
+                      setIsItemDropdownOpen(true);
+                    }}
+                    onFocus={() => setIsItemDropdownOpen(true)}
+                    placeholder="Search items to add..."
+                    className="block w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  />
+                </div>
+                {isItemDropdownOpen && (
+                  <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl max-h-64 overflow-y-auto">
+                    {menuItems
+                      .filter((item) => {
+                        const query = itemSearchQuery.toLowerCase();
+                        return (
+                          item.name.toLowerCase().includes(query) &&
+                          !selectedDealItems.find((i) => i.menuItemId === item.id)
+                        );
+                      })
+                      .map((item, index, arr) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => {
+                            handleAddItemToDeal(item.id);
+                            setItemSearchQuery('');
+                            setIsItemDropdownOpen(false);
+                          }}
+                          className={`w-full px-4 py-3 text-left hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-colors flex items-center justify-between ${
+                            index !== arr.length - 1 ? 'border-b border-gray-100 dark:border-gray-700' : ''
+                          }`}
+                        >
+                          <span className="font-medium text-gray-900 dark:text-gray-100">{item.name}</span>
+                          <span className="text-sm font-semibold text-primary-600 dark:text-primary-400">
+                            {formatCurrency(item.price)}
+                          </span>
+                        </button>
+                      ))}
+                    {menuItems.filter((item) => {
+                      const query = itemSearchQuery.toLowerCase();
+                      return (
+                        item.name.toLowerCase().includes(query) &&
+                        !selectedDealItems.find((i) => i.menuItemId === item.id)
+                      );
+                    }).length === 0 && (
+                      <div className="px-4 py-4 text-gray-500 dark:text-gray-400 text-center text-sm">
+                        {itemSearchQuery ? 'No items found' : 'All items already added'}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Selected Items List */}
@@ -627,32 +687,32 @@ export const Deals: React.FC = () => {
               {selectedDealItems.map((item) => (
                 <div
                   key={item.menuItemId}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600"
                 >
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-900">{item.menuItemName}</p>
-                    <p className="text-xs text-gray-600">Quantity: {item.quantity}</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-gray-900 dark:text-gray-100 truncate">{item.menuItemName}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Quantity: {item.quantity}</p>
                   </div>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-2 ml-3">
                     <button
                       type="button"
                       onClick={() => handleUpdateItemQuantity(item.menuItemId, item.quantity - 1)}
-                      className="w-6 h-6 flex items-center justify-center rounded bg-gray-200 hover:bg-gray-300 text-gray-700"
+                      className="w-7 h-7 flex items-center justify-center rounded-md bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 font-medium transition-colors"
                     >
                       -
                     </button>
-                    <span className="w-8 text-center font-semibold">{item.quantity}</span>
+                    <span className="w-8 text-center font-semibold text-gray-900 dark:text-gray-100">{item.quantity}</span>
                     <button
                       type="button"
                       onClick={() => handleUpdateItemQuantity(item.menuItemId, item.quantity + 1)}
-                      className="w-6 h-6 flex items-center justify-center rounded bg-gray-200 hover:bg-gray-300 text-gray-700"
+                      className="w-7 h-7 flex items-center justify-center rounded-md bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-200 font-medium transition-colors"
                     >
                       +
                     </button>
                     <button
                       type="button"
                       onClick={() => handleRemoveItemFromDeal(item.menuItemId)}
-                      className="ml-2 text-red-600 hover:text-red-800"
+                      className="ml-1 p-1 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
                     >
                       <XMarkIcon className="w-5 h-5" />
                     </button>
