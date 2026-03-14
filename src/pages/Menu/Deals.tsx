@@ -711,7 +711,7 @@ export const Deals: React.FC = () => {
         onClose={closeModal}
         title={editingDeal ? 'Edit Deal' : 'Add Deal'}
         size="lg"
-        preventBackdropClose={isNewVariantModalOpen}
+        preventBackdropClose={isNewVariantModalOpen || isNewItemModalOpen}
       >
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <Input
@@ -1274,6 +1274,7 @@ export const Deals: React.FC = () => {
         title="Create Deal Item"
         size="md"
         zIndex="z-[60]"
+        preventBackdropClose
       >
         <div className="space-y-4">
           <p className="text-sm text-gray-600 dark:text-gray-400">
