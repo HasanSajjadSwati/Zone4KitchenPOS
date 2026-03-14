@@ -18,6 +18,7 @@ import {
   getVariantOptions,
   createVariant,
   createVariantOption,
+  createMenuItem,
 } from '@/services/menuService';
 import { useAuthStore } from '@/stores/authStore';
 import { useDialog } from '@/hooks/useDialog';
@@ -137,6 +138,14 @@ export const Deals: React.FC = () => {
   const [newVariantOptions, setNewVariantOptions] = useState<{ name: string; priceModifier: number }[]>([]);
   const [newOptionName, setNewOptionName] = useState('');
   const [newOptionPrice, setNewOptionPrice] = useState(0);
+
+  // New Item Modal state
+  const [isNewItemModalOpen, setIsNewItemModalOpen] = useState(false);
+  const [newItemName, setNewItemName] = useState('');
+  const [newItemPrice, setNewItemPrice] = useState(0);
+  const [newItemCategoryId, setNewItemCategoryId] = useState('');
+  const [newItemDescription, setNewItemDescription] = useState('');
+  const [isCreatingItem, setIsCreatingItem] = useState(false);
 
   const {
     register,
@@ -454,6 +463,44 @@ export const Deals: React.FC = () => {
     setNewVariantOptions(newVariantOptions.filter((_, i) => i !== index));
   };
 
+  const handleCreateNewItem = async () => {
+    if (!currentUser || !newItemName.trim()) return;
+
+    setIsCreatingItem(true);
+    try {
+      const newItem = await createMenuItem(
+        {
+          name: newItemName.trim(),
+          description: newItemDescription || null,
+          price: newItemPrice,
+          categoryId: newItemCategoryId,
+          isActive: true,
+          isDealOnly: true, // Mark as deal-only item
+          hasVariants: false,
+        },
+        currentUser.id
+      );
+
+      // Reload menu items and auto-add to the deal
+      const items = await getAllMenuItems();
+      setMenuItems(items.filter((i) => i.isActive));
+      
+      // Auto-add the new item to the deal
+      handleAddItemToDeal(newItem.id);
+      
+      // Close modal and reset form
+      setIsNewItemModalOpen(false);
+      setNewItemName('');
+      setNewItemPrice(0);
+      setNewItemCategoryId('');
+      setNewItemDescription('');
+    } catch (error) {
+      await dialog.alert(error instanceof Error ? error.message : 'Failed to create item', 'Error');
+    } finally {
+      setIsCreatingItem(false);
+    }
+  };
+
   const toggleDealVariantSelection = (variantId: string) => {
     setSelectedDealVariants((prev) => {
       const exists = prev.find((v) => v.variantId === variantId);
@@ -697,67 +744,79 @@ export const Deals: React.FC = () => {
             </div>
 
             {/* Add Item Selector with Search */}
-            <div className="mb-3" ref={itemSearchRef}>
+            <div className="mb-3">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Add Menu Item
               </label>
-              <div className="relative">
-                <div className="relative">
-                  <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    type="text"
-                    value={itemSearchQuery}
-                    onChange={(e) => {
-                      setItemSearchQuery(e.target.value);
-                      setIsItemDropdownOpen(true);
-                    }}
-                    onFocus={() => setIsItemDropdownOpen(true)}
-                    placeholder="Search items to add..."
-                    className="block w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                  />
-                </div>
-                {isItemDropdownOpen && (
-                  <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl max-h-64 overflow-y-auto">
-                    {menuItems
-                      .filter((item) => {
+              <div className="flex gap-2">
+                <div className="flex-1 relative" ref={itemSearchRef}>
+                  <div className="relative">
+                    <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="text"
+                      value={itemSearchQuery}
+                      onChange={(e) => {
+                        setItemSearchQuery(e.target.value);
+                        setIsItemDropdownOpen(true);
+                      }}
+                      onFocus={() => setIsItemDropdownOpen(true)}
+                      placeholder="Search items to add..."
+                      className="block w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                    />
+                  </div>
+                  {isItemDropdownOpen && (
+                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl max-h-64 overflow-y-auto">
+                      {menuItems
+                        .filter((item) => {
+                          const query = itemSearchQuery.toLowerCase();
+                          return (
+                            item.name.toLowerCase().includes(query) &&
+                            !selectedDealItems.find((i) => i.menuItemId === item.id)
+                          );
+                        })
+                        .map((item, index, arr) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => {
+                              handleAddItemToDeal(item.id);
+                              setItemSearchQuery('');
+                              setIsItemDropdownOpen(false);
+                            }}
+                            className={`w-full px-4 py-3 text-left hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-colors flex items-center justify-between ${
+                              index !== arr.length - 1 ? 'border-b border-gray-100 dark:border-gray-700' : ''
+                            }`}
+                          >
+                            <span className="font-medium text-gray-900 dark:text-gray-100">{item.name}</span>
+                            <span className="text-sm font-semibold text-primary-600 dark:text-primary-400">
+                              {formatCurrency(item.price)}
+                            </span>
+                          </button>
+                        ))}
+                      {menuItems.filter((item) => {
                         const query = itemSearchQuery.toLowerCase();
                         return (
                           item.name.toLowerCase().includes(query) &&
                           !selectedDealItems.find((i) => i.menuItemId === item.id)
                         );
-                      })
-                      .map((item, index, arr) => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => {
-                            handleAddItemToDeal(item.id);
-                            setItemSearchQuery('');
-                            setIsItemDropdownOpen(false);
-                          }}
-                          className={`w-full px-4 py-3 text-left hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-colors flex items-center justify-between ${
-                            index !== arr.length - 1 ? 'border-b border-gray-100 dark:border-gray-700' : ''
-                          }`}
-                        >
-                          <span className="font-medium text-gray-900 dark:text-gray-100">{item.name}</span>
-                          <span className="text-sm font-semibold text-primary-600 dark:text-primary-400">
-                            {formatCurrency(item.price)}
-                          </span>
-                        </button>
-                      ))}
-                    {menuItems.filter((item) => {
-                      const query = itemSearchQuery.toLowerCase();
-                      return (
-                        item.name.toLowerCase().includes(query) &&
-                        !selectedDealItems.find((i) => i.menuItemId === item.id)
-                      );
-                    }).length === 0 && (
+                      }).length === 0 && (
                       <div className="px-4 py-4 text-gray-500 dark:text-gray-400 text-center text-sm">
                         {itemSearchQuery ? 'No items found' : 'All items already added'}
                       </div>
                     )}
-                  </div>
-                )}
+                    </div>
+                  )}
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => setIsNewItemModalOpen(true)}
+                  leftIcon={<PlusIcon className="w-4 h-4" />}
+                  className="h-[42px]"
+                >
+                  New
+                </Button>
               </div>
             </div>
 
@@ -1160,6 +1219,105 @@ export const Deals: React.FC = () => {
               onClick={handleCreateNewVariant}
               isLoading={isCreatingVariant}
               disabled={!newVariantName.trim()}
+            >
+              Create & Add
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Create New Item Modal */}
+      <Modal
+        isOpen={isNewItemModalOpen}
+        onClose={() => {
+          setIsNewItemModalOpen(false);
+          setNewItemName('');
+          setNewItemPrice(0);
+          setNewItemCategoryId('');
+          setNewItemDescription('');
+        }}
+        title="Create Deal Item"
+        size="md"
+        zIndex="z-[60]"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Create a new item that will only be available as part of deals.
+          </p>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Item Name
+            </label>
+            <input
+              type="text"
+              value={newItemName}
+              onChange={(e) => setNewItemName(e.target.value)}
+              placeholder="e.g., Deal Burger, Combo Drink"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Price (Rs)
+            </label>
+            <input
+              type="number"
+              value={newItemPrice}
+              onChange={(e) => setNewItemPrice(Number(e.target.value))}
+              placeholder="0"
+              min="0"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Set to 0 if the item price is included in the deal price.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Category (Optional)
+            </label>
+            <CategoryFilter
+              categories={categories}
+              value={newItemCategoryId}
+              onChange={setNewItemCategoryId}
+              placeholder="Select category"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Description (Optional)
+            </label>
+            <textarea
+              value={newItemDescription}
+              onChange={(e) => setNewItemDescription(e.target.value)}
+              placeholder="Brief description of the item..."
+              rows={2}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+            />
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                setIsNewItemModalOpen(false);
+                setNewItemName('');
+                setNewItemPrice(0);
+                setNewItemCategoryId('');
+                setNewItemDescription('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateNewItem}
+              isLoading={isCreatingItem}
+              disabled={!newItemName.trim()}
             >
               Create & Add
             </Button>
