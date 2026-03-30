@@ -289,7 +289,7 @@ export interface KOTPrint {
 export interface AuditLog {
   id: string;
   userId: string;
-  action: 'create' | 'update' | 'delete' | 'print' | 'export' | 'login' | 'logout' | 'wipe' | 'import';
+  action: 'create' | 'update' | 'delete' | 'print' | 'export' | 'login' | 'logout' | 'wipe' | 'import' | 'admin_unlock';
   tableName: string;
   recordId: string;
   before: any | null;

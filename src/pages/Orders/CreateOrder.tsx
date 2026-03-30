@@ -1776,10 +1776,10 @@ export const CreateOrder: React.FC = () => {
                         size="sm"
                         variant="secondary"
                         onClick={async () => {
-                          const reason = await dialog.prompt(
-                            'Enter a detailed reason for unlocking this order (minimum 10 characters):',
-                            'Admin: Unlock Order'
-                          );
+                          const reason = await dialog.prompt({
+                            message: 'Enter a detailed reason for unlocking this order (minimum 10 characters):',
+                            title: 'Admin: Unlock Order'
+                          });
                           if (reason && reason.trim().length >= 10) {
                             try {
                               await adminUnlockOrder({

@@ -979,9 +979,8 @@ export async function getOrderDetailedReport(
     orderFilters.dateField = 'completedAt';
   }
 
-  // FIX: Don't pass 'all' as status - it's not a valid database value
-  // Valid statuses are: 'open', 'completed', 'cancelled'
-  if (filters.status && filters.status !== 'all') {
+  // Only pass status if explicitly specified (undefined means 'all')
+  if (filters.status) {
     orderFilters.status = filters.status;
   }
   if (filters.orderType) {
