@@ -346,21 +346,26 @@ function buildCustomerReport(customer: Customer, orders: Order[]): CustomerDetai
 /**
  * Get sales summary for a date range
  */
-export async function getSalesSummary(range: DateRange): Promise<SalesSummary> {
+export async function getSalesSummary(range: DateRange, registerSessionId?: string): Promise<SalesSummary> {
   const rangeFilters = buildRangeFilters(range);
-  try {
-    const summary = await apiClient.getSalesSummaryReport(rangeFilters);
-    if (summary) {
-      return summary as SalesSummary;
+
+  if (!registerSessionId) {
+    try {
+      const summary = await apiClient.getSalesSummaryReport(rangeFilters);
+      if (summary) {
+        return summary as SalesSummary;
+      }
+    } catch (error) {
+      console.warn('Sales summary report endpoint failed, falling back to client aggregation:', error);
     }
-  } catch (error) {
-    console.warn('Sales summary report endpoint failed, falling back to client aggregation:', error);
   }
 
-  const orders = filterOrdersInRange(
-    await apiClient.getOrders({ ...rangeFilters, status: 'completed', includePast: 'true' }),
-    range
-  );
+  const orderQuery: Record<string, string> = registerSessionId
+    ? { registerSessionId, status: 'completed', includePast: 'true' }
+    : { ...rangeFilters, status: 'completed', includePast: 'true' };
+  const orders = registerSessionId
+    ? await apiClient.getOrders(orderQuery)
+    : filterOrdersInRange(await apiClient.getOrders(orderQuery), range);
 
   const payments = await fetchPaymentsByOrderIds(orders.map((order: Order) => order.id));
 
@@ -462,21 +467,26 @@ export async function getSalesSummary(range: DateRange): Promise<SalesSummary> {
 /**
  * Get sales by category
  */
-export async function getCategorySales(range: DateRange): Promise<CategorySales[]> {
+export async function getCategorySales(range: DateRange, registerSessionId?: string): Promise<CategorySales[]> {
   const rangeFilters = buildRangeFilters(range);
-  try {
-    const categories = await apiClient.getCategorySalesReport(rangeFilters);
-    if (Array.isArray(categories)) {
-      return categories as CategorySales[];
+
+  if (!registerSessionId) {
+    try {
+      const categories = await apiClient.getCategorySalesReport(rangeFilters);
+      if (Array.isArray(categories)) {
+        return categories as CategorySales[];
+      }
+    } catch (error) {
+      console.warn('Category sales report endpoint failed, falling back to client aggregation:', error);
     }
-  } catch (error) {
-    console.warn('Category sales report endpoint failed, falling back to client aggregation:', error);
   }
 
-  const orders = filterOrdersInRange(
-    await apiClient.getOrders({ ...rangeFilters, status: 'completed', includePast: 'true' }),
-    range
-  );
+  const orderQuery: Record<string, string> = registerSessionId
+    ? { registerSessionId, status: 'completed', includePast: 'true' }
+    : { ...rangeFilters, status: 'completed', includePast: 'true' };
+  const orders = registerSessionId
+    ? await apiClient.getOrders(orderQuery)
+    : filterOrdersInRange(await apiClient.getOrders(orderQuery), range);
   const orderIds = orders.map((order: Order) => order.id);
   const allItems = await fetchOrderItemsByOrderIds(orderIds);
   const orderItems = allItems.filter((item: OrderItem) => item.itemType === 'menu_item');
@@ -535,21 +545,26 @@ export async function getCategorySales(range: DateRange): Promise<CategorySales[
 /**
  * Get sales by menu item
  */
-export async function getItemSales(range: DateRange): Promise<ItemSales[]> {
+export async function getItemSales(range: DateRange, registerSessionId?: string): Promise<ItemSales[]> {
   const rangeFilters = buildRangeFilters(range);
-  try {
-    const items = await apiClient.getItemSalesReport(rangeFilters);
-    if (Array.isArray(items)) {
-      return items as ItemSales[];
+
+  if (!registerSessionId) {
+    try {
+      const items = await apiClient.getItemSalesReport(rangeFilters);
+      if (Array.isArray(items)) {
+        return items as ItemSales[];
+      }
+    } catch (error) {
+      console.warn('Item sales report endpoint failed, falling back to client aggregation:', error);
     }
-  } catch (error) {
-    console.warn('Item sales report endpoint failed, falling back to client aggregation:', error);
   }
 
-  const orders = filterOrdersInRange(
-    await apiClient.getOrders({ ...rangeFilters, status: 'completed', includePast: 'true' }),
-    range
-  );
+  const orderQuery: Record<string, string> = registerSessionId
+    ? { registerSessionId, status: 'completed', includePast: 'true' }
+    : { ...rangeFilters, status: 'completed', includePast: 'true' };
+  const orders = registerSessionId
+    ? await apiClient.getOrders(orderQuery)
+    : filterOrdersInRange(await apiClient.getOrders(orderQuery), range);
   const orderIds = orders.map((order: Order) => order.id);
   const allItems = await fetchOrderItemsByOrderIds(orderIds);
   const orderItems = allItems.filter((item: OrderItem) => item.itemType === 'menu_item');
@@ -608,21 +623,26 @@ export async function getItemSales(range: DateRange): Promise<ItemSales[]> {
 /**
  * Get sales by deal
  */
-export async function getDealSales(range: DateRange): Promise<DealSales[]> {
+export async function getDealSales(range: DateRange, registerSessionId?: string): Promise<DealSales[]> {
   const rangeFilters = buildRangeFilters(range);
-  try {
-    const deals = await apiClient.getDealSalesReport(rangeFilters);
-    if (Array.isArray(deals)) {
-      return deals as DealSales[];
+
+  if (!registerSessionId) {
+    try {
+      const deals = await apiClient.getDealSalesReport(rangeFilters);
+      if (Array.isArray(deals)) {
+        return deals as DealSales[];
+      }
+    } catch (error) {
+      console.warn('Deal sales report endpoint failed, falling back to client aggregation:', error);
     }
-  } catch (error) {
-    console.warn('Deal sales report endpoint failed, falling back to client aggregation:', error);
   }
 
-  const orders = filterOrdersInRange(
-    await apiClient.getOrders({ ...rangeFilters, status: 'completed', includePast: 'true' }),
-    range
-  );
+  const orderQuery: Record<string, string> = registerSessionId
+    ? { registerSessionId, status: 'completed', includePast: 'true' }
+    : { ...rangeFilters, status: 'completed', includePast: 'true' };
+  const orders = registerSessionId
+    ? await apiClient.getOrders(orderQuery)
+    : filterOrdersInRange(await apiClient.getOrders(orderQuery), range);
   const orderIds = orders.map((order: Order) => order.id);
   const allItems = await fetchOrderItemsByOrderIds(orderIds);
   const orderItems = allItems.filter((item: OrderItem) => item.itemType === 'deal');
@@ -855,21 +875,26 @@ export async function getRegisterSessions(range: DateRange): Promise<RegisterSes
 /**
  * Get daily sales breakdown
  */
-export async function getDailySales(range: DateRange): Promise<DailySales[]> {
+export async function getDailySales(range: DateRange, registerSessionId?: string): Promise<DailySales[]> {
   const rangeFilters = buildRangeFilters(range);
-  try {
-    const daily = await apiClient.getDailySalesReport(rangeFilters);
-    if (Array.isArray(daily)) {
-      return daily as DailySales[];
+
+  if (!registerSessionId) {
+    try {
+      const daily = await apiClient.getDailySalesReport(rangeFilters);
+      if (Array.isArray(daily)) {
+        return daily as DailySales[];
+      }
+    } catch (error) {
+      console.warn('Daily sales report endpoint failed, falling back to client aggregation:', error);
     }
-  } catch (error) {
-    console.warn('Daily sales report endpoint failed, falling back to client aggregation:', error);
   }
 
-  const orders = filterOrdersInRange(
-    await apiClient.getOrders({ ...rangeFilters, status: 'completed', includePast: 'true' }),
-    range
-  );
+  const orderQuery: Record<string, string> = registerSessionId
+    ? { registerSessionId, status: 'completed', includePast: 'true' }
+    : { ...rangeFilters, status: 'completed', includePast: 'true' };
+  const orders = registerSessionId
+    ? await apiClient.getOrders(orderQuery)
+    : filterOrdersInRange(await apiClient.getOrders(orderQuery), range);
 
   // Group by date
   const dailyMap = new Map<string, {
@@ -1105,9 +1130,12 @@ export async function getOrderDetailedReport(
 /**
  * Get cancelled orders report for a date range
  */
-export async function getCancelledOrders(range: DateRange): Promise<CancelledOrder[]> {
+export async function getCancelledOrders(range: DateRange, registerSessionId?: string): Promise<CancelledOrder[]> {
   const rangeFilters = buildRangeFilters(range);
-  const cancelledOrders = await apiClient.getOrders({ ...rangeFilters, status: 'cancelled', includePast: 'true' });
+  const orderQuery: Record<string, string> = registerSessionId
+    ? { registerSessionId, status: 'cancelled', includePast: 'true' }
+    : { ...rangeFilters, status: 'cancelled', includePast: 'true' };
+  const cancelledOrders = await apiClient.getOrders(orderQuery);
 
   const users = (await db.users.toArray()) as User[];
   const userMap = new Map<string, string>(users.map((u: User) => [u.id, u.fullName]));
@@ -1137,9 +1165,12 @@ export async function getCancelledOrders(range: DateRange): Promise<CancelledOrd
 /**
  * Get daily expense report with sales - expenses = net profit
  */
-export async function getDailyExpenseReport(range: DateRange): Promise<DailyExpenseReport[]> {
+export async function getDailyExpenseReport(range: DateRange, registerSessionId?: string): Promise<DailyExpenseReport[]> {
   const rangeFilters = buildRangeFilters(range);
-  const completedOrders = await apiClient.getOrders({ ...rangeFilters, status: 'completed', includePast: 'true' });
+  const orderQuery: Record<string, string> = registerSessionId
+    ? { registerSessionId, status: 'completed', includePast: 'true' }
+    : { ...rangeFilters, status: 'completed', includePast: 'true' };
+  const completedOrders = await apiClient.getOrders(orderQuery);
 
   const allExpenses = await db.expenses.toArray();
   const expenses = allExpenses.filter((expense: Expense) => {
@@ -1193,9 +1224,12 @@ export async function getDailyExpenseReport(range: DateRange): Promise<DailyExpe
 /**
  * Get discounted orders report
  */
-export async function getDiscountedOrders(range: DateRange): Promise<DiscountReportItem[]> {
+export async function getDiscountedOrders(range: DateRange, registerSessionId?: string): Promise<DiscountReportItem[]> {
   const rangeFilters = buildRangeFilters(range);
-  const orders = (await apiClient.getOrders({ ...rangeFilters, status: 'completed', includePast: 'true' }))
+  const orderQuery: Record<string, string> = registerSessionId
+    ? { registerSessionId, status: 'completed', includePast: 'true' }
+    : { ...rangeFilters, status: 'completed', includePast: 'true' };
+  const orders = (await apiClient.getOrders(orderQuery))
     .filter((o: Order) => o.discountAmount > 0);
 
   return orders

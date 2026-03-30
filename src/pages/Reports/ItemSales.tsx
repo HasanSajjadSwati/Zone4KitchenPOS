@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Card, TimePicker } from '@/components/ui';
+import { Button, Card, Select, TimePicker } from '@/components/ui';
 import { ArrowDownTrayIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import {
   getItemSales,
@@ -12,13 +12,15 @@ import {
   type DealSales,
   type CategorySales,
 } from '@/services/reportService';
+import { getAllSessions } from '@/services/registerService';
+import type { RegisterSession } from '@/db/types';
 import { useDialog } from '@/hooks/useDialog';
 import { useDayRange } from '@/hooks/useDayRange';
 import { formatCurrency } from '@/utils/validation';
-import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays } from 'date-fns';
+import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays, format } from 'date-fns';
 
 type TabType = 'items' | 'deals' | 'categories';
-type DateRangePreset = 'today' | 'yesterday' | 'this_week' | 'this_month' | 'custom';
+type DateRangePreset = 'today' | 'yesterday' | 'this_week' | 'this_month' | 'custom' | 'register_session';
 
 export const ItemSales: React.FC = () => {
   const dialog = useDialog();
@@ -34,6 +36,22 @@ export const ItemSales: React.FC = () => {
   const [categorySales, setCategorySales] = useState<CategorySales[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // Register session filter
+  const [registerSessions, setRegisterSessions] = useState<RegisterSession[]>([]);
+  const [selectedSessionId, setSelectedSessionId] = useState<string>('');
+
+  useEffect(() => {
+    const loadSessions = async () => {
+      try {
+        const result = await getAllSessions(50, 0);
+        setRegisterSessions(result.sessions);
+      } catch (error) {
+        console.error('Failed to load register sessions:', error);
+      }
+    };
+    loadSessions();
+  }, []);
 
   const combineDateTime = (
     dateValue: string,
@@ -74,23 +92,32 @@ export const ItemSales: React.FC = () => {
           startDate: combineDateTime(customStartDate, customStartTime, startOfDay(now), 'start'),
           endDate: combineDateTime(customEndDate, customEndTime, endOfDay(now), 'end'),
         };
+      case 'register_session':
+        return { startDate: new Date(0), endDate: new Date() };
       default:
         return { startDate: startOfDay(now), endDate: endOfDay(now) };
     }
   };
 
   useEffect(() => {
+    if (datePreset === 'register_session' && !selectedSessionId) {
+      setItemSales([]);
+      setDealSales([]);
+      setCategorySales([]);
+      return;
+    }
     loadReportData();
-  }, [datePreset, customStartDate, customStartTime, customEndDate, customEndTime]);
+  }, [datePreset, customStartDate, customStartTime, customEndDate, customEndTime, selectedSessionId]);
 
   const loadReportData = async () => {
     setIsLoading(true);
     try {
       const range = await getDateRange();
+      const sessionId = datePreset === 'register_session' && selectedSessionId ? selectedSessionId : undefined;
       const [items, deals, categories] = await Promise.all([
-        getItemSales(range),
-        getDealSales(range),
-        getCategorySales(range),
+        getItemSales(range, sessionId),
+        getDealSales(range, sessionId),
+        getCategorySales(range, sessionId),
       ]);
       setItemSales(items);
       setDealSales(deals);
@@ -214,20 +241,50 @@ export const ItemSales: React.FC = () => {
       {/* Date Range Selection */}
       <Card padding="md">
         <div className="flex flex-wrap items-center gap-2">
-          {(['today', 'yesterday', 'this_week', 'this_month', 'custom'] as DateRangePreset[]).map((preset) => (
+          {(['today', 'yesterday', 'this_week', 'this_month', 'custom', 'register_session'] as DateRangePreset[]).map((preset) => (
             <button
               key={preset}
-              onClick={() => setDatePreset(preset)}
+              onClick={() => {
+                setDatePreset(preset);
+                if (preset !== 'register_session') {
+                  setSelectedSessionId('');
+                }
+              }}
               className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
                 datePreset === preset
                   ? 'bg-primary-600 text-white shadow-sm'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
-              {preset.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+              {preset === 'register_session' ? 'Register Session' : preset.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
             </button>
           ))}
         </div>
+
+        {datePreset === 'register_session' && (
+          <div className="pt-3 border-t border-gray-100 mt-4">
+            <Select
+              label="Select Register Session"
+              value={selectedSessionId}
+              onChange={(e) => setSelectedSessionId(e.target.value)}
+            >
+              <option value="">-- Select a session --</option>
+              {registerSessions.map((session) => {
+                const openDate = format(new Date(session.openedAt), 'dd/MM/yyyy, hh:mm a');
+                const closeDate = session.closedAt ? format(new Date(session.closedAt), 'dd/MM/yyyy, hh:mm a') : 'Still Open';
+                const statusLabel = session.status === 'open' ? ' (OPEN)' : '';
+                return (
+                  <option key={session.id} value={session.id}>
+                    {openDate} → {closeDate}{statusLabel} | Sales: Rs {session.totalSales?.toLocaleString() || 0} / {session.totalOrders || 0} orders
+                  </option>
+                );
+              })}
+            </Select>
+            <p className="text-xs text-gray-500 mt-1">
+              Filter by exact register session to match register sales totals perfectly.
+            </p>
+          </div>
+        )}
 
         {datePreset === 'custom' && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4 pt-4 border-t border-gray-100">

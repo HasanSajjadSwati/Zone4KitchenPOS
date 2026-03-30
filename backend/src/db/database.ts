@@ -115,6 +115,7 @@ function buildColumnMap(schemaSql: string): Record<string, string> {
 
 const EXTRA_COLUMN_MAP: Record<string, string> = {
   rolename: 'roleName',
+  rolepermissions: 'rolePermissions',
   variantname: 'variantName',
   varianttype: 'variantType',
   menuitemname: 'menuItemName',
