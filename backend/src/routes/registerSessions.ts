@@ -21,8 +21,13 @@ async function getSessionFinancials(sessionId: string): Promise<{
   const row = await getAsync(
     `
       WITH session_orders AS (
+        -- FIX: Include both active and archived orders for accurate register totals
         SELECT o.id, o.total
-        FROM orders o
+        FROM (
+          SELECT id, total, registerSessionId, status FROM orders
+          UNION ALL
+          SELECT id, total, registerSessionId, status FROM pastOrders
+        ) o
         WHERE o.registerSessionId = ? AND o.status = 'completed'
       ),
       ranked_payments AS (
@@ -39,7 +44,11 @@ async function getSessionFinancials(sessionId: string): Promise<{
             ),
             0
           ) AS "paidBefore"
-        FROM payments p
+        FROM (
+          SELECT orderId, method, amount, paidAt, id FROM payments
+          UNION ALL
+          SELECT orderId, method, amount, paidAt, id FROM pastPayments
+        ) p
         JOIN session_orders so ON so.id = p.orderId
       ),
       applied_payments AS (

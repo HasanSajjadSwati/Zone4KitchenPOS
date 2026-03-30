@@ -8,11 +8,13 @@ import {
   type DateRange,
   type OrderDetailedReportItem,
 } from '@/services/reportService';
+import { getAllSessions } from '@/services/registerService';
+import type { RegisterSession } from '@/db/types';
 import { formatCurrency, formatDateTime } from '@/utils/validation';
 import { useDayRange } from '@/hooks/useDayRange';
-import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays } from 'date-fns';
+import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays, format } from 'date-fns';
 
-type DateRangePreset = 'today' | 'yesterday' | 'this_week' | 'this_month' | 'custom';
+type DateRangePreset = 'today' | 'yesterday' | 'this_week' | 'this_month' | 'custom' | 'register_session';
 type StatusFilter = 'all' | 'open' | 'completed' | 'cancelled';
 type TypeFilter = 'all' | 'dine_in' | 'take_away' | 'delivery';
 type PaymentFilter = 'all' | 'paid' | 'unpaid';
@@ -50,6 +52,23 @@ export const OrderDetailedReport: React.FC = () => {
   const [appliedSearchQuery, setAppliedSearchQuery] = useState('');
   const [reportData, setReportData] = useState<OrderDetailedReportItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Register session filter
+  const [registerSessions, setRegisterSessions] = useState<RegisterSession[]>([]);
+  const [selectedSessionId, setSelectedSessionId] = useState<string>('');
+
+  // Load recent register sessions on mount
+  useEffect(() => {
+    const loadSessions = async () => {
+      try {
+        const result = await getAllSessions(50, 0); // Get last 50 sessions
+        setRegisterSessions(result.sessions);
+      } catch (error) {
+        console.error('Failed to load register sessions:', error);
+      }
+    };
+    loadSessions();
+  }, []);
 
   const combineDateTime = (
     dateValue: string,
@@ -91,6 +110,9 @@ export const OrderDetailedReport: React.FC = () => {
           startDate: combineDateTime(customStartDate, customStartTime, startOfDay(now), 'start'),
           endDate: combineDateTime(customEndDate, customEndTime, endOfDay(now), 'end'),
         };
+      case 'register_session':
+        // When using register session, we don't use date range
+        return { startDate: new Date(0), endDate: new Date() };
       default:
         return { startDate: startOfDay(now), endDate: endOfDay(now) };
     }
@@ -105,6 +127,7 @@ export const OrderDetailedReport: React.FC = () => {
         orderType: typeFilter === 'all' ? undefined : typeFilter,
         paymentStatus: paymentFilter === 'all' ? undefined : paymentFilter,
         query: appliedSearchQuery || undefined,
+        registerSessionId: datePreset === 'register_session' && selectedSessionId ? selectedSessionId : undefined,
       });
       setReportData(rows);
     } catch (error) {
@@ -116,8 +139,13 @@ export const OrderDetailedReport: React.FC = () => {
   };
 
   useEffect(() => {
+    // Don't load if register_session is selected but no session is chosen
+    if (datePreset === 'register_session' && !selectedSessionId) {
+      setReportData([]);
+      return;
+    }
     loadData();
-  }, [datePreset, customStartDate, customStartTime, customEndDate, customEndTime, statusFilter, typeFilter, paymentFilter, appliedSearchQuery]);
+  }, [datePreset, customStartDate, customStartTime, customEndDate, customEndTime, statusFilter, typeFilter, paymentFilter, appliedSearchQuery, selectedSessionId]);
 
   const handleSearch = () => {
     setAppliedSearchQuery(searchQuery.trim());
@@ -197,20 +225,51 @@ export const OrderDetailedReport: React.FC = () => {
         <div className="space-y-4">
           {/* Date range pills */}
           <div className="flex flex-wrap items-center gap-2">
-            {(['today', 'yesterday', 'this_week', 'this_month', 'custom'] as DateRangePreset[]).map((preset) => (
+            {(['today', 'yesterday', 'this_week', 'this_month', 'custom', 'register_session'] as DateRangePreset[]).map((preset) => (
               <button
                 key={preset}
-                onClick={() => setDatePreset(preset)}
+                onClick={() => {
+                  setDatePreset(preset);
+                  if (preset !== 'register_session') {
+                    setSelectedSessionId('');
+                  }
+                }}
                 className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
                   datePreset === preset
                     ? 'bg-primary-600 text-white shadow-sm'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
-                {preset.replace('_', ' ').charAt(0).toUpperCase() + preset.replace('_', ' ').slice(1)}
+                {preset === 'register_session' ? 'Register Session' : preset.replace('_', ' ').charAt(0).toUpperCase() + preset.replace('_', ' ').slice(1)}
               </button>
             ))}
           </div>
+
+          {/* Register Session Selector */}
+          {datePreset === 'register_session' && (
+            <div className="pt-3 border-t border-gray-100">
+              <Select
+                label="Select Register Session"
+                value={selectedSessionId}
+                onChange={(e) => setSelectedSessionId(e.target.value)}
+              >
+                <option value="">-- Select a session --</option>
+                {registerSessions.map((session) => {
+                  const openDate = format(new Date(session.openedAt), 'dd/MM/yyyy, hh:mm a');
+                  const closeDate = session.closedAt ? format(new Date(session.closedAt), 'dd/MM/yyyy, hh:mm a') : 'Still Open';
+                  const statusLabel = session.status === 'open' ? ' (OPEN)' : '';
+                  return (
+                    <option key={session.id} value={session.id}>
+                      {openDate} → {closeDate}{statusLabel} | Sales: Rs {session.totalSales?.toLocaleString() || 0} / {session.totalOrders || 0} orders
+                    </option>
+                  );
+                })}
+              </Select>
+              <p className="text-xs text-gray-500 mt-1">
+                Filter by exact register session to match register sales totals perfectly.
+              </p>
+            </div>
+          )}
 
           {datePreset === 'custom' && (
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-3 border-t border-gray-100">

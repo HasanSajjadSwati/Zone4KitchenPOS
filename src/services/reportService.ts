@@ -149,6 +149,7 @@ export interface OrderDetailedReportFilters {
   orderType?: 'dine_in' | 'take_away' | 'delivery';
   paymentStatus?: 'paid' | 'unpaid';
   query?: string;
+  registerSessionId?: string; // Filter by specific register session
 }
 
 export interface OrderDetailedReportItem {
@@ -963,20 +964,31 @@ export async function getOrderDetailedReport(
   range: DateRange,
   filters: OrderDetailedReportFilters = {}
 ): Promise<OrderDetailedReportItem[]> {
-  const rangeFilters = buildRangeFilters(range);
   const orderFilters: Record<string, string> = {
-    ...rangeFilters,
-    dateField: filters.status === 'completed' ? 'completedAt' : 'createdAt',
+    includePast: 'true',
   };
 
-  if (filters.status) {
+  // If filtering by register session, use that instead of date range
+  // This ensures exact match with register session totals
+  if (filters.registerSessionId) {
+    orderFilters.registerSessionId = filters.registerSessionId;
+  } else {
+    // Use date range filtering
+    const rangeFilters = buildRangeFilters(range);
+    Object.assign(orderFilters, rangeFilters);
+    orderFilters.dateField = 'completedAt';
+  }
+
+  // FIX: Don't pass 'all' as status - it's not a valid database value
+  // Valid statuses are: 'open', 'completed', 'cancelled'
+  if (filters.status && filters.status !== 'all') {
     orderFilters.status = filters.status;
   }
   if (filters.orderType) {
     orderFilters.orderType = filters.orderType;
   }
 
-  const orders = (await apiClient.getOrders({ ...orderFilters, includePast: 'true' })) as Order[];
+  const orders = (await apiClient.getOrders(orderFilters)) as Order[];
   let filteredOrders = orders;
 
   if (filters.paymentStatus === 'paid') {

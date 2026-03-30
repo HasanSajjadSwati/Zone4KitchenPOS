@@ -10,6 +10,108 @@ async function recordExists(table: ReferentialTable, id: string): Promise<boolea
   return Boolean(row);
 }
 
+// Helper to check if a user has a specific permission
+interface PermissionCheckResult {
+  allowed: boolean;
+  user: any;
+  role: any;
+  reason?: string;
+}
+
+async function checkUserPermission(
+  userId: string | null,
+  resource: string,
+  action: string
+): Promise<PermissionCheckResult> {
+  if (!userId) {
+    return { allowed: false, user: null, role: null, reason: 'User ID not provided' };
+  }
+
+  const user = await getAsync(
+    `SELECT u.*, r.name as roleName, r.permissions as rolePermissions
+     FROM users u
+     JOIN roles r ON u.roleId = r.id
+     WHERE u.id = ?`,
+    [userId]
+  );
+
+  if (!user) {
+    return { allowed: false, user: null, role: null, reason: 'User not found' };
+  }
+
+  // Admin always has full access
+  if (user.roleName === 'Admin') {
+    return { allowed: true, user, role: { name: user.roleName } };
+  }
+
+  try {
+    const permissions = JSON.parse(user.rolePermissions || '[]');
+    const resourcePerm = permissions.find((p: any) => p.resource === resource);
+    
+    if (resourcePerm && resourcePerm.actions.includes(action)) {
+      return { allowed: true, user, role: { name: user.roleName } };
+    }
+    
+    return { 
+      allowed: false, 
+      user, 
+      role: { name: user.roleName },
+      reason: `Permission denied: ${user.roleName} role does not have '${action}' permission on '${resource}'`
+    };
+  } catch (_e) {
+    return { allowed: false, user, role: null, reason: 'Failed to parse role permissions' };
+  }
+}
+
+// FRAUD PREVENTION: Helper to check if order is locked from modifications
+interface OrderLockStatus {
+  isLocked: boolean;
+  reason: string | null;
+  order: any;
+}
+
+async function checkOrderLocked(orderId: string): Promise<OrderLockStatus> {
+  const order = await getAsync('SELECT * FROM orders WHERE id = ?', [orderId]);
+  if (!order) {
+    return { isLocked: false, reason: null, order: null };
+  }
+  
+  // Order is locked if it's been paid OR completed
+  if (order.isPaid) {
+    return { isLocked: true, reason: 'Order has been paid and cannot be modified', order };
+  }
+  if (order.status === 'completed') {
+    return { isLocked: true, reason: 'Order is completed and cannot be modified', order };
+  }
+  if (order.status === 'cancelled') {
+    return { isLocked: true, reason: 'Order is cancelled and cannot be modified', order };
+  }
+  
+  return { isLocked: false, reason: null, order };
+}
+
+// FRAUD PREVENTION: Create audit log for order modifications
+async function logOrderModification(
+  action: string,
+  orderId: string,
+  userId: string | null,
+  before: any,
+  after: any,
+  description: string
+): Promise<void> {
+  try {
+    const id = uuidv4();
+    const now = new Date().toISOString();
+    await runAsync(
+      `INSERT INTO auditLogs (id, userId, action, tableName, recordId, before, after, description, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, userId, action, 'orders', orderId, JSON.stringify(before), JSON.stringify(after), description, now]
+    );
+  } catch (error) {
+    console.error('Failed to log order modification:', error);
+  }
+}
+
 // Helper function to recalculate and update order totals
 async function recalculateOrderTotals(orderId: string): Promise<void> {
   const order = await getAsync('SELECT * FROM orders WHERE id = ?', [orderId]);
@@ -100,7 +202,9 @@ orderRoutes.get('/', async (req, res) => {
     const params: any[] = [];
     const resolvedDateField = dateField === 'completedAt' ? 'completedAt' : 'createdAt';
 
-    if (status) {
+    // FIX: 'all' is not a valid status - don't filter by it
+    // Valid statuses are: 'open', 'completed', 'cancelled'
+    if (status && status !== 'all') {
       query += ' AND status = ?';
       params.push(status);
     }
@@ -136,21 +240,52 @@ orderRoutes.get('/', async (req, res) => {
         params.push(...ids);
       }
     }
-    if (startDate) {
-      query += ` AND ${resolvedDateField} >= ?`;
-      params.push(startDate);
-    }
-    if (endDate) {
-      query += ` AND ${resolvedDateField} <= ?`;
-      params.push(endDate);
+    
+    // Date range filtering
+    // For overnight orders (created 11pm, completed 1am), we want inclusive matching:
+    // Show order if EITHER createdAt OR completedAt falls within the date range
+    // This handles business days that span midnight
+    if (startDate && endDate) {
+      if (!status || status === 'all') {
+        // "All" filter: include if created OR completed in range
+        query += ` AND (
+          (createdAt >= ? AND createdAt <= ?)
+          OR
+          (status = 'completed' AND completedAt IS NOT NULL AND completedAt >= ? AND completedAt <= ?)
+        )`;
+        params.push(startDate, endDate, startDate, endDate);
+      } else if (status === 'completed') {
+        // "Completed" filter: include completed orders created OR completed in range
+        // This ensures overnight orders appear in the date they were created too
+        query += ` AND (
+          (createdAt >= ? AND createdAt <= ?)
+          OR
+          (completedAt >= ? AND completedAt <= ?)
+        )`;
+        params.push(startDate, endDate, startDate, endDate);
+      } else {
+        // "Open" or "Cancelled": use createdAt only
+        query += ` AND createdAt >= ? AND createdAt <= ?`;
+        params.push(startDate, endDate);
+      }
+    } else {
+      // Single-ended date filter: use resolved field
+      if (startDate) {
+        query += ` AND ${resolvedDateField} >= ?`;
+        params.push(startDate);
+      }
+      if (endDate) {
+        query += ` AND ${resolvedDateField} <= ?`;
+        params.push(endDate);
+      }
     }
 
     // Handle isPaid filter
     const { isPaid, limit, offset } = req.query;
     if (isPaid === 'true') {
-      query += ' AND ispaid = true';
+      query += ' AND isPaid = 1';
     } else if (isPaid === 'false') {
-      query += ' AND ispaid = false';
+      query += ' AND isPaid = 0';
     }
 
     // Get total count for pagination (before LIMIT)
@@ -379,6 +514,42 @@ orderRoutes.put('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Order not found' });
     }
 
+    // PERMISSION CHECK: Verify user has 'cancel' permission if trying to cancel order
+    if (status === 'cancelled') {
+      const userId = req.headers['x-user-id'] as string || req.body.userId;
+      const permCheck = await checkUserPermission(userId, 'orders', 'cancel');
+      if (!permCheck.allowed) {
+        return res.status(403).json({ error: permCheck.reason || 'You do not have permission to cancel orders' });
+      }
+    }
+
+    // FRAUD PREVENTION: Block financial modifications on paid/completed orders
+    const isOrderLocked = order.isPaid || order.status === 'completed' || order.status === 'cancelled';
+    const hasFinancialChanges = 
+      subtotal !== undefined ||
+      discountType !== undefined ||
+      discountValue !== undefined ||
+      discountAmount !== undefined ||
+      total !== undefined ||
+      deliveryCharge !== undefined;
+    
+    // Allow only specific changes on locked orders: status changes to complete/cancel, delivery status, notes
+    // Block all financial modifications
+    if (isOrderLocked && hasFinancialChanges) {
+      // Log the attempted modification
+      await logOrderModification(
+        'BLOCKED_UPDATE_ORDER',
+        req.params.id,
+        req.body.userId || req.headers['x-user-id'] as string || null,
+        { subtotal: order.subtotal, discountAmount: order.discountAmount, total: order.total },
+        { attemptedChanges: { subtotal, discountType, discountValue, discountAmount, total, deliveryCharge } },
+        `BLOCKED: Attempted to modify financial data on locked order. Order status: ${order.status}, isPaid: ${order.isPaid}`
+      );
+      return res.status(403).json({ 
+        error: 'Cannot modify financial data on a paid or completed order. Contact an administrator.' 
+      });
+    }
+
     if (order.orderType === 'delivery' && customerPhone !== undefined && String(customerPhone).trim().length === 0) {
       return res.status(400).json({ error: 'Customer phone is required for delivery orders' });
     }
@@ -499,6 +670,21 @@ orderRoutes.post('/:id/items', async (req, res) => {
     const { id: providedId, itemType, menuItemId, dealId, quantity, unitPrice, totalPrice, notes, selectedVariants, dealBreakdown } = req.body;
     const { id: orderId } = req.params;
 
+    // FRAUD PREVENTION: Check if order is locked
+    const lockStatus = await checkOrderLocked(orderId);
+    if (lockStatus.isLocked) {
+      // Log the attempted modification
+      await logOrderModification(
+        'BLOCKED_ADD_ITEM',
+        orderId,
+        req.body.userId || req.headers['x-user-id'] as string || null,
+        null,
+        { attemptedItem: { itemType, menuItemId, dealId, quantity, unitPrice, totalPrice } },
+        `BLOCKED: Attempted to add item to locked order. Reason: ${lockStatus.reason}`
+      );
+      return res.status(403).json({ error: lockStatus.reason });
+    }
+
     if (!itemType || !quantity || unitPrice === undefined || totalPrice === undefined) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
@@ -560,6 +746,22 @@ orderRoutes.get('/:id/items', async (req, res) => {
 orderRoutes.put('/:id/items/:itemId', async (req, res) => {
   try {
     const { quantity, unitPrice, totalPrice, notes, selectedVariants } = req.body;
+
+    // FRAUD PREVENTION: Check if order is locked
+    const lockStatus = await checkOrderLocked(req.params.id);
+    if (lockStatus.isLocked) {
+      const item = await getAsync('SELECT * FROM orderItems WHERE id = ?', [req.params.itemId]);
+      // Log the attempted modification
+      await logOrderModification(
+        'BLOCKED_UPDATE_ITEM',
+        req.params.id,
+        req.body.userId || req.headers['x-user-id'] as string || null,
+        item,
+        { attemptedChanges: { quantity, unitPrice, totalPrice, notes } },
+        `BLOCKED: Attempted to modify item in locked order. Reason: ${lockStatus.reason}`
+      );
+      return res.status(403).json({ error: lockStatus.reason });
+    }
 
     const item = await getAsync('SELECT * FROM orderItems WHERE id = ?', [req.params.itemId]);
     if (!item) {
@@ -657,6 +859,29 @@ orderRoutes.put('/:id/delivery-status', async (req, res) => {
 // Delete order item
 orderRoutes.delete('/:id/items/:itemId', async (req, res) => {
   try {
+    // PERMISSION CHECK: Verify user has 'delete' permission on 'order_items' resource
+    const userId = req.headers['x-user-id'] as string || req.body.userId;
+    const permCheck = await checkUserPermission(userId, 'order_items', 'delete');
+    if (!permCheck.allowed) {
+      return res.status(403).json({ error: permCheck.reason || 'You do not have permission to delete order items' });
+    }
+
+    // FRAUD PREVENTION: Check if order is locked
+    const lockStatus = await checkOrderLocked(req.params.id);
+    if (lockStatus.isLocked) {
+      const item = await getAsync('SELECT * FROM orderItems WHERE id = ?', [req.params.itemId]);
+      // Log the attempted deletion - THIS IS THE MAIN FRAUD VECTOR
+      await logOrderModification(
+        'BLOCKED_DELETE_ITEM',
+        req.params.id,
+        req.headers['x-user-id'] as string || null,
+        item,
+        null,
+        `BLOCKED: Attempted to DELETE item from locked order. Reason: ${lockStatus.reason}. Item value: ${item?.totalPrice || 'unknown'}`
+      );
+      return res.status(403).json({ error: lockStatus.reason });
+    }
+
     const item = await getAsync('SELECT * FROM orderItems WHERE id = ?', [req.params.itemId]);
     if (!item) {
       return res.status(404).json({ error: 'Order item not found' });
@@ -671,6 +896,101 @@ orderRoutes.delete('/:id/items/:itemId', async (req, res) => {
     broadcastSync('order_items', 'delete', req.params.id);
     
     res.json({ message: 'Order item deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// FRAUD PREVENTION: Admin-only endpoint to unlock an order for legitimate corrections
+// This creates a complete audit trail and requires admin authorization
+orderRoutes.post('/:id/admin-unlock', async (req, res) => {
+  try {
+    const { adminUserId, reason } = req.body;
+    const orderId = req.params.id;
+
+    if (!adminUserId || !reason) {
+      return res.status(400).json({ error: 'Admin user ID and reason are required' });
+    }
+
+    if (reason.trim().length < 10) {
+      return res.status(400).json({ error: 'Please provide a detailed reason (at least 10 characters)' });
+    }
+
+    // Verify admin role
+    const admin = await getAsync(
+      `SELECT u.id, u.fullName, r.name as roleName
+       FROM users u
+       JOIN roles r ON u.roleId = r.id
+       WHERE u.id = ?`,
+      [adminUserId]
+    );
+
+    if (!admin) {
+      return res.status(404).json({ error: 'Admin user not found' });
+    }
+
+    if (String(admin.roleName).toLowerCase() !== 'admin') {
+      // Log the unauthorized attempt
+      await logOrderModification(
+        'BLOCKED_ADMIN_UNLOCK',
+        orderId,
+        adminUserId,
+        null,
+        null,
+        `BLOCKED: Non-admin user "${admin.fullName}" attempted to unlock order. Role: ${admin.roleName}`
+      );
+      return res.status(403).json({ error: 'Only administrators can unlock orders' });
+    }
+
+    const order = await getAsync('SELECT * FROM orders WHERE id = ?', [orderId]);
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    const now = new Date().toISOString();
+
+    // Store original state
+    const beforeState = {
+      isPaid: order.isPaid,
+      status: order.status,
+      total: order.total,
+      subtotal: order.subtotal,
+      discountAmount: order.discountAmount
+    };
+
+    // Unlock: Set isPaid to false temporarily and status to 'open'
+    // The order can now be modified, but will need to be re-paid
+    await runAsync(
+      `UPDATE orders SET isPaid = 0, status = 'open', updatedAt = ? WHERE id = ?`,
+      [now, orderId]
+    );
+
+    const updated = await getAsync('SELECT * FROM orders WHERE id = ?', [orderId]);
+
+    // Create detailed audit log
+    await logOrderModification(
+      'ADMIN_UNLOCK_ORDER',
+      orderId,
+      adminUserId,
+      beforeState,
+      {
+        isPaid: updated.isPaid,
+        status: updated.status,
+        unlockedAt: now,
+        unlockedBy: admin.fullName,
+        reason: reason
+      },
+      `ADMIN OVERRIDE: Order unlocked by "${admin.fullName}". Reason: ${reason}. Original paid: ${beforeState.isPaid}, original total: ${beforeState.total}`
+    );
+
+    // Broadcast update
+    broadcastSync('orders', 'update', orderId);
+
+    res.json({
+      message: 'Order unlocked successfully. All modifications will be logged.',
+      order: convertBooleans(updated),
+      warning: 'This action has been logged in the audit trail.'
+    });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }

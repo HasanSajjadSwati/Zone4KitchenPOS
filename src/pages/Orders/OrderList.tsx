@@ -58,6 +58,7 @@ const getDeliveryStatusInfo = (status: string | null) => {
 export const OrderList: React.FC = () => {
   const navigate = useNavigate();
   const currentUser = useAuthStore((state) => state.currentUser);
+  const canCancelOrder = useAuthStore((state) => state.hasPermission('orders', 'cancel'));
   const dialog = useDialog();
   const { getTodayRange, ready: dayRangeReady } = useDayRange();
   const [orders, setOrders] = useState<Order[]>([]);
@@ -447,14 +448,16 @@ export const OrderList: React.FC = () => {
                     >
                       KOT
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="danger"
-                      onClick={() => openCancelModal(order)}
-                      leftIcon={<XMarkIcon className="w-4 h-4" />}
-                    >
-                      Cancel
-                    </Button>
+                    {canCancelOrder && (
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        onClick={() => openCancelModal(order)}
+                        leftIcon={<XMarkIcon className="w-4 h-4" />}
+                      >
+                        Cancel
+                      </Button>
+                    )}
                   </>
                 )}
 

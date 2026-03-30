@@ -28,6 +28,7 @@ import {
   completeOrder,
   getOrderWithItems,
   calculateOrderTotals,
+  adminUnlockOrder,
 } from '@/services/orderService';
 import {
   getAllCategories,
@@ -146,7 +147,10 @@ export const CreateOrder: React.FC = () => {
   const navigate = useNavigate();
   const editOrderId = searchParams.get('orderId');
   const currentUser = useAuthStore((state) => state.currentUser);
+  const currentRole = useAuthStore((state) => state.currentRole);
   const canApplyDiscount = useAuthStore((state) => state.hasPermission('discounts', 'create'));
+  const canDeleteOrderItem = useAuthStore((state) => state.hasPermission('order_items', 'delete'));
+  const isAdmin = currentRole?.name === 'Admin';
   const dialog = useDialog();
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
@@ -392,6 +396,12 @@ export const CreateOrder: React.FC = () => {
 
   const handleAddItem = async (menuItem: MenuItem) => {
     if (!currentOrder || !currentUser) return;
+
+    // FRAUD PREVENTION: Block adding items to locked orders
+    if (currentOrder.isPaid || currentOrder.status === 'completed') {
+      await dialog.alert('Cannot add items to a paid or completed order. Contact an administrator if changes are needed.', 'Order Locked');
+      return;
+    }
 
     // Check if item has variants
     if (menuItem.hasVariants) {
@@ -810,6 +820,13 @@ export const CreateOrder: React.FC = () => {
   const handleAddItemWithVariants = async () => {
     if (!selectedMenuItem || !currentOrder || !currentUser) return;
 
+    // FRAUD PREVENTION: Block adding items to locked orders
+    if (currentOrder.isPaid || currentOrder.status === 'completed') {
+      await dialog.alert('Cannot add items to a paid or completed order. Contact an administrator if changes are needed.', 'Order Locked');
+      setIsVariantModalOpen(false);
+      return;
+    }
+
     // Validate required variants
     const missingRequired = itemVariants.filter(
       (iv) => iv.isRequired && !selectedVariants.find((sv) => sv.variantId === iv.variant.id)
@@ -921,6 +938,12 @@ export const CreateOrder: React.FC = () => {
 
   const handleAddDeal = async (deal: Deal) => {
     if (!currentOrder || !currentUser) return;
+
+    // FRAUD PREVENTION: Block adding items to locked orders
+    if (currentOrder.isPaid || currentOrder.status === 'completed') {
+      await dialog.alert('Cannot add items to a paid or completed order. Contact an administrator if changes are needed.', 'Order Locked');
+      return;
+    }
 
     setIsLoading(true);
     try {
@@ -1063,6 +1086,13 @@ export const CreateOrder: React.FC = () => {
 
   const handleAddDealWithVariants = async () => {
     if (!selectedDeal || !currentOrder || !currentUser) return;
+
+    // FRAUD PREVENTION: Block adding items to locked orders
+    if (currentOrder.isPaid || currentOrder.status === 'completed') {
+      await dialog.alert('Cannot add items to a paid or completed order. Contact an administrator if changes are needed.', 'Order Locked');
+      setIsDealVariantModalOpen(false);
+      return;
+    }
 
     if (dealVariants.length > 0) {
       const validation = validateVariantSelections(dealVariants, selectedDealVariants);
@@ -1716,11 +1746,67 @@ export const CreateOrder: React.FC = () => {
           <div className="col-span-12 lg:col-span-4 space-y-4">
             <Card padding="md">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="font-bold text-gray-900">Order Items</h2>
+                <div className="flex items-center space-x-2">
+                  <h2 className="font-bold text-gray-900">Order Items</h2>
+                  {/* FRAUD PREVENTION: Show lock indicator for paid/completed orders */}
+                  {(currentOrder.isPaid || currentOrder.status === 'completed') && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-200">
+                      <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                      </svg>
+                      Locked
+                    </span>
+                  )}
+                </div>
                 <span className="text-sm text-gray-600">
                   Order #{currentOrder.orderNumber}
                 </span>
               </div>
+
+              {/* FRAUD PREVENTION: Show warning for locked orders */}
+              {(currentOrder.isPaid || currentOrder.status === 'completed') && (
+                <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800 dark:bg-yellow-900/20 dark:border-yellow-700 dark:text-yellow-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">Order is locked</p>
+                      <p className="text-xs mt-1">Items cannot be modified after payment. Contact an administrator if changes are needed.</p>
+                    </div>
+                    {isAdmin && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={async () => {
+                          const reason = await dialog.prompt(
+                            'Enter a detailed reason for unlocking this order (minimum 10 characters):',
+                            'Admin: Unlock Order'
+                          );
+                          if (reason && reason.trim().length >= 10) {
+                            try {
+                              await adminUnlockOrder({
+                                orderId: currentOrder.id,
+                                adminUserId: currentUser!.id,
+                                reason: reason.trim(),
+                              });
+                              await refreshOrder();
+                              await dialog.alert('Order unlocked successfully. All changes will be logged.', 'Success');
+                            } catch (error) {
+                              await dialog.alert(error instanceof Error ? error.message : 'Failed to unlock order', 'Error');
+                            }
+                          } else if (reason !== null) {
+                            await dialog.alert('Please provide a detailed reason (at least 10 characters)', 'Error');
+                          }
+                        }}
+                        className="ml-2 whitespace-nowrap"
+                      >
+                        <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                        </svg>
+                        Unlock
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-3 max-h-[600px] overflow-y-auto">
                 {orderItems.map((item) => (
@@ -1814,17 +1900,23 @@ export const CreateOrder: React.FC = () => {
                             size="sm"
                             variant="secondary"
                             onClick={() => handleEditOrderItem(item)}
+                            disabled={currentOrder.isPaid || currentOrder.status === 'completed'}
+                            title={currentOrder.isPaid || currentOrder.status === 'completed' ? 'Order is locked' : 'Edit item'}
                           >
                             <PencilIcon className="w-4 h-4" />
                           </Button>
                         )}
-                        <Button
-                          size="sm"
-                          variant="danger"
-                          onClick={() => handleRemoveItem(item.id)}
-                        >
-                          <TrashIcon className="w-4 h-4" />
-                        </Button>
+                        {canDeleteOrderItem && (
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            onClick={() => handleRemoveItem(item.id)}
+                            disabled={currentOrder.isPaid || currentOrder.status === 'completed'}
+                            title={currentOrder.isPaid || currentOrder.status === 'completed' ? 'Order is locked' : 'Remove item'}
+                          >
+                            <TrashIcon className="w-4 h-4" />
+                          </Button>
+                        )}
                       </div>
                     </div>
 
@@ -1834,6 +1926,7 @@ export const CreateOrder: React.FC = () => {
                           size="sm"
                           variant="secondary"
                           onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
+                          disabled={currentOrder.isPaid || currentOrder.status === 'completed'}
                         >
                           <MinusIcon className="w-4 h-4" />
                         </Button>
@@ -1844,6 +1937,7 @@ export const CreateOrder: React.FC = () => {
                           size="sm"
                           variant="secondary"
                           onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
+                          disabled={currentOrder.isPaid || currentOrder.status === 'completed'}
                         >
                           <PlusIcon className="w-4 h-4" />
                         </Button>

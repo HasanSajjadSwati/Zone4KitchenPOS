@@ -70,16 +70,21 @@ class APIClient {
     });
   }
 
-  async put(endpoint: string, data: any) {
+  async put(endpoint: string, data: any, options: RequestInit = {}) {
     return this.request(endpoint, {
       method: 'PUT',
       body: JSON.stringify(data),
+      ...options,
+      headers: {
+        ...options.headers,
+      },
     });
   }
 
-  async delete(endpoint: string) {
+  async delete(endpoint: string, options: RequestInit = {}) {
     return this.request(endpoint, {
       method: 'DELETE',
+      ...options,
     });
   }
 
@@ -353,8 +358,12 @@ class APIClient {
     return this.post('/orders', data);
   }
 
-  async updateOrder(id: string, data: any) {
-    return this.put(`/orders/${id}`, data);
+  async updateOrder(id: string, data: any, userId?: string) {
+    const headers: Record<string, string> = {};
+    if (userId) {
+      headers['x-user-id'] = userId;
+    }
+    return this.put(`/orders/${id}`, data, { headers });
   }
 
   async addOrderItem(orderId: string, data: any) {
@@ -424,8 +433,12 @@ class APIClient {
     return this.put(`/orders/${orderId}/items/${itemId}`, data);
   }
 
-  async deleteOrderItem(orderId: string, itemId: string) {
-    return this.delete(`/orders/${orderId}/items/${itemId}`);
+  async deleteOrderItem(orderId: string, itemId: string, userId?: string) {
+    const headers: Record<string, string> = {};
+    if (userId) {
+      headers['x-user-id'] = userId;
+    }
+    return this.delete(`/orders/${orderId}/items/${itemId}`, { headers });
   }
 
   async updateDeliveryStatus(orderId: string, deliveryStatus: string) {

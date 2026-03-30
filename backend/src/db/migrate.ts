@@ -60,6 +60,42 @@ export async function initializeDatabase() {
       } catch (_e) { /* skip if permissions JSON is corrupt */ }
     }
 
+    // Migration: Add order_items resource and cancel action to existing roles
+    const allRoles = await allAsync('SELECT id, name, permissions FROM roles') as any[];
+    for (const role of allRoles) {
+      try {
+        const perms = JSON.parse(role.permissions || '[]');
+        let updated = false;
+
+        // Check if order_items resource exists
+        const hasOrderItems = perms.some((p: any) => p.resource === 'order_items');
+        if (!hasOrderItems) {
+          // Admin and Manager get delete permission, Cashier does not
+          if (role.name === 'Admin' || role.name === 'Manager') {
+            perms.push({ resource: 'order_items', actions: ['create', 'read', 'update', 'delete'] });
+          } else {
+            perms.push({ resource: 'order_items', actions: ['create', 'read', 'update'] });
+          }
+          updated = true;
+        }
+
+        // Check if orders resource has cancel action (Admin and Manager only)
+        const ordersPermIdx = perms.findIndex((p: any) => p.resource === 'orders');
+        if (ordersPermIdx !== -1 && (role.name === 'Admin' || role.name === 'Manager')) {
+          const ordersPerm = perms[ordersPermIdx];
+          if (!ordersPerm.actions.includes('cancel')) {
+            ordersPerm.actions.push('cancel');
+            updated = true;
+          }
+        }
+
+        if (updated) {
+          await runAsync('UPDATE roles SET permissions = ? WHERE id = ?', [JSON.stringify(perms), role.id]);
+          console.log(`✓ Updated ${role.name} role with order_items and cancel permissions`);
+        }
+      } catch (_e) { /* skip if permissions JSON is corrupt */ }
+    }
+
     // Check if roles exist
     const rolesCount = await allAsync('SELECT COUNT(*) as count FROM roles');
     const existingRoles = Number(rolesCount[0]?.count ?? 0);
@@ -72,7 +108,8 @@ export async function initializeDatabase() {
       const cashierRoleId = uuidv4();
 
       const adminPermissions = JSON.stringify([
-        { resource: 'orders', actions: ['create', 'read', 'update', 'delete'] },
+        { resource: 'orders', actions: ['create', 'read', 'update', 'delete', 'cancel'] },
+        { resource: 'order_items', actions: ['create', 'read', 'update', 'delete'] },
         { resource: 'past_orders', actions: ['read'] },
         { resource: 'menu', actions: ['create', 'read', 'update', 'delete'] },
         { resource: 'reports', actions: ['read', 'export'] },
@@ -88,7 +125,8 @@ export async function initializeDatabase() {
       ]);
 
       const managerPermissions = JSON.stringify([
-        { resource: 'orders', actions: ['create', 'read', 'update', 'delete'] },
+        { resource: 'orders', actions: ['create', 'read', 'update', 'delete', 'cancel'] },
+        { resource: 'order_items', actions: ['create', 'read', 'update', 'delete'] },
         { resource: 'menu', actions: ['create', 'read', 'update'] },
         { resource: 'reports', actions: ['read', 'export'] },
         { resource: 'users', actions: ['read'] },
@@ -104,6 +142,7 @@ export async function initializeDatabase() {
 
       const cashierPermissions = JSON.stringify([
         { resource: 'orders', actions: ['create', 'read', 'update'] },
+        { resource: 'order_items', actions: ['create', 'read', 'update'] },
         { resource: 'menu', actions: ['read'] },
         { resource: 'register', actions: ['create', 'read'] },
         { resource: 'staff', actions: ['read'] },

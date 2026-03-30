@@ -347,9 +347,9 @@ export async function updateOrderItemQuantityFast(
 // Fast version that uses item data directly (no fetch required)
 export async function removeOrderItemFast(
   item: OrderItem,
-  _userId: string
+  userId: string
 ): Promise<void> {
-  await apiClient.deleteOrderItem(item.orderId, item.id);
+  await apiClient.deleteOrderItem(item.orderId, item.id, userId);
   await recalculateOrderTotal(item.orderId);
 }
 
@@ -454,7 +454,7 @@ export async function removeOrderItem(itemId: string, userId: string): Promise<v
   const orderId = item.orderId;
 
   // Use direct API call with orderId we already have (avoids redundant fetch)
-  await apiClient.deleteOrderItem(orderId, itemId);
+  await apiClient.deleteOrderItem(orderId, itemId, userId);
   await recalculateOrderTotal(orderId);
 
   await logAudit({
@@ -635,6 +635,7 @@ export async function cancelOrder(
   await db.orders.update(orderId, {
     status: 'cancelled',
     cancellationReason,
+    userId, // Include userId for permission check on backend
     updatedAt: new Date(),
   });
 
@@ -773,6 +774,34 @@ export async function getOrdersPaginated(params: OrderQueryParams): Promise<Pagi
   }
   
   return result as PaginatedOrdersResult;
+}
+
+// FRAUD PREVENTION: Admin unlock function
+// Allows administrators to unlock a paid/completed order for legitimate corrections
+// This creates a complete audit trail
+export interface AdminUnlockParams {
+  orderId: string;
+  adminUserId: string;
+  reason: string;
+}
+
+export async function adminUnlockOrder(params: AdminUnlockParams): Promise<{ order: Order; message: string }> {
+  const response = await apiClient.post(`/orders/${params.orderId}/admin-unlock`, {
+    adminUserId: params.adminUserId,
+    reason: params.reason,
+  });
+  
+  await logAudit({
+    userId: params.adminUserId,
+    action: 'admin_unlock',
+    tableName: 'orders',
+    recordId: params.orderId,
+    description: `Admin unlocked order. Reason: ${params.reason}`,
+    before: null,
+    after: response.order,
+  });
+  
+  return response;
 }
 
 export async function getPastOrders(): Promise<Order[]> {

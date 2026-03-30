@@ -1,7 +1,7 @@
 // User and Role Types
 export interface Permission {
   resource: string;
-  actions: ('create' | 'read' | 'update' | 'delete' | 'export')[];
+  actions: ('create' | 'read' | 'update' | 'delete' | 'export' | 'cancel')[];
 }
 
 export interface Role {
