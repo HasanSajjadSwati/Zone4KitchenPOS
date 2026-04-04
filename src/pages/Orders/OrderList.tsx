@@ -6,7 +6,6 @@ import {
   PrinterIcon,
   XMarkIcon,
   PencilIcon,
-  CurrencyDollarIcon,
   TruckIcon,
 } from '@heroicons/react/24/outline';
 import { Button, Card, Modal, Select, Input } from '@/components/ui';
@@ -17,7 +16,6 @@ import {
   getOrdersPaginated,
   getOrderItems,
   cancelOrder,
-  markOrderAsPaid,
   updateDeliveryStatus,
 } from '@/services/orderService';
 import { printKOT, printCustomerReceipt } from '@/services/printService';
@@ -29,17 +27,10 @@ import { formatCurrency, formatDateTime } from '@/utils/validation';
 import type { Order, OrderItem, MenuItem, Deal } from '@/db/types';
 import { db } from '@/db';
 
-const paymentSchema = z.object({
-  paymentMethod: z.enum(['cash', 'card', 'online', 'other']),
-  paymentAmount: z.number().optional(),
-  paymentReference: z.string().optional(),
-});
-
 const cancelSchema = z.object({
   cancellationReason: z.string().min(3, 'Reason must be at least 3 characters').max(500, 'Reason is too long'),
 });
 
-type PaymentFormData = z.infer<typeof paymentSchema>;
 type CancelFormData = z.infer<typeof cancelSchema>;
 
 const DELIVERY_STATUSES = [
@@ -68,7 +59,6 @@ export const OrderList: React.FC = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [selectedOrderItems, setSelectedOrderItems] = useState<OrderItem[]>([]);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [isDeliveryStatusModalOpen, setIsDeliveryStatusModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -79,11 +69,6 @@ export const OrderList: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalOrders, setTotalOrders] = useState(0);
   const pageSize = 50; // Orders per page);
-
-  const paymentForm = useForm<PaymentFormData>({
-    resolver: zodResolver(paymentSchema),
-    defaultValues: { paymentMethod: 'cash' },
-  });
 
   const cancelForm = useForm<CancelFormData>({
     resolver: zodResolver(cancelSchema),
@@ -233,38 +218,6 @@ export const OrderList: React.FC = () => {
       await dialog.alert(`Delivery status updated to "${getDeliveryStatusInfo(newStatus).label}"`, 'Success');
     } catch (error) {
       await dialog.alert(error instanceof Error ? error.message : 'Failed to update delivery status', 'Error');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const openPaymentModal = (order: Order) => {
-    setSelectedOrder(order);
-    paymentForm.reset({
-      paymentMethod: 'cash',
-      paymentAmount: order.total,
-    });
-    setIsPaymentModalOpen(true);
-  };
-
-  const handleMarkAsPaid = async (data: PaymentFormData) => {
-    if (!currentUser || !selectedOrder) return;
-
-    setIsLoading(true);
-    try {
-      await markOrderAsPaid({
-        orderId: selectedOrder.id,
-        paymentMethod: data.paymentMethod,
-        paymentAmount: data.paymentAmount,
-        paymentReference: data.paymentReference,
-        userId: currentUser.id,
-      });
-
-      await loadOrders();
-      setIsPaymentModalOpen(false);
-      await dialog.alert('Order marked as paid successfully!', 'Success');
-    } catch (error) {
-      await dialog.alert(error instanceof Error ? error.message : 'Failed to mark order as paid', 'Error');
     } finally {
       setIsLoading(false);
     }
@@ -428,16 +381,6 @@ export const OrderList: React.FC = () => {
                         leftIcon={<TruckIcon className="w-4 h-4" />}
                       >
                         Delivery
-                      </Button>
-                    )}
-                    {!order.isPaid && (
-                      <Button
-                        size="sm"
-                        variant="primary"
-                        onClick={() => openPaymentModal(order)}
-                        leftIcon={<CurrencyDollarIcon className="w-4 h-4" />}
-                      >
-                        Mark Paid
                       </Button>
                     )}
                     <Button
@@ -670,90 +613,6 @@ export const OrderList: React.FC = () => {
               <Button onClick={() => setIsDetailsModalOpen(false)}>Close</Button>
             </div>
           </div>
-        )}
-      </Modal>
-
-      {/* Payment Modal */}
-      <Modal
-        isOpen={isPaymentModalOpen}
-        onClose={() => setIsPaymentModalOpen(false)}
-        title={`Mark Order as Paid - ${selectedOrder?.orderNumber}`}
-        size="md"
-      >
-        {selectedOrder && (
-          <form onSubmit={paymentForm.handleSubmit(handleMarkAsPaid)} className="space-y-4">
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600">Order Total:</span>
-                <span className="text-2xl font-bold text-primary-600">
-                  {formatCurrency(selectedOrder.total)}
-                </span>
-              </div>
-            </div>
-
-            <Select
-              label="Payment Method"
-              {...paymentForm.register('paymentMethod')}
-              error={paymentForm.formState.errors.paymentMethod?.message}
-            >
-              <option value="cash">Cash</option>
-              <option value="card">Card</option>
-              <option value="online">Online</option>
-              <option value="other">Other</option>
-            </Select>
-
-            <Input
-              label="Amount Tendered"
-              type="number"
-              step="0.01"
-              helperText="Used for change calculation only. Recorded payment is capped to remaining order balance."
-              {...paymentForm.register('paymentAmount', { valueAsNumber: true })}
-              error={paymentForm.formState.errors.paymentAmount?.message}
-            />
-
-            {/* Change Due Calculator */}
-            {(() => {
-              const paymentAmount = paymentForm.watch('paymentAmount');
-              const orderTotal = selectedOrder.total;
-              const change = (paymentAmount || 0) - orderTotal;
-
-              if (paymentAmount && change > 0) {
-                return (
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-green-700 font-medium">Change to Return:</span>
-                      <span className="text-2xl font-bold text-green-600">
-                        {formatCurrency(change)}
-                      </span>
-                    </div>
-                  </div>
-                );
-              }
-              return null;
-            })()}
-
-            <Input
-              label="Payment Reference (optional)"
-              type="text"
-              placeholder="Transaction ID, Check Number, etc."
-              {...paymentForm.register('paymentReference')}
-              error={paymentForm.formState.errors.paymentReference?.message}
-            />
-
-            <div className="flex justify-end space-x-3 pt-4">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => setIsPaymentModalOpen(false)}
-                disabled={isLoading}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" variant="primary" disabled={isLoading}>
-                {isLoading ? 'Processing...' : 'Mark as Paid'}
-              </Button>
-            </div>
-          </form>
         )}
       </Modal>
 
