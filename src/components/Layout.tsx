@@ -122,6 +122,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       items: [
         { name: 'Sales Summary', href: '/reports/sales-summary', icon: ChartBarIcon, resource: 'reports', action: 'read' },
         { name: 'Item Sales', href: '/reports/item-sales', icon: ChartBarIcon, resource: 'reports', action: 'read' },
+        { name: 'Category Sales', href: '/reports/category-sales', icon: RectangleStackIcon, resource: 'reports', action: 'read' },
         { name: 'Cancelled Orders', href: '/reports/cancelled-orders', icon: ClipboardDocumentListIcon, resource: 'reports', action: 'read' },
         { name: 'Order Details', href: '/reports/orders-detailed', icon: DocumentTextIcon, resource: 'reports', action: 'read' },
         { name: 'Discounts', href: '/reports/discounts', icon: ReceiptPercentIcon, resource: 'reports', action: 'read' },

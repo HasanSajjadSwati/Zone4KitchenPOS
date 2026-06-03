@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Select, TimePicker } from '@/components/ui';
-import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
+import { Card, Button, TimePicker, RegisterSessionPicker } from '@/components/ui';
+import { ArrowDownTrayIcon, EyeIcon } from '@heroicons/react/24/outline';
 import { getCancelledOrders, exportToCSV, exportToPDF, type CancelledOrder, type DateRange } from '@/services/reportService';
 import { getAllSessions } from '@/services/registerService';
 import type { RegisterSession } from '@/db/types';
 import { formatCurrency, formatDateTime } from '@/utils/validation';
 import { useDayRange } from '@/hooks/useDayRange';
-import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays, format } from 'date-fns';
+import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays } from 'date-fns';
+import { OrderDetailModal } from '@/components/OrderDetailModal';
 
 type DateRangePreset = 'today' | 'yesterday' | 'this_week' | 'this_month' | 'custom' | 'register_session';
 
@@ -19,6 +20,10 @@ export const CancelledOrdersReport: React.FC = () => {
   const [customEndTime, setCustomEndTime] = useState('23:59');
   const [cancelledOrders, setCancelledOrders] = useState<CancelledOrder[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Order detail modal
+  const [viewOrderId, setViewOrderId] = useState<string | null>(null);
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
 
   // Register session filter
   const [registerSessions, setRegisterSessions] = useState<RegisterSession[]>([]);
@@ -166,28 +171,11 @@ export const CancelledOrdersReport: React.FC = () => {
           </div>
 
           {datePreset === 'register_session' && (
-            <div className="pt-3 border-t border-gray-100">
-              <Select
-                label="Select Register Session"
-                value={selectedSessionId}
-                onChange={(e) => setSelectedSessionId(e.target.value)}
-              >
-                <option value="">-- Select a session --</option>
-                {registerSessions.map((session) => {
-                  const openDate = format(new Date(session.openedAt), 'dd/MM/yyyy, hh:mm a');
-                  const closeDate = session.closedAt ? format(new Date(session.closedAt), 'dd/MM/yyyy, hh:mm a') : 'Still Open';
-                  const statusLabel = session.status === 'open' ? ' (OPEN)' : '';
-                  return (
-                    <option key={session.id} value={session.id}>
-                      {openDate} → {closeDate}{statusLabel} | Sales: Rs {session.totalSales?.toLocaleString() || 0} / {session.totalOrders || 0} orders
-                    </option>
-                  );
-                })}
-              </Select>
-              <p className="text-xs text-gray-500 mt-1">
-                Filter by exact register session to match register sales totals perfectly.
-              </p>
-            </div>
+            <RegisterSessionPicker
+              sessions={registerSessions}
+              selectedId={selectedSessionId}
+              onSelect={setSelectedSessionId}
+            />
           )}
 
           {datePreset === 'custom' && (
@@ -263,7 +251,15 @@ export const CancelledOrdersReport: React.FC = () => {
               <tbody className="divide-y divide-gray-100">
                 {cancelledOrders.map((order) => (
                   <tr key={order.orderId} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{order.orderNumber}</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm">
+                      <button
+                        onClick={() => { setViewOrderId(order.orderId); setIsOrderModalOpen(true); }}
+                        className="font-medium text-primary-600 hover:text-primary-800 hover:underline flex items-center gap-1.5"
+                      >
+                        <EyeIcon className="w-3.5 h-3.5" />
+                        {order.orderNumber}
+                      </button>
+                    </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                       {formatDateTime(order.orderDate)}
                     </td>
@@ -288,6 +284,13 @@ export const CancelledOrdersReport: React.FC = () => {
           </div>
         )}
       </Card>
+
+      {/* Order Detail Modal */}
+      <OrderDetailModal
+        orderId={viewOrderId}
+        isOpen={isOrderModalOpen}
+        onClose={() => { setIsOrderModalOpen(false); setViewOrderId(null); }}
+      />
     </div>
   );
 };

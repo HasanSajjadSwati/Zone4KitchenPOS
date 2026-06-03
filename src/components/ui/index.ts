@@ -6,3 +6,4 @@ export { Card } from './Card';
 export { Badge } from './Badge';
 export { CategoryFilter } from './CategoryFilter';
 export { TimePicker } from './TimePicker';
+export { RegisterSessionPicker } from './RegisterSessionPicker';

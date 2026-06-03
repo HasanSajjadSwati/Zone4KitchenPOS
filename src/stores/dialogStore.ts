@@ -34,7 +34,7 @@ export type Dialog = AlertDialog | ConfirmDialog | PromptDialog;
 interface DialogState {
   dialog: Dialog | null;
   isOpen: boolean;
-  showAlert: (message: string, title?: string) => void;
+  showAlert: (message: string, title?: string, onClose?: () => void) => void;
   showConfirm: (params: {
     message: string;
     title?: string;
@@ -59,9 +59,9 @@ interface DialogState {
 export const useDialogStore = create<DialogState>((set) => ({
   dialog: null,
   isOpen: false,
-  showAlert: (message: string, title?: string) => {
+  showAlert: (message: string, title?: string, onClose?: () => void) => {
     set({
-      dialog: { type: 'alert', message, title },
+      dialog: { type: 'alert', message, title, onClose },
       isOpen: true,
     });
   },

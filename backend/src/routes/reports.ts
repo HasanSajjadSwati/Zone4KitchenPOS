@@ -401,3 +401,115 @@ reportRoutes.get('/category-sales', async (req, res) => {
     res.status(500).json({ error: (error as Error).message });
   }
 });
+
+// Hierarchical category sales (major categories with subcategory breakdown)
+reportRoutes.get('/category-sales-detailed', async (req, res) => {
+  try {
+    const dateExpr = 'o.completedAt';
+    const { conditions, params } = buildDateFilters(dateExpr, req.query.startDate, req.query.endDate);
+    const baseConditions = [`o.status = 'completed'`, `oi.itemType = 'menu_item'`, ...conditions];
+    const whereClause = baseConditions.length > 0 ? `WHERE ${baseConditions.join(' AND ')}` : '';
+
+    logger.debug('Category sales detailed query', { whereClause, params });
+
+    // Get sales per subcategory (the actual category items belong to)
+    const rows = await allAsync(
+      `
+        SELECT
+          c.id AS "categoryId",
+          c.name AS "categoryName",
+          c.type AS "categoryType",
+          c.parentId AS "parentId",
+          COALESCE(SUM(oi.totalPrice), 0) AS "totalSales",
+          COALESCE(SUM(oi.quantity), 0) AS "totalQuantity",
+          COUNT(DISTINCT oi.orderId) AS "orderCount",
+          CASE
+            WHEN COALESCE(SUM(oi.quantity), 0) > 0
+            THEN COALESCE(SUM(oi.totalPrice), 0) / COALESCE(SUM(oi.quantity), 0)
+            ELSE 0
+          END AS "averagePrice"
+        FROM ${ALL_ORDER_ITEMS} oi
+        JOIN ${ALL_ORDERS} o ON o.id = oi.orderId
+        JOIN menuItems m ON m.id = oi.menuItemId
+        JOIN categories c ON c.id = m.categoryId
+        ${whereClause}
+        GROUP BY c.id, c.name, c.type, c.parentId
+        ORDER BY "totalSales" DESC
+      `,
+      params
+    );
+
+    // Get all categories to build hierarchy (including those with no sales)
+    const allCategories = await allAsync(
+      `SELECT id, name, type, parentId, sortOrder FROM categories WHERE isActive = 1 ORDER BY sortOrder`,
+      []
+    );
+
+    // Build maps
+    const majorCategories = allCategories.filter((c: any) => c.type === 'major');
+    const salesByCategory = new Map<string, any>();
+    for (const row of rows) {
+      salesByCategory.set(row.categoryId, {
+        categoryId: row.categoryId,
+        categoryName: row.categoryName,
+        categoryType: row.categoryType,
+        parentId: row.parentId,
+        totalSales: toNumber(row.totalSales),
+        totalQuantity: toNumber(row.totalQuantity),
+        orderCount: toNumber(row.orderCount),
+        averagePrice: toNumber(row.averagePrice),
+      });
+    }
+
+    // Build hierarchical result
+    const result = majorCategories.map((major: any) => {
+      // Find subcategories for this major category
+      const subCategories = allCategories
+        .filter((c: any) => c.parentId === major.id)
+        .map((sub: any) => {
+          const sales = salesByCategory.get(sub.id);
+          return {
+            categoryId: sub.id,
+            categoryName: sub.name,
+            totalSales: sales ? sales.totalSales : 0,
+            totalQuantity: sales ? sales.totalQuantity : 0,
+            orderCount: sales ? sales.orderCount : 0,
+            averagePrice: sales ? sales.averagePrice : 0,
+          };
+        })
+        .sort((a: any, b: any) => b.totalSales - a.totalSales);
+
+      // Major category own sales (items directly in major category)
+      const majorSales = salesByCategory.get(major.id);
+
+      // Aggregate: major category totals = own sales + all subcategory sales
+      const subTotalSales = subCategories.reduce((sum: number, s: any) => sum + s.totalSales, 0);
+      const subTotalQuantity = subCategories.reduce((sum: number, s: any) => sum + s.totalQuantity, 0);
+      const subOrderIds = subCategories.reduce((sum: number, s: any) => sum + s.orderCount, 0);
+
+      const ownSales = majorSales ? majorSales.totalSales : 0;
+      const ownQuantity = majorSales ? majorSales.totalQuantity : 0;
+      const ownOrders = majorSales ? majorSales.orderCount : 0;
+
+      const aggregatedTotalSales = ownSales + subTotalSales;
+      const aggregatedTotalQuantity = ownQuantity + subTotalQuantity;
+      const aggregatedOrderCount = ownOrders + subOrderIds;
+
+      return {
+        categoryId: major.id,
+        categoryName: major.name,
+        totalSales: aggregatedTotalSales,
+        totalQuantity: aggregatedTotalQuantity,
+        orderCount: aggregatedOrderCount,
+        averagePrice: aggregatedTotalQuantity > 0 ? aggregatedTotalSales / aggregatedTotalQuantity : 0,
+        subCategories,
+      };
+    })
+    .sort((a: any, b: any) => b.totalSales - a.totalSales);
+
+    res.json(result);
+  } catch (error) {
+    logger.error('Category sales detailed report error', error);
+    res.status(500).json({ error: (error as Error).message });
+  }
+});

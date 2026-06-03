@@ -44,6 +44,25 @@ export interface CategorySales {
   averagePrice: number;
 }
 
+export interface SubCategorySales {
+  categoryId: string;
+  categoryName: string;
+  totalSales: number;
+  totalQuantity: number;
+  orderCount: number;
+  averagePrice: number;
+}
+
+export interface MajorCategorySales {
+  categoryId: string;
+  categoryName: string;
+  totalSales: number;
+  totalQuantity: number;
+  orderCount: number;
+  averagePrice: number;
+  subCategories: SubCategorySales[];
+}
+
 export interface ItemSales {
   itemId: string;
   itemName: string;
@@ -540,6 +559,71 @@ export async function getCategorySales(range: DateRange, registerSessionId?: str
   }
 
   return result.sort((a, b) => b.totalSales - a.totalSales);
+}
+
+/**
+ * Get hierarchical sales by major category with subcategory breakdown
+ */
+export async function getCategorySalesDetailed(range: DateRange, registerSessionId?: string): Promise<MajorCategorySales[]> {
+  const rangeFilters = buildRangeFilters(range);
+
+  if (!registerSessionId) {
+    try {
+      const data = await apiClient.getCategorySalesDetailedReport(rangeFilters);
+      if (Array.isArray(data)) {
+        return data as MajorCategorySales[];
+      }
+    } catch (error) {
+      console.warn('Category sales detailed report endpoint failed, falling back to client aggregation:', error);
+    }
+  }
+
+  // Fallback: use existing getCategorySales + local category hierarchy
+  const [flatSales, allCategories] = await Promise.all([
+    getCategorySales(range, registerSessionId),
+    db.categories.toArray(),
+  ]);
+
+  const majorCategories = allCategories.filter((c: Category) => c.type === 'major');
+  const salesMap = new Map(flatSales.map(s => [s.categoryId, s]));
+
+  return majorCategories
+    .map((major: Category) => {
+      const subs = allCategories.filter((c: Category) => c.parentId === major.id);
+      const subCategorySales: SubCategorySales[] = subs
+        .map((sub: Category) => {
+          const sales = salesMap.get(sub.id);
+          return {
+            categoryId: sub.id,
+            categoryName: sub.name,
+            totalSales: sales?.totalSales || 0,
+            totalQuantity: sales?.totalQuantity || 0,
+            orderCount: sales?.orderCount || 0,
+            averagePrice: sales?.averagePrice || 0,
+          };
+        })
+        .sort((a: SubCategorySales, b: SubCategorySales) => b.totalSales - a.totalSales);
+
+      const majorSales = salesMap.get(major.id);
+      const ownSales = majorSales?.totalSales || 0;
+      const ownQty = majorSales?.totalQuantity || 0;
+      const ownOrders = majorSales?.orderCount || 0;
+
+      const totalSales = ownSales + subCategorySales.reduce((s, c) => s + c.totalSales, 0);
+      const totalQuantity = ownQty + subCategorySales.reduce((s, c) => s + c.totalQuantity, 0);
+      const orderCount = ownOrders + subCategorySales.reduce((s, c) => s + c.orderCount, 0);
+
+      return {
+        categoryId: major.id,
+        categoryName: major.name,
+        totalSales,
+        totalQuantity,
+        orderCount,
+        averagePrice: totalQuantity > 0 ? totalSales / totalQuantity : 0,
+        subCategories: subCategorySales,
+      };
+    })
+    .sort((a: MajorCategorySales, b: MajorCategorySales) => b.totalSales - a.totalSales);
 }
 
 /**

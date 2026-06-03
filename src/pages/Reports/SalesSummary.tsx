@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Card, Select, TimePicker } from '@/components/ui';
+import { Button, Card, TimePicker, RegisterSessionPicker } from '@/components/ui';
 import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import {
   getSalesSummary,
@@ -15,7 +15,7 @@ import type { RegisterSession } from '@/db/types';
 import { useDialog } from '@/hooks/useDialog';
 import { useDayRange } from '@/hooks/useDayRange';
 import { formatCurrency } from '@/utils/validation';
-import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays, format } from 'date-fns';
+import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays } from 'date-fns';
 
 type DateRangePreset = 'today' | 'yesterday' | 'this_week' | 'this_month' | 'custom' | 'register_session';
 
@@ -305,28 +305,11 @@ export const SalesSummary: React.FC = () => {
         </div>
 
         {datePreset === 'register_session' && (
-          <div className="pt-3 border-t border-gray-100 mt-4">
-            <Select
-              label="Select Register Session"
-              value={selectedSessionId}
-              onChange={(e) => setSelectedSessionId(e.target.value)}
-            >
-              <option value="">-- Select a session --</option>
-              {registerSessions.map((session) => {
-                const openDate = format(new Date(session.openedAt), 'dd/MM/yyyy, hh:mm a');
-                const closeDate = session.closedAt ? format(new Date(session.closedAt), 'dd/MM/yyyy, hh:mm a') : 'Still Open';
-                const statusLabel = session.status === 'open' ? ' (OPEN)' : '';
-                return (
-                  <option key={session.id} value={session.id}>
-                    {openDate} → {closeDate}{statusLabel} | Sales: Rs {session.totalSales?.toLocaleString() || 0} / {session.totalOrders || 0} orders
-                  </option>
-                );
-              })}
-            </Select>
-            <p className="text-xs text-gray-500 mt-1">
-              Filter by exact register session to match register sales totals perfectly.
-            </p>
-          </div>
+          <RegisterSessionPicker
+            sessions={registerSessions}
+            selectedId={selectedSessionId}
+            onSelect={setSelectedSessionId}
+          />
         )}
 
         {datePreset === 'custom' && (

@@ -603,6 +603,15 @@ class APIClient {
     return this.get(endpoint);
   }
 
+  async getCategorySalesDetailedReport(filters?: Record<string, string>) {
+    let endpoint = '/reports/category-sales-detailed';
+    if (filters) {
+      const params = new URLSearchParams(filters);
+      endpoint += `?${params.toString()}`;
+    }
+    return this.get(endpoint);
+  }
+
   // Waiters
   async getWaiters() {
     return this.get('/staff/waiters');

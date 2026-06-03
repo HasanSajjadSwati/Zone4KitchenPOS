@@ -3,7 +3,13 @@
     "allow": [
       "Bash(npm run build:*)",
       "Bash(wc:*)",
-      "Bash(npx vite build:*)"
+      "Bash(npx vite build:*)",
+      "mcp__plugin_claude-mem_mcp-search__smart_outline",
+      "Bash(done)",
+      "Bash(dir:*)",
+      "Bash(ls:*)",
+      "Bash(sqlite3:*)",
+      "Bash(grep:*)"
     ]
   }
 }

@@ -13,6 +13,9 @@ export const DialogProvider: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleClose = () => {
+    if (dialog?.type === 'alert' && dialog.onClose) {
+      dialog.onClose();
+    }
     setPromptValue('');
     setIsLoading(false);
     close();

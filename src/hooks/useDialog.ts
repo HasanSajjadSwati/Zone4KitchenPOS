@@ -6,9 +6,7 @@ export const useDialog = () => {
   return {
     alert: (message: string, title?: string) => {
       return new Promise<void>((resolve) => {
-        showAlert(message, title);
-        // Resolve after a short delay to allow the modal to close
-        setTimeout(resolve, 100);
+        showAlert(message, title, () => resolve());
       });
     },
     confirm: (params: {

@@ -40,6 +40,11 @@ export async function initializeDatabase() {
     await runAsync('CREATE INDEX IF NOT EXISTS idx_payments_orderId_method ON payments(orderId, method)');
     logger.info('Report performance indexes created/verified');
 
+    // Add discountReference column to orders (safe for existing databases)
+    await runAsync('ALTER TABLE orders ADD COLUMN IF NOT EXISTS discountReference TEXT');
+    await runAsync('ALTER TABLE pastOrders ADD COLUMN IF NOT EXISTS discountReference TEXT');
+    logger.info('Added discountReference column to orders tables');
+
     // Add itemName column to order items (safe for existing databases)
     await runAsync('ALTER TABLE orderItems ADD COLUMN IF NOT EXISTS itemName TEXT NOT NULL DEFAULT \'\'');
     await runAsync('ALTER TABLE pastOrderItems ADD COLUMN IF NOT EXISTS itemName TEXT NOT NULL DEFAULT \'\'');

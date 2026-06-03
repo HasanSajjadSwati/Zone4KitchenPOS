@@ -352,16 +352,24 @@ orderRoutes.get('/', async (req, res) => {
   }
 });
 
-// Get order with items
+// Get order with items (checks active orders first, then past/archived orders)
 orderRoutes.get('/:id', async (req, res) => {
   try {
     let order = await getAsync('SELECT * FROM orders WHERE id = ?', [req.params.id]);
+    let itemsTable = 'orderItems';
+
+    // Fall back to past/archived orders if not found in active orders
+    if (!order) {
+      order = await getAsync('SELECT * FROM pastOrders WHERE id = ?', [req.params.id]);
+      itemsTable = 'pastOrderItems';
+    }
+
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
     }
 
     const items = await allAsync(
-      'SELECT * FROM orderItems WHERE orderId = ? ORDER BY addedAt',
+      `SELECT * FROM ${itemsTable} WHERE orderId = ? ORDER BY addedAt`,
       [req.params.id]
     );
 
@@ -383,17 +391,19 @@ orderRoutes.get('/:id', async (req, res) => {
       }
       const totalBeforeCharges = Math.max(0, itemsTotal - discountAmount);
       const total = Math.max(0, totalBeforeCharges + deliveryCharge);
-      
+
       // Update in memory for response
       order.subtotal = itemsTotal;
       order.discountAmount = discountAmount;
       order.total = total;
-      
-      // Persist the fix
-      await runAsync(
-        'UPDATE orders SET subtotal = ?, discountAmount = ?, total = ? WHERE id = ?',
-        [itemsTotal, discountAmount, total, order.id]
-      );
+
+      // Persist the fix (only for active orders)
+      if (itemsTable === 'orderItems') {
+        await runAsync(
+          'UPDATE orders SET subtotal = ?, discountAmount = ?, total = ? WHERE id = ?',
+          [itemsTotal, discountAmount, total, order.id]
+        );
+      }
     }
 
     res.json(convertBooleans({ ...order, items: parsedItems }));
@@ -419,6 +429,7 @@ orderRoutes.post('/', async (req, res) => {
       subtotal,
       discountType,
       discountValue,
+      discountReference,
       discountAmount,
       total,
       createdBy,
@@ -476,13 +487,13 @@ orderRoutes.post('/', async (req, res) => {
       `INSERT INTO orders (
         id, orderNumber, registerSessionId, orderType, tableId, waiterId,
         customerName, customerPhone, customerId, riderId, deliveryAddress, deliveryCharge,
-        subtotal, discountType, discountValue, discountAmount, total,
+        subtotal, discountType, discountValue, discountReference, discountAmount, total,
         status, deliveryStatus, isPaid, createdBy, createdAt, updatedAt, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id, orderNumber, registerSessionId, orderType, tableId || null, waiterId || null,
         customerName || null, customerPhone || null, customerId || null, riderId || null, deliveryAddress || null, normalizedDeliveryCharge,
-        subtotal, discountType || null, discountValue || 0, discountAmount || 0, total,
+        subtotal, discountType || null, discountValue || 0, discountReference || null, discountAmount || 0, total,
         'open', initialDeliveryStatus, 0, createdBy, now, now, notes || null
       ]
     );
@@ -504,7 +515,7 @@ orderRoutes.put('/:id', async (req, res) => {
   try {
     const {
       customerName, customerPhone, customerId, notes,
-      status, deliveryStatus, isPaid, subtotal, discountType, discountValue, discountAmount, total,
+      status, deliveryStatus, isPaid, subtotal, discountType, discountValue, discountReference, discountAmount, total,
       completedBy, cancellationReason, waiterId, riderId, deliveryAddress, deliveryCharge
     } = req.body;
     const now = new Date().toISOString();
@@ -608,6 +619,10 @@ orderRoutes.put('/:id', async (req, res) => {
     if (discountAmount !== undefined) {
       updates.push('discountAmount = ?');
       values.push(discountAmount);
+    }
+    if (discountReference !== undefined) {
+      updates.push('discountReference = ?');
+      values.push(discountReference);
     }
     if (total !== undefined) {
       updates.push('total = ?');

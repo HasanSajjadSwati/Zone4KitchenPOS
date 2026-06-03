@@ -9,12 +9,12 @@ import {
   TruckIcon,
 } from '@heroicons/react/24/outline';
 import { Button, Card, Modal, Select } from '@/components/ui';
+import { OrderDetailModal } from '@/components/OrderDetailModal';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
   getOrdersPaginated,
-  getOrderItems,
   cancelOrder,
   updateDeliveryStatus,
 } from '@/services/orderService';
@@ -24,8 +24,7 @@ import { useDialog } from '@/hooks/useDialog';
 import { useSyncRefresh } from '@/contexts/SyncContext';
 import { useDayRange } from '@/hooks/useDayRange';
 import { formatCurrency, formatDateTime } from '@/utils/validation';
-import type { Order, OrderItem, MenuItem, Deal } from '@/db/types';
-import { db } from '@/db';
+import type { Order } from '@/db/types';
 
 const cancelSchema = z.object({
   cancellationReason: z.string().min(3, 'Reason must be at least 3 characters').max(500, 'Reason is too long'),
@@ -57,13 +56,10 @@ export const OrderList: React.FC = () => {
   const [filterType, setFilterType] = useState<string>('all');
   const [filterPayment, setFilterPayment] = useState<'all' | 'paid' | 'unpaid'>('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [selectedOrderItems, setSelectedOrderItems] = useState<OrderItem[]>([]);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [isDeliveryStatusModalOpen, setIsDeliveryStatusModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [menuItemNameById, setMenuItemNameById] = useState<Record<string, string>>({});
-  const [dealNameById, setDealNameById] = useState<Record<string, string>>({});
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -83,41 +79,6 @@ export const OrderList: React.FC = () => {
   useEffect(() => {
     setCurrentPage(1);
   }, [filterStatus, filterType, filterPayment]);
-
-  useEffect(() => {
-    const loadItemLookups = async () => {
-      try {
-        const [menuItems, deals] = await Promise.all([
-          db.menuItems.toArray(),
-          db.deals.toArray(),
-        ]);
-        const menuItemNames: Record<string, string> = {};
-        const dealNames: Record<string, string> = {};
-
-        (menuItems as MenuItem[]).forEach((item) => {
-          menuItemNames[item.id] = item.name;
-        });
-
-        (deals as Deal[]).forEach((deal) => {
-          dealNames[deal.id] = deal.name;
-        });
-
-        setMenuItemNameById(menuItemNames);
-        setDealNameById(dealNames);
-      } catch (error) {
-        console.warn('Failed to load item names for order details:', error);
-      }
-    };
-
-    loadItemLookups();
-  }, []);
-
-  const getItemDisplayName = (item: OrderItem) => {
-    if (item.itemType === 'menu_item') {
-      return item.menuItemId ? menuItemNameById[item.menuItemId] || 'Unknown Item' : 'Unknown Item';
-    }
-    return item.dealId ? dealNameById[item.dealId] || 'Unknown Deal' : 'Unknown Deal';
-  };
 
   const loadOrders = useCallback(async () => {
     // Use day range based on setting (register session or calendar day)
@@ -143,10 +104,8 @@ export const OrderList: React.FC = () => {
   // Real-time sync: auto-refresh when orders/payments change on other terminals
   useSyncRefresh(['orders', 'order_items', 'payments'], loadOrders);
 
-  const handleViewDetails = async (order: Order) => {
+  const handleViewDetails = (order: Order) => {
     setSelectedOrder(order);
-    const items = await getOrderItems(order.id);
-    setSelectedOrderItems(items);
     setIsDetailsModalOpen(true);
   };
 
@@ -459,162 +418,11 @@ export const OrderList: React.FC = () => {
       </div>
 
       {/* Order Details Modal */}
-      <Modal
+      <OrderDetailModal
+        orderId={selectedOrder?.id || null}
         isOpen={isDetailsModalOpen}
         onClose={() => setIsDetailsModalOpen(false)}
-        title={`Order Details - ${selectedOrder?.orderNumber}`}
-        size="lg"
-      >
-        {selectedOrder && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
-              <div>
-                <p className="text-sm text-gray-600">Status</p>
-                <p className="font-semibold">{selectedOrder.status.toUpperCase()}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Payment</p>
-                <p className="font-semibold">
-                  {selectedOrder.isPaid ? 'PAID' : 'UNPAID'}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Type</p>
-                <p className="font-semibold">
-                  {selectedOrder.orderType.replace('_', ' ').toUpperCase()}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Created</p>
-                <p className="font-semibold">{formatDateTime(selectedOrder.createdAt)}</p>
-              </div>
-              {selectedOrder.orderType === 'delivery' && (
-                <div>
-                  <p className="text-sm text-gray-600">Delivery Status</p>
-                  <span className={`inline-block px-2 py-1 text-xs font-medium rounded ${getDeliveryStatusInfo(selectedOrder.deliveryStatus).color}`}>
-                    {getDeliveryStatusInfo(selectedOrder.deliveryStatus).label}
-                  </span>
-                </div>
-              )}
-              {selectedOrder.customerName && (
-                <div className="col-span-2">
-                  <p className="text-sm text-gray-600">Customer</p>
-                  <p className="font-semibold">{selectedOrder.customerName}</p>
-                  {selectedOrder.customerPhone && (
-                    <p className="text-sm text-gray-500">{selectedOrder.customerPhone}</p>
-                  )}
-                </div>
-              )}
-              {selectedOrder.deliveryAddress && (
-                <div className="col-span-2">
-                  <p className="text-sm text-gray-600">Delivery Address</p>
-                  <p className="font-semibold">{selectedOrder.deliveryAddress}</p>
-                </div>
-              )}
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-3">Order Items</h3>
-              <div className="space-y-2">
-                {selectedOrderItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"
-                  >
-                    <div className="flex-1">
-                      <p className="font-semibold text-gray-900">
-                        {item.quantity}x{' '}
-                        {getItemDisplayName(item)}
-                      </p>
-                      {item.selectedVariants.length > 0 && (
-                        <p className="text-sm text-gray-600">
-                          {item.selectedVariants
-                            .map((v) => {
-                              if (v.selectedOptions && v.selectedOptions.length > 0) {
-                                const optionNames = v.selectedOptions.map((o) => o.optionName).join(', ');
-                                return `${v.variantName}: ${optionNames}`;
-                              }
-                              return `${v.variantName}: ${v.optionName}`;
-                            })
-                            .join(', ')}
-                        </p>
-                      )}
-                      {item.notes && (
-                        <p className="text-sm text-gray-500 italic">{item.notes}</p>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm text-gray-600">
-                        {formatCurrency(item.unitPrice)} each
-                      </p>
-                      <p className="font-bold text-gray-900">
-                        {formatCurrency(item.totalPrice)}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="border-t border-gray-200 pt-4 space-y-2">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Subtotal:</span>
-                <span className="font-semibold">{formatCurrency(selectedOrder.subtotal)}</span>
-              </div>
-
-              {selectedOrder.discountAmount > 0 && (
-                <div className="flex justify-between text-red-600">
-                  <span>
-                    Discount
-                    {selectedOrder.discountReference &&
-                      ` (${selectedOrder.discountReference})`}
-                    :
-                  </span>
-                  <span className="font-semibold">
-                    -{formatCurrency(selectedOrder.discountAmount)}
-                  </span>
-                </div>
-              )}
-
-              {selectedOrder.orderType === 'delivery' && (
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Delivery Charges:</span>
-                  <span className="font-semibold">
-                    {formatCurrency(selectedOrder.deliveryCharge)}
-                  </span>
-                </div>
-              )}
-
-              <div className="flex justify-between text-lg font-bold border-t border-gray-300 pt-2">
-                <span>Total:</span>
-                <span className="text-primary-600">{formatCurrency(selectedOrder.total)}</span>
-              </div>
-            </div>
-
-            <div className="flex justify-end space-x-3 pt-4">
-              {selectedOrder.status === 'open' && (
-                <Button
-                  variant="secondary"
-                  onClick={() => handlePrintKOT(selectedOrder.id)}
-                  leftIcon={<PrinterIcon className="w-5 h-5" />}
-                >
-                  Print KOT
-                </Button>
-              )}
-              {selectedOrder.status === 'completed' && (
-                <Button
-                  variant="secondary"
-                  onClick={() => handlePrintReceipt(selectedOrder.id)}
-                  leftIcon={<PrinterIcon className="w-5 h-5" />}
-                >
-                  Print Receipt
-                </Button>
-              )}
-              <Button onClick={() => setIsDetailsModalOpen(false)}>Close</Button>
-            </div>
-          </div>
-        )}
-      </Modal>
+      />
 
       {/* Cancel Order Modal */}
       <Modal
