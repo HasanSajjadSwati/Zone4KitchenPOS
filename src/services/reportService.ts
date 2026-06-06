@@ -1388,6 +1388,90 @@ export async function searchCustomerReports(query: string): Promise<CustomerDeta
   return reports.sort((a, b) => b.totalAmount - a.totalAmount);
 }
 
+export interface ItemTrendPoint {
+  itemId: string;
+  itemName: string;
+  categoryName: string | null;
+  dailyData: { date: string; quantity: number; sales: number }[];
+  totalQuantity: number;
+  totalSales: number;
+}
+
+/**
+ * Get per-item daily sales trend for a date range
+ */
+export async function getItemTrendData(range: DateRange, registerSessionId?: string): Promise<ItemTrendPoint[]> {
+  const rangeFilters = buildRangeFilters(range);
+  const orderQuery: Record<string, string> = registerSessionId
+    ? { registerSessionId, status: 'completed', includePast: 'true' }
+    : { ...rangeFilters, status: 'completed', includePast: 'true' };
+
+  const orders = registerSessionId
+    ? await apiClient.getOrders(orderQuery)
+    : filterOrdersInRange(await apiClient.getOrders(orderQuery), range);
+
+  const orderIds = orders.map((order: Order) => order.id);
+  const allItems = await fetchOrderItemsByOrderIds(orderIds);
+  const orderItems = allItems.filter((item: OrderItem) => item.itemType === 'menu_item');
+
+  const orderDateMap = new Map<string, string>();
+  for (const order of orders) {
+    const d = resolveOrderDate(order);
+    if (d) {
+      const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      orderDateMap.set(order.id, date);
+    }
+  }
+
+  const menuItems = await db.menuItems.toArray();
+  const categories = await db.categories.toArray();
+
+  const itemDateMap = new Map<string, Map<string, { quantity: number; sales: number }>>();
+
+  for (const item of orderItems) {
+    if (!item.menuItemId) continue;
+    const date = orderDateMap.get(item.orderId);
+    if (!date) continue;
+
+    if (!itemDateMap.has(item.menuItemId)) {
+      itemDateMap.set(item.menuItemId, new Map());
+    }
+    const dateMap = itemDateMap.get(item.menuItemId)!;
+    const existing = dateMap.get(date) || { quantity: 0, sales: 0 };
+    existing.quantity += item.quantity;
+    existing.sales += item.totalPrice;
+    dateMap.set(date, existing);
+  }
+
+  const result: ItemTrendPoint[] = [];
+  for (const [itemId, dateMap] of itemDateMap.entries()) {
+    const menuItem = menuItems.find((m: MenuItem) => m.id === itemId);
+    if (!menuItem) continue;
+
+    const category = menuItem.categoryId
+      ? categories.find((c: Category) => c.id === menuItem.categoryId)
+      : null;
+
+    const dailyData = Array.from(dateMap.entries())
+      .map(([date, stats]) => ({ date, ...stats }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    const totalQuantity = dailyData.reduce((s, d) => s + d.quantity, 0);
+    const totalSales = dailyData.reduce((s, d) => s + d.sales, 0);
+
+    result.push({
+      itemId,
+      itemName: menuItem.name,
+      categoryName: category?.name || null,
+      dailyData,
+      totalQuantity,
+      totalSales,
+    });
+  }
+
+  return result.sort((a, b) => b.totalSales - a.totalSales);
+}
+
 /**
  * Export data to CSV format
  */

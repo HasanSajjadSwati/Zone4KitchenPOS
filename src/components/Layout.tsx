@@ -129,6 +129,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         { name: 'Employee Loans', href: '/reports/employee-loans', icon: DocumentTextIcon, resource: 'reports', action: 'read' },
         { name: 'Daily Expense', href: '/reports/daily-expense', icon: DocumentTextIcon, resource: 'reports', action: 'read' },
         { name: 'Customer Details', href: '/reports/customer-detailed', icon: DocumentTextIcon, resource: 'reports', action: 'read' },
+        { name: 'Trend Analysis', href: '/reports/trend-analysis', icon: ChartBarIcon, resource: 'reports', action: 'read' },
       ],
     },
   ];
