@@ -379,7 +379,7 @@ export const TrendAnalysis: React.FC = () => {
                   interval="preserveStartEnd"
                 />
                 <YAxis
-                  tickFormatter={(v) => formatAxisValue(v, metric)}
+                  tickFormatter={(v: number) => formatAxisValue(v, metric)}
                   tick={{ fontSize: 11 }}
                   width={metric === 'revenue' ? 56 : 36}
                 />
@@ -412,7 +412,7 @@ export const TrendAnalysis: React.FC = () => {
                   interval={0}
                 />
                 <YAxis
-                  tickFormatter={(v) => formatAxisValue(v, metric)}
+                  tickFormatter={(v: number) => formatAxisValue(v, metric)}
                   tick={{ fontSize: 11 }}
                   width={metric === 'revenue' ? 56 : 36}
                 />
