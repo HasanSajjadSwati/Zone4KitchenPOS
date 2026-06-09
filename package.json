@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build && npm run postbuild",
-    "postbuild": "copy *.bat dist\\ && copy STAFF-INSTRUCTIONS.txt dist\\ && copy package.json dist\\",
+    "build": "tsc && vite build",
+    "build:win": "npm run build && copy *.bat dist\\ && copy package.json dist\\",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "start": "serve -s dist -l 3000",
