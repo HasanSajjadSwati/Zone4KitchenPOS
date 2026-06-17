@@ -63,6 +63,14 @@ export interface MajorCategorySales {
   subCategories: SubCategorySales[];
 }
 
+export interface VariantOptionSales {
+  variantName: string;
+  optionName: string;
+  priceModifier: number;
+  totalQuantity: number;
+  totalSales: number; // revenue from this option's modifier (priceModifier * quantity)
+}
+
 export interface ItemSales {
   itemId: string;
   itemName: string;
@@ -72,6 +80,7 @@ export interface ItemSales {
   totalQuantity: number;
   orderCount: number;
   averagePrice: number;
+  variants: VariantOptionSales[];
 }
 
 export interface DealSales {
@@ -627,6 +636,98 @@ export async function getCategorySalesDetailed(range: DateRange, registerSession
 }
 
 /**
+ * Aggregate priced variant-option sales from a set of order items, keyed by menuItemId.
+ * Only options with priceModifier > 0 are included. Multi-select variants contribute
+ * one row per selected option; single-select variants contribute their own option.
+ */
+function aggregateItemVariants(orderItems: OrderItem[]): Map<string, VariantOptionSales[]> {
+  const byItem = new Map<string, Map<string, VariantOptionSales>>();
+
+  for (const item of orderItems) {
+    if (item.itemType !== 'menu_item' || !item.menuItemId) continue;
+    const selections = Array.isArray(item.selectedVariants) ? item.selectedVariants : [];
+
+    for (const selection of selections) {
+      const options = selection.selectedOptions && selection.selectedOptions.length > 0
+        ? selection.selectedOptions
+        : [{ optionId: selection.optionId, optionName: selection.optionName, priceModifier: selection.priceModifier }];
+
+      for (const option of options) {
+        const modifier = Number(option.priceModifier) || 0;
+        if (modifier <= 0) continue;
+
+        if (!byItem.has(item.menuItemId)) byItem.set(item.menuItemId, new Map());
+        const inner = byItem.get(item.menuItemId)!;
+        const key = `${selection.variantName}|||${option.optionName}`;
+
+        if (!inner.has(key)) {
+          inner.set(key, {
+            variantName: selection.variantName,
+            optionName: option.optionName,
+            priceModifier: modifier,
+            totalQuantity: 0,
+            totalSales: 0,
+          });
+        }
+
+        const agg = inner.get(key)!;
+        agg.totalQuantity += item.quantity;
+        agg.totalSales += modifier * item.quantity;
+      }
+    }
+  }
+
+  const result = new Map<string, VariantOptionSales[]>();
+  for (const [itemId, inner] of byItem.entries()) {
+    result.set(itemId, Array.from(inner.values()).sort((a, b) => b.totalSales - a.totalSales));
+  }
+  return result;
+}
+
+/**
+ * Get priced variant-option sales grouped by menu item.
+ * Uses the server-side aggregation endpoint when available, otherwise falls back
+ * to client-side aggregation (also used for the register-session filter).
+ */
+async function getItemVariantSalesMap(
+  range: DateRange,
+  registerSessionId?: string
+): Promise<Map<string, VariantOptionSales[]>> {
+  if (!registerSessionId) {
+    try {
+      const rows = await apiClient.getItemVariantSalesReport(buildRangeFilters(range));
+      if (Array.isArray(rows)) {
+        const map = new Map<string, VariantOptionSales[]>();
+        for (const row of rows) {
+          if (!row.itemId) continue;
+          if (!map.has(row.itemId)) map.set(row.itemId, []);
+          map.get(row.itemId)!.push({
+            variantName: row.variantName || '',
+            optionName: row.optionName || '',
+            priceModifier: Number(row.priceModifier) || 0,
+            totalQuantity: Number(row.totalQuantity) || 0,
+            totalSales: Number(row.totalSales) || 0,
+          });
+        }
+        return map;
+      }
+    } catch (error) {
+      console.warn('Item variant sales endpoint failed, falling back to client aggregation:', error);
+    }
+  }
+
+  const orderQuery: Record<string, string> = registerSessionId
+    ? { registerSessionId, status: 'completed', includePast: 'true' }
+    : { ...buildRangeFilters(range), status: 'completed', includePast: 'true' };
+  const orders = registerSessionId
+    ? await apiClient.getOrders(orderQuery)
+    : filterOrdersInRange(await apiClient.getOrders(orderQuery), range);
+  const orderIds = orders.map((order: Order) => order.id);
+  const allItems = await fetchOrderItemsByOrderIds(orderIds);
+  return aggregateItemVariants(allItems);
+}
+
+/**
  * Get sales by menu item
  */
 export async function getItemSales(range: DateRange, registerSessionId?: string): Promise<ItemSales[]> {
@@ -636,7 +737,11 @@ export async function getItemSales(range: DateRange, registerSessionId?: string)
     try {
       const items = await apiClient.getItemSalesReport(rangeFilters);
       if (Array.isArray(items)) {
-        return items as ItemSales[];
+        const variantMap = await getItemVariantSalesMap(range, undefined);
+        return (items as ItemSales[]).map((item) => ({
+          ...item,
+          variants: variantMap.get(item.itemId) || [],
+        }));
       }
     } catch (error) {
       console.warn('Item sales report endpoint failed, falling back to client aggregation:', error);
@@ -652,6 +757,7 @@ export async function getItemSales(range: DateRange, registerSessionId?: string)
   const orderIds = orders.map((order: Order) => order.id);
   const allItems = await fetchOrderItemsByOrderIds(orderIds);
   const orderItems = allItems.filter((item: OrderItem) => item.itemType === 'menu_item');
+  const variantMap = aggregateItemVariants(orderItems);
 
   const menuItems = await db.menuItems.toArray();
   const categories = await db.categories.toArray();
@@ -698,6 +804,7 @@ export async function getItemSales(range: DateRange, registerSessionId?: string)
       totalQuantity: stats.totalQuantity,
       orderCount: stats.orderCount.size,
       averagePrice: stats.totalQuantity > 0 ? stats.totalSales / stats.totalQuantity : 0,
+      variants: variantMap.get(itemId) || [],
     });
   }
 

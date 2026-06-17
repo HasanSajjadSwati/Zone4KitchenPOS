@@ -303,6 +303,68 @@ reportRoutes.get('/item-sales', async (req, res) => {
   }
 });
 
+// Item variant sales (breakdown of priced variant options per menu item)
+reportRoutes.get('/item-variant-sales', async (req, res) => {
+  try {
+    const dateExpr = 'o.completedAt';
+    const { conditions, params } = buildDateFilters(dateExpr, req.query.startDate, req.query.endDate);
+    const baseConditions = [`o.status = 'completed'`, `oi.itemType = 'menu_item'`, ...conditions];
+    const whereClause = baseConditions.length > 0 ? `WHERE ${baseConditions.join(' AND ')}` : '';
+
+    // priceModifier resolves to the multi-select option modifier when present,
+    // otherwise the single-select modifier on the variant selection itself.
+    const modifierExpr = `COALESCE(NULLIF(opt->>'priceModifier', '')::numeric, NULLIF(v->>'priceModifier', '')::numeric, 0)`;
+    const optionNameExpr = `COALESCE(opt->>'optionName', v->>'optionName')`;
+
+    logger.debug('Item variant sales query', { whereClause, params });
+
+    const rows = await allAsync(
+      `
+        SELECT
+          oi.menuItemId AS "itemId",
+          v->>'variantName' AS "variantName",
+          ${optionNameExpr} AS "optionName",
+          ${modifierExpr} AS "priceModifier",
+          COALESCE(SUM(oi.quantity), 0) AS "totalQuantity",
+          COALESCE(SUM(oi.quantity * ${modifierExpr}), 0) AS "totalSales"
+        FROM ${ALL_ORDER_ITEMS} oi
+        JOIN ${ALL_ORDERS} o ON o.id = oi.orderId
+        CROSS JOIN LATERAL jsonb_array_elements(
+          CASE
+            WHEN oi.selectedVariants IS NULL OR oi.selectedVariants = '' THEN '[]'::jsonb
+            ELSE oi.selectedVariants::jsonb
+          END
+        ) AS v
+        LEFT JOIN LATERAL jsonb_array_elements(
+          CASE
+            WHEN jsonb_typeof(v->'selectedOptions') = 'array' THEN v->'selectedOptions'
+            ELSE '[]'::jsonb
+          END
+        ) AS opt ON true
+        ${whereClause}
+          AND ${modifierExpr} > 0
+        GROUP BY oi.menuItemId, v->>'variantName', ${optionNameExpr}, ${modifierExpr}
+        ORDER BY oi.menuItemId, "totalSales" DESC
+      `,
+      params
+    );
+
+    const result = rows.map((row) => ({
+      itemId: row.itemId,
+      variantName: row.variantName || '',
+      optionName: row.optionName || '',
+      priceModifier: toNumber(row.priceModifier),
+      totalQuantity: toNumber(row.totalQuantity),
+      totalSales: toNumber(row.totalSales),
+    }));
+
+    res.json(result);
+  } catch (error) {
+    logger.error('Item variant sales report error', error);
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
 // Deal sales
 reportRoutes.get('/deal-sales', async (req, res) => {
   try {

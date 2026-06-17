@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Button, Card, TimePicker, RegisterSessionPicker } from '@/components/ui';
-import { ArrowDownTrayIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { ArrowDownTrayIcon, MagnifyingGlassIcon, ChevronRightIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import {
   getItemSales,
   getDealSales,
@@ -36,6 +36,19 @@ export const ItemSales: React.FC = () => {
   const [categorySales, setCategorySales] = useState<CategorySales[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+
+  const toggleItemExpanded = (itemId: string) => {
+    setExpandedItems((prev) => {
+      const next = new Set(prev);
+      if (next.has(itemId)) {
+        next.delete(itemId);
+      } else {
+        next.add(itemId);
+      }
+      return next;
+    });
+  };
 
   // Register session filter
   const [registerSessions, setRegisterSessions] = useState<RegisterSession[]>([]);
@@ -135,14 +148,25 @@ export const ItemSales: React.FC = () => {
 
     switch (tab) {
       case 'items': {
-        const data = getFilteredItems().map(item => ({
-          'Item Name': item.itemName,
-          'Category': item.categoryName || 'N/A',
-          'Quantity Sold': item.totalQuantity,
-          'Total Sales': formatCurrency(item.totalSales),
-          'Orders': item.orderCount,
-          'Average Price': formatCurrency(item.averagePrice),
-        }));
+        const data = getFilteredItems().flatMap(item => {
+          const itemRow = {
+            'Item Name': item.itemName,
+            'Category': item.categoryName || 'N/A',
+            'Quantity Sold': item.totalQuantity,
+            'Total Sales': formatCurrency(item.totalSales),
+            'Orders': item.orderCount,
+            'Average Price': formatCurrency(item.averagePrice),
+          };
+          const variantRows = (item.variants || []).map(variant => ({
+            'Item Name': `    └ ${variant.variantName}: ${variant.optionName}`,
+            'Category': '',
+            'Quantity Sold': variant.totalQuantity,
+            'Total Sales': formatCurrency(variant.totalSales),
+            'Orders': '',
+            'Average Price': '',
+          }));
+          return [itemRow, ...variantRows];
+        });
         return { data, base, title: 'Menu Item Sales Report', orientation: 'landscape' as const };
       }
       case 'deals': {
@@ -343,25 +367,58 @@ export const ItemSales: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {getFilteredItems().map((item, index) => (
-                    <tr key={item.itemId} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center">
-                          <div className="flex-shrink-0 w-7 h-7 bg-primary-50 text-primary-600 rounded-full flex items-center justify-center mr-3">
-                            <span className="font-semibold text-xs">{index + 1}</span>
-                          </div>
-                          <span className="text-sm font-medium text-gray-900">{item.itemName}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-500">{item.categoryName || 'N/A'}</td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-700">{item.totalQuantity}</td>
-                      <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">
-                        {formatCurrency(item.totalSales)}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-700">{item.orderCount}</td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-700">{formatCurrency(item.averagePrice)}</td>
-                    </tr>
-                  ))}
+                  {getFilteredItems().map((item, index) => {
+                    const hasVariants = (item.variants?.length ?? 0) > 0;
+                    const isExpanded = expandedItems.has(item.itemId);
+                    return (
+                      <React.Fragment key={item.itemId}>
+                        <tr
+                          className={`transition-colors ${hasVariants ? 'cursor-pointer hover:bg-gray-50' : 'hover:bg-gray-50/50'}`}
+                          onClick={hasVariants ? () => toggleItemExpanded(item.itemId) : undefined}
+                        >
+                          <td className="px-4 py-3">
+                            <div className="flex items-center">
+                              <div className="flex-shrink-0 w-7 h-7 bg-primary-50 text-primary-600 rounded-full flex items-center justify-center mr-3">
+                                <span className="font-semibold text-xs">{index + 1}</span>
+                              </div>
+                              <span className="text-sm font-medium text-gray-900">{item.itemName}</span>
+                              {hasVariants && (
+                                <span className="ml-2 inline-flex items-center text-gray-400">
+                                  {isExpanded
+                                    ? <ChevronDownIcon className="w-4 h-4" />
+                                    : <ChevronRightIcon className="w-4 h-4" />}
+                                  <span className="ml-1 text-xs text-gray-400">{item.variants.length}</span>
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-500">{item.categoryName || 'N/A'}</td>
+                          <td className="px-4 py-3 text-sm text-right text-gray-700">{item.totalQuantity}</td>
+                          <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">
+                            {formatCurrency(item.totalSales)}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-right text-gray-700">{item.orderCount}</td>
+                          <td className="px-4 py-3 text-sm text-right text-gray-700">{formatCurrency(item.averagePrice)}</td>
+                        </tr>
+                        {hasVariants && isExpanded && item.variants.map((variant, vIndex) => (
+                          <tr key={`${item.itemId}-${vIndex}`} className="bg-gray-50/40">
+                            <td className="px-4 py-2 pl-14">
+                              <div className="flex items-center gap-2 text-sm">
+                                <span className="text-gray-400">└</span>
+                                <span className="font-medium text-gray-700">{variant.variantName}:</span>
+                                <span className="text-gray-600">{variant.optionName}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-2"></td>
+                            <td className="px-4 py-2 text-sm text-right text-gray-600">{variant.totalQuantity}</td>
+                            <td className="px-4 py-2 text-sm text-right text-gray-700">{formatCurrency(variant.totalSales)}</td>
+                            <td className="px-4 py-2"></td>
+                            <td className="px-4 py-2"></td>
+                          </tr>
+                        ))}
+                      </React.Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

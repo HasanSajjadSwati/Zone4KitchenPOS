@@ -585,6 +585,15 @@ class APIClient {
     return this.get(endpoint);
   }
 
+  async getItemVariantSalesReport(filters?: Record<string, string>) {
+    let endpoint = '/reports/item-variant-sales';
+    if (filters) {
+      const params = new URLSearchParams(filters);
+      endpoint += `?${params.toString()}`;
+    }
+    return this.get(endpoint);
+  }
+
   async getDealSalesReport(filters?: Record<string, string>) {
     let endpoint = '/reports/deal-sales';
     if (filters) {
