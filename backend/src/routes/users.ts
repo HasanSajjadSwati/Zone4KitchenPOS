@@ -31,7 +31,7 @@ const ensureAdmin = async (adminUserId: string) => {
 userRoutes.get('/', async (req, res) => {
   try {
     const users = await allAsync(`
-      SELECT u.id, u.username, u.passwordHash, u.fullName, u.roleId, u.isActive, u.createdAt, u.updatedAt, r.name as roleName
+      SELECT u.id, u.username, u.fullName, u.roleId, u.isActive, u.createdAt, u.updatedAt, r.name as roleName
       FROM users u
       JOIN roles r ON u.roleId = r.id
       ORDER BY u.createdAt DESC
@@ -46,7 +46,7 @@ userRoutes.get('/', async (req, res) => {
 userRoutes.get('/:id', async (req, res) => {
   try {
     const user = await getAsync(`
-      SELECT u.id, u.username, u.passwordHash, u.fullName, u.roleId, u.isActive, u.createdAt, u.updatedAt, r.name as roleName
+      SELECT u.id, u.username, u.fullName, u.roleId, u.isActive, u.createdAt, u.updatedAt, r.name as roleName
       FROM users u
       JOIN roles r ON u.roleId = r.id
       WHERE u.id = ?

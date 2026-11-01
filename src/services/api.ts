@@ -1,5 +1,8 @@
 // API Service for backend communication
+import { useAuthStore } from '@/stores/authStore';
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:3001/api' : '/api');
+const LOGIN_ENDPOINT = '/auth/login';
 
 class APIClient {
   private baseUrl: string;
@@ -10,12 +13,14 @@ class APIClient {
 
   private async request(endpoint: string, options: RequestInit = {}) {
     const url = `${this.baseUrl}${endpoint}`;
+    const token = useAuthStore.getState().session?.token;
 
     try {
       const response = await fetch(url, {
         ...options,
         headers: {
           'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
           ...options.headers,
         },
       });
@@ -23,6 +28,11 @@ class APIClient {
       const contentType = response.headers.get('content-type') || '';
       const isJson = contentType.includes('application/json');
       const raw = await response.text();
+
+      // Expired or missing token: drop the session so the app returns to the login screen.
+      if (response.status === 401 && endpoint !== LOGIN_ENDPOINT) {
+        useAuthStore.getState().logout();
+      }
 
       if (!response.ok) {
         let message = response.statusText;
@@ -89,6 +99,11 @@ class APIClient {
   }
 
   // Specific resource endpoints
+
+  // Auth
+  async login(username: string, password: string) {
+    return this.post(LOGIN_ENDPOINT, { username, password });
+  }
 
   // Users
   async getUsers() {

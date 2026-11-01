@@ -1,6 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import type { Server } from 'http';
 import { logger } from './utils/logger.js';
+import { isAuthorizedWebSocketUrl } from './auth/requireAuth.js';
 
 export type SyncEventType =
   | 'orders'
@@ -26,15 +27,18 @@ export interface SyncEvent {
 
 let wss: WebSocketServer | null = null;
 
-export function initWebSocket(server: Server): WebSocketServer {
+export function initWebSocket(server: Server, authSecret: string): WebSocketServer {
   // Attach WebSocket server to HTTP server on /api/ws path
-  wss = new WebSocketServer({ 
+  wss = new WebSocketServer({
     server,
     path: '/api/ws',
-    // Allow connections from any origin (CORS for WebSocket)
+    // Any origin may connect, but only with a valid login token (?token=)
     verifyClient: (info, callback) => {
-      // Accept all connections
-      callback(true);
+      if (isAuthorizedWebSocketUrl(info.req.url, authSecret)) {
+        callback(true);
+      } else {
+        callback(false, 401, 'Unauthorized');
+      }
     }
   });
 

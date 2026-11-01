@@ -27,13 +27,17 @@ import { reportRoutes } from './routes/reports.js';
 import { maintenanceRoutes } from './routes/maintenance.js';
 import { auditLogRoutes } from './routes/auditLogs.js';
 import { pastOrderRoutes } from './routes/pastOrders.js';
+import { createAuthRoutes } from './routes/auth.js';
 import { initializeDatabase } from './db/migrate.js';
 import { logger } from './utils/logger.js';
+import { getAuthSecret } from './auth/token.js';
+import { requireAuth } from './auth/requireAuth.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({
   path: path.resolve(__dirname, '../.env'),
 });
+const AUTH_SECRET = getAuthSecret();
 const app = express();
 const PORT = process.env.PORT || 3001;
 const DEBUG = process.env.DEBUG === 'true';
@@ -43,6 +47,8 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+// Every /api call except health and login needs a token from POST /api/auth/login
+app.use(requireAuth(AUTH_SECRET));
 
 // Request logging middleware (optional)
 if (DEBUG) {
@@ -60,6 +66,7 @@ await initializeDatabase();
 
 
 // Routes
+app.use('/api/auth', createAuthRoutes(AUTH_SECRET));
 app.use('/api/users', userRoutes);
 app.use('/api/roles', roleRoutes);
 app.use('/api/categories', categoryRoutes);
@@ -113,7 +120,7 @@ if (shouldServeFrontend) {
 
 // Create HTTP server and attach WebSocket
 const server = createServer(app);
-initWebSocket(server);
+initWebSocket(server, AUTH_SECRET);
 
 // Start server
 server.listen(PORT, () => {
