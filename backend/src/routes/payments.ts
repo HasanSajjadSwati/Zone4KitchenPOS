@@ -1,13 +1,26 @@
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { runAsync, getAsync, allAsync } from '../db/database.js';
+import { runAsync, getAsync, allAsync, withTransaction } from '../db/database.js';
 import { broadcastSync } from '../websocket.js';
 
 export const paymentRoutes = express.Router();
 
+// Amounts are REAL, so allow for float noise when comparing against the order total.
+const PAYMENT_TOLERANCE = 0.01;
+
+// auditLogs.action has a CHECK constraint allowing only lower-case verbs, so the payment
+// event names are mapped onto those and kept as a [TAG] prefix on the description.
+const PAYMENT_AUDIT_ACTIONS = {
+  CREATE_PAYMENT: 'create',
+  UPDATE_PAYMENT: 'update',
+  BLOCKED_DELETE_PAYMENT: 'delete',
+} as const;
+
+const formatAmount = (value: number) => String(Math.round(value * 100) / 100);
+
 // FRAUD PREVENTION: Audit logging for payments
 async function logPaymentAudit(
-  action: string,
+  event: keyof typeof PAYMENT_AUDIT_ACTIONS,
   paymentId: string,
   orderId: string,
   userId: string | null,
@@ -21,7 +34,7 @@ async function logPaymentAudit(
     await runAsync(
       `INSERT INTO auditLogs (id, userId, action, tableName, recordId, before, after, description, createdAt)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, userId, action, 'payments', paymentId, JSON.stringify(before), JSON.stringify(after), description, now]
+      [id, userId, PAYMENT_AUDIT_ACTIONS[event], 'payments', paymentId, JSON.stringify(before), JSON.stringify(after), `[${event}] ${description}`, now]
     );
   } catch (error) {
     console.error('Failed to log payment audit:', error);
@@ -116,14 +129,38 @@ paymentRoutes.post('/', async (req, res) => {
     const id = providedId || uuidv4();
     const now = new Date().toISOString();
 
-    await runAsync(
-      `INSERT INTO payments (id, orderId, amount, method, reference, paidAt, receivedBy, notes, createdAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, orderId, amount, method, reference || null, now, receivedBy, notes || null, now]
-    );
+    // Lock the order row so two tills settling the same order cannot both see it unpaid.
+    const outcome = await withTransaction(async (tx) => {
+      const order = await tx.getAsync('SELECT total FROM orders WHERE id = ? FOR UPDATE', [orderId]);
+      if (!order) {
+        return { status: 404, error: 'Order not found' } as const;
+      }
 
-    const payment = await getAsync('SELECT * FROM payments WHERE id = ?', [id]);
-    
+      const { paid } = await tx.getAsync(
+        'SELECT COALESCE(SUM(amount), 0) AS paid FROM payments WHERE orderId = ?',
+        [orderId]
+      );
+      const outstanding = Number(order.total) - Number(paid);
+      if (Number(amount) > outstanding + PAYMENT_TOLERANCE) {
+        const error = outstanding <= PAYMENT_TOLERANCE
+          ? 'Order is already fully paid'
+          : `Payment of ${formatAmount(Number(amount))} exceeds the outstanding balance of ${formatAmount(outstanding)}`;
+        return { status: 409, error } as const;
+      }
+
+      await tx.runAsync(
+        `INSERT INTO payments (id, orderId, amount, method, reference, paidAt, receivedBy, notes, createdAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id, orderId, amount, method, reference || null, now, receivedBy, notes || null, now]
+      );
+      return { status: 201, payment: await tx.getAsync('SELECT * FROM payments WHERE id = ?', [id]) } as const;
+    });
+
+    if (outcome.status !== 201) {
+      return res.status(outcome.status).json({ error: outcome.error });
+    }
+    const { payment } = outcome;
+
     // FRAUD PREVENTION: Log payment creation
     await logPaymentAudit(
       'CREATE_PAYMENT',
@@ -170,7 +207,7 @@ paymentRoutes.put('/:id', async (req, res) => {
       'UPDATE_PAYMENT',
       req.params.id,
       payment.orderId,
-      req.body.userId || req.headers['x-user-id'] as string || null,
+      res.locals.authUser?.id ?? req.body.userId ?? (req.headers['x-user-id'] as string) ?? null,
       beforePayment,
       updated,
       `Payment updated. Amount: ${beforePayment.amount} -> ${updated.amount}`
@@ -200,7 +237,7 @@ paymentRoutes.delete('/:id', async (req, res) => {
       'BLOCKED_DELETE_PAYMENT',
       req.params.id,
       payment.orderId,
-      req.body.userId || req.headers['x-user-id'] as string || null,
+      res.locals.authUser?.id ?? req.body.userId ?? (req.headers['x-user-id'] as string) ?? null,
       payment,
       null,
       `BLOCKED: Attempted to DELETE payment of ${payment.amount}. Payment deletion is disabled for fraud prevention.`
