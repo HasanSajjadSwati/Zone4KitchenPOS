@@ -1,36 +1,26 @@
-import bcrypt from 'bcryptjs';
-import { addHours } from 'date-fns';
 import { db } from '@/db';
+import type { Role, User } from '@/db/types';
+import { apiClient } from '@/services/api';
 import { useAuthStore } from '@/stores/authStore';
 import { logAudit } from '@/utils/audit';
 
+interface LoginResponse {
+  token: string;
+  expiresAt: string;
+  user: User;
+  role: Role;
+}
+
 export async function login(username: string, password: string) {
-  const user = await db.users.where('username').equals(username).first();
+  // The server checks the password and signs an 8-hour token; it rejects
+  // unknown users, wrong passwords and disabled accounts with a message.
+  const { token, expiresAt, user, role } = (await apiClient.login(username, password)) as LoginResponse;
 
-  if (!user) {
-    throw new Error('Invalid credentials');
-  }
-
-  if (!user.isActive) {
-    throw new Error('Account is disabled');
-  }
-
-  const isValid = await bcrypt.compare(password, user.passwordHash);
-  if (!isValid) {
-    throw new Error('Invalid credentials');
-  }
-
-  // Get user role
-  const role = await db.roles.get(user.roleId);
-  if (!role) {
-    throw new Error('User role not found');
-  }
-
-  // Create session (8-hour expiration)
   const session = {
     userId: user.id,
     loginAt: new Date(),
-    expiresAt: addHours(new Date(), 8),
+    expiresAt: new Date(expiresAt),
+    token,
   };
 
   // Update store
@@ -56,6 +46,12 @@ export async function restoreSession(): Promise<boolean> {
   const session = authStore.session;
 
   if (!session) {
+    return false;
+  }
+
+  // Sessions saved before server-side login have no token and cannot call the API.
+  if (!session.token) {
+    authStore.logout();
     return false;
   }
 

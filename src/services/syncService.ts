@@ -2,6 +2,7 @@
  * Real-time Sync Service
  * Connects to the backend WebSocket server and notifies the app when data changes.
  */
+import { useAuthStore } from '@/stores/authStore';
 
 export type SyncEventType =
   | 'orders'
@@ -78,11 +79,13 @@ class SyncService {
     this.isConnecting = true;
     this.shouldReconnect = true;
     const url = this.getWebSocketUrl();
-    
+    // The server only accepts the socket with a valid login token; keep it out of the logs.
+    const token = useAuthStore.getState().session?.token ?? '';
+
     console.log('[Sync] Connecting to:', url);
 
     try {
-      this.ws = new WebSocket(url);
+      this.ws = new WebSocket(`${url}?token=${encodeURIComponent(token)}`);
 
       this.ws.onopen = () => {
         console.log('[Sync] Connected to server at', url);

@@ -556,7 +556,9 @@ interface CompleteOrderParams {
 }
 
 async function getOrderPaidTotal(orderId: string): Promise<number> {
-  const payments = await db.payments.where('orderId').equals(orderId).toArray();
+  // Ask for this order's payments only. db.payments.where() downloads the whole payments
+  // table (several MB) and filters it in the browser, which failed intermittently on slow tills.
+  const payments = ((await apiClient.getPaymentsByOrder(orderId)) ?? []) as Payment[];
   return payments.reduce((sum: number, payment: Payment) => {
     const amount = Number(payment.amount);
     return sum + (Number.isFinite(amount) ? Math.max(0, amount) : 0);

@@ -6,6 +6,8 @@ interface Session {
   userId: string;
   loginAt: Date;
   expiresAt: Date;
+  // Signed by the backend at login; sent as a Bearer token on every API call.
+  token?: string;
 }
 
 interface AuthStore {

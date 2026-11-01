@@ -161,6 +161,35 @@ export function allAsync(query: string, params: any[] = []): Promise<any[]> {
   });
 }
 
+export interface TransactionClient {
+  runAsync(query: string, params?: any[]): Promise<{ rowCount: number | null }>;
+  getAsync(query: string, params?: any[]): Promise<any>;
+}
+
+// Runs fn on one pooled connection inside BEGIN/COMMIT, rolling back if fn throws.
+// Needed when a read must lock rows until the matching write commits (SELECT ... FOR UPDATE).
+export async function withTransaction<T>(fn: (tx: TransactionClient) => Promise<T>): Promise<T> {
+  const client = await pool.connect();
+  const tx: TransactionClient = {
+    runAsync: (query, params = []) =>
+      client.query(normalizeQuery(query), params).then((result) => ({ rowCount: result.rowCount })),
+    getAsync: (query, params = []) =>
+      client.query(normalizeQuery(query), params).then((result) => convertBooleans(normalizeRowKeys(result.rows[0]))),
+  };
+
+  try {
+    await client.query('BEGIN');
+    const result = await fn(tx);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 // List of fields that may be stored as integer flags and should be coerced to boolean
 const booleanFields = [
   'isActive', 'isDealOnly', 'hasVariants', 'isRequired', 'isPaid',
