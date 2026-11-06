@@ -49,6 +49,14 @@ describe('recycle registry', () => {
     ]));
   });
 
+  it('joined checks qualify deletedAt/purgedAt (no ambiguous columns)', () => {
+    for (const def of Object.values(RECYCLE_TYPES)) {
+      for (const c of allChecks(def).filter((x) => / JOIN /.test(x.sql))) {
+        expect(c.sql, `${def.type}: ${c.label}`).not.toMatch(/(^|[^.\w])(deletedAt|purgedAt)\b/);
+      }
+    }
+  });
+
   it('binChildren mirror binParents', () => {
     expect(RECYCLE_TYPES.categories.binChildren.map((c) => c.label).sort())
       .toEqual(['deals', 'menu items', 'subcategories']);
