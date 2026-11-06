@@ -128,7 +128,7 @@ const COLUMN_MAP = {
   ...EXTRA_COLUMN_MAP,
 };
 
-function normalizeRowKeys<T extends Record<string, any> | null | undefined>(row: T): T {
+export function normalizeRowKeys<T extends Record<string, any> | null | undefined>(row: T): T {
   if (!row) return row;
   const normalized: Record<string, any> = {};
 

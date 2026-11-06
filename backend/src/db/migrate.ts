@@ -3,6 +3,7 @@ import { postgresSchema } from './schema-postgres.js';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger.js';
+import { RECYCLE_TABLES } from '../constants/recycle.js';
 
 export async function initializeDatabase() {
   try {
@@ -23,8 +24,28 @@ export async function initializeDatabase() {
     await runAsync('ALTER TABLE settings ADD COLUMN IF NOT EXISTS deliveryCharge REAL DEFAULT 0');
     await runAsync('ALTER TABLE settings ADD COLUMN IF NOT EXISTS dayCountByRegister BOOLEAN DEFAULT FALSE');
     await runAsync('ALTER TABLE orders ADD COLUMN IF NOT EXISTS deliveryCharge REAL DEFAULT 0');
-    // Users are soft-deleted: history rows reference them, so the row must stay.
-    await runAsync('ALTER TABLE users ADD COLUMN IF NOT EXISTS deletedAt TIMESTAMPTZ');
+    // Recycle Bin: rows are soft-deleted (history rows reference them, so the row must stay).
+    for (const table of RECYCLE_TABLES) {
+      await runAsync(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS deletedAt TIMESTAMPTZ`);
+      await runAsync(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS deletedBy TEXT`);
+      await runAsync(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS purgedAt TIMESTAMPTZ`);
+    }
+    // Unique names only apply among live rows, so a deleted name can be reused.
+    const liveUnique: Array<[string, string, string]> = [
+      ['users', 'username', 'users_username_key'],
+      ['customers', 'phone', 'customers_phone_key'],
+      ['diningTables', 'tableNumber', 'diningtables_tablenumber_key'],
+      ['employees', 'cnic', 'employees_cnic_key'],
+      ['roles', 'name', 'roles_name_key'],
+    ];
+    for (const [table, , constraint] of liveUnique) {
+      await runAsync(`ALTER TABLE ${table} DROP CONSTRAINT IF EXISTS ${constraint}`);
+    }
+    for (const [table, column] of liveUnique) {
+      await runAsync(`CREATE UNIQUE INDEX IF NOT EXISTS uq_${table}_${column}_live ON ${table}(${column}) WHERE deletedAt IS NULL`);
+    }
+    // Undo the '<name>.deleted.<ms>' renames made by the first user soft delete.
+    await runAsync("UPDATE users SET username = split_part(username, '.deleted.', 1) WHERE deletedAt IS NOT NULL AND username LIKE '%.deleted.%'");
     await runAsync('UPDATE settings SET printAllIncludeKOT = TRUE WHERE printAllIncludeKOT IS NULL');
     await runAsync('UPDATE settings SET printAllIncludeCustomer = TRUE WHERE printAllIncludeCustomer IS NULL');
     await runAsync('UPDATE settings SET printAllIncludeCounter = FALSE WHERE printAllIncludeCounter IS NULL');
