@@ -90,9 +90,29 @@ async function checkOrderLocked(orderId: string): Promise<OrderLockStatus> {
   return { isLocked: false, reason: null, order };
 }
 
+// auditLogs.action has a CHECK constraint allowing only lower-case verbs (and userId is NOT NULL),
+// so the event names are mapped onto those verbs and kept as a [TAG] prefix on the description.
+// Before this every order-modification audit row was rejected by the database.
+const ORDER_AUDIT_ACTIONS = {
+  BLOCKED_UPDATE_ORDER: 'update',
+  BLOCKED_ADD_ITEM: 'create',
+  BLOCKED_UPDATE_ITEM: 'update',
+  BLOCKED_DELETE_ITEM: 'delete',
+  BLOCKED_ADMIN_UNLOCK: 'update',
+  ADMIN_UNLOCK_ORDER: 'update',
+} as const;
+
+// The logged-in user from the API token; the till often sends no x-user-id header.
+function actingUserId(req: express.Request, res: express.Response): string | null {
+  return (res.locals.authUser?.id as string | undefined)
+    || (req.body?.userId as string | undefined)
+    || (req.headers['x-user-id'] as string | undefined)
+    || null;
+}
+
 // FRAUD PREVENTION: Create audit log for order modifications
 async function logOrderModification(
-  action: string,
+  event: keyof typeof ORDER_AUDIT_ACTIONS,
   orderId: string,
   userId: string | null,
   before: any,
@@ -105,7 +125,7 @@ async function logOrderModification(
     await runAsync(
       `INSERT INTO auditLogs (id, userId, action, tableName, recordId, before, after, description, createdAt)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, userId, action, 'orders', orderId, JSON.stringify(before), JSON.stringify(after), description, now]
+      [id, userId, ORDER_AUDIT_ACTIONS[event], 'orders', orderId, JSON.stringify(before), JSON.stringify(after), `[${event}] ${description}`, now]
     );
   } catch (error) {
     console.error('Failed to log order modification:', error);
@@ -280,12 +300,12 @@ orderRoutes.get('/', async (req, res) => {
       }
     }
 
-    // Handle isPaid filter
+    // Handle isPaid filter (BOOLEAN column: Postgres rejects the integers 1/0 here)
     const { isPaid, limit, offset } = req.query;
     if (isPaid === 'true') {
-      query += ' AND isPaid = 1';
+      query += ' AND isPaid = TRUE';
     } else if (isPaid === 'false') {
-      query += ' AND isPaid = 0';
+      query += ' AND isPaid = FALSE';
     }
 
     // Get total count for pagination (before LIMIT)
@@ -551,7 +571,7 @@ orderRoutes.put('/:id', async (req, res) => {
       await logOrderModification(
         'BLOCKED_UPDATE_ORDER',
         req.params.id,
-        req.body.userId || req.headers['x-user-id'] as string || null,
+        actingUserId(req, res),
         { subtotal: order.subtotal, discountAmount: order.discountAmount, total: order.total },
         { attemptedChanges: { subtotal, discountType, discountValue, discountAmount, total, deliveryCharge } },
         `BLOCKED: Attempted to modify financial data on locked order. Order status: ${order.status}, isPaid: ${order.isPaid}`
@@ -692,7 +712,7 @@ orderRoutes.post('/:id/items', async (req, res) => {
       await logOrderModification(
         'BLOCKED_ADD_ITEM',
         orderId,
-        req.body.userId || req.headers['x-user-id'] as string || null,
+        actingUserId(req, res),
         null,
         { attemptedItem: { itemType, menuItemId, dealId, quantity, unitPrice, totalPrice } },
         `BLOCKED: Attempted to add item to locked order. Reason: ${lockStatus.reason}`
@@ -770,7 +790,7 @@ orderRoutes.put('/:id/items/:itemId', async (req, res) => {
       await logOrderModification(
         'BLOCKED_UPDATE_ITEM',
         req.params.id,
-        req.body.userId || req.headers['x-user-id'] as string || null,
+        actingUserId(req, res),
         item,
         { attemptedChanges: { quantity, unitPrice, totalPrice, notes } },
         `BLOCKED: Attempted to modify item in locked order. Reason: ${lockStatus.reason}`
@@ -889,7 +909,7 @@ orderRoutes.delete('/:id/items/:itemId', async (req, res) => {
       await logOrderModification(
         'BLOCKED_DELETE_ITEM',
         req.params.id,
-        req.headers['x-user-id'] as string || null,
+        actingUserId(req, res),
         item,
         null,
         `BLOCKED: Attempted to DELETE item from locked order. Reason: ${lockStatus.reason}. Item value: ${item?.totalPrice || 'unknown'}`
@@ -976,7 +996,7 @@ orderRoutes.post('/:id/admin-unlock', async (req, res) => {
     // Unlock: Set isPaid to false temporarily and status to 'open'
     // The order can now be modified, but will need to be re-paid
     await runAsync(
-      `UPDATE orders SET isPaid = 0, status = 'open', updatedAt = ? WHERE id = ?`,
+      `UPDATE orders SET isPaid = FALSE, status = 'open', updatedAt = ? WHERE id = ?`,
       [now, orderId]
     );
 
