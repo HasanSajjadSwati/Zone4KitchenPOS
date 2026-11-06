@@ -1,6 +1,8 @@
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { runAsync, getAsync, allAsync } from '../db/database.js';
+import { moveToBin } from '../recycle/moveToBin.js';
+import { whereLive } from '../recycle/liveFilter.js';
 
 export const categoryRoutes = express.Router();
 
@@ -8,7 +10,7 @@ export const categoryRoutes = express.Router();
 categoryRoutes.get('/', async (req, res) => {
   try {
     const categories = await allAsync(
-      'SELECT * FROM categories ORDER BY sortOrder, createdAt'
+      `SELECT * FROM categories${whereLive(req)} ORDER BY sortOrder, createdAt`
     );
     res.json(categories);
   } catch (error) {
@@ -89,38 +91,7 @@ categoryRoutes.put('/:id', async (req, res) => {
 // Delete category
 categoryRoutes.delete('/:id', async (req, res) => {
   try {
-    const category = await getAsync('SELECT * FROM categories WHERE id = ?', [req.params.id]);
-    if (!category) {
-      return res.status(404).json({ error: 'Category not found' });
-    }
-
-    const blockers: string[] = [];
-    const dependencies = [
-      { table: 'categories', column: 'parentId', label: 'child categories' },
-      { table: 'menuItems', column: 'categoryId', label: 'menu items' },
-      { table: 'deals', column: 'categoryId', label: 'deals' }
-    ];
-
-    for (const dependency of dependencies) {
-      const countRow = await getAsync(
-        `SELECT COUNT(*) AS count FROM ${dependency.table} WHERE ${dependency.column} = ?`,
-        [req.params.id]
-      );
-      const count = Number((countRow?.count) ?? 0);
-      if (count > 0) {
-        blockers.push(`${count} ${dependency.label}`);
-      }
-    }
-
-    if (blockers.length) {
-      return res.status(409).json({
-        error: 'Category has dependent records',
-        details: `Remove or reassign ${blockers.join(', ')} before deleting this category.`
-      });
-    }
-
-    await runAsync('DELETE FROM categories WHERE id = ?', [req.params.id]);
-    res.json({ message: 'Category deleted successfully' });
+    await moveToBin(res, 'categories', req.params.id);
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }

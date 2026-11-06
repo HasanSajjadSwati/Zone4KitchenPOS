@@ -1,13 +1,15 @@
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { runAsync, getAsync, allAsync, convertBooleans, convertBooleansArray } from '../db/database.js';
+import { moveToBin } from '../recycle/moveToBin.js';
+import { whereLive } from '../recycle/liveFilter.js';
 
 export const variantRoutes = express.Router();
 
 // Get all variants
 variantRoutes.get('/', async (req, res) => {
   try {
-    const variants = await allAsync('SELECT * FROM variants ORDER BY sortOrder, createdAt');
+    const variants = await allAsync(`SELECT * FROM variants${whereLive(req)} ORDER BY sortOrder, createdAt`);
     res.json(convertBooleansArray(variants));
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -88,13 +90,7 @@ variantRoutes.put('/:id', async (req, res) => {
 // Delete variant
 variantRoutes.delete('/:id', async (req, res) => {
   try {
-    const variant = await getAsync('SELECT * FROM variants WHERE id = ?', [req.params.id]);
-    if (!variant) {
-      return res.status(404).json({ error: 'Variant not found' });
-    }
-
-    await runAsync('DELETE FROM variants WHERE id = ?', [req.params.id]);
-    res.json({ message: 'Variant deleted successfully' });
+    await moveToBin(res, 'variants', req.params.id);
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }

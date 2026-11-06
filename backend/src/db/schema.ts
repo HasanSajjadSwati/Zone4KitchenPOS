@@ -313,7 +313,7 @@ CREATE TABLE IF NOT EXISTS kotPrints (
 CREATE TABLE IF NOT EXISTS auditLogs (
   id TEXT PRIMARY KEY,
   userId TEXT NOT NULL,
-  action TEXT NOT NULL CHECK(action IN ('create', 'update', 'delete', 'print', 'export', 'login', 'logout', 'wipe', 'import')),
+  action TEXT NOT NULL CHECK(action IN ('create', 'update', 'delete', 'print', 'export', 'login', 'logout', 'backup', 'restore', 'wipe', 'import')),
   tableName TEXT NOT NULL,
   recordId TEXT,
   before TEXT,

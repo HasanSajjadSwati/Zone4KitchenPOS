@@ -1,13 +1,15 @@
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { runAsync, getAsync, allAsync } from '../db/database.js';
+import { moveToBin } from '../recycle/moveToBin.js';
+import { whereLive } from '../recycle/liveFilter.js';
 
 export const roleRoutes = express.Router();
 
 // Get all roles
 roleRoutes.get('/', async (req, res) => {
   try {
-    const roles = await allAsync('SELECT id, name, permissions, createdAt FROM roles ORDER BY createdAt');
+    const roles = await allAsync(`SELECT id, name, permissions, createdAt FROM roles${whereLive(req)} ORDER BY createdAt`);
     const rolesWithParsed = roles.map(role => ({
       ...role,
       permissions: JSON.parse(role.permissions)
@@ -79,13 +81,7 @@ roleRoutes.put('/:id', async (req, res) => {
 // Delete role
 roleRoutes.delete('/:id', async (req, res) => {
   try {
-    const role = await getAsync('SELECT * FROM roles WHERE id = ?', [req.params.id]);
-    if (!role) {
-      return res.status(404).json({ error: 'Role not found' });
-    }
-
-    await runAsync('DELETE FROM roles WHERE id = ?', [req.params.id]);
-    res.json({ message: 'Role deleted successfully' });
+    await moveToBin(res, 'roles', req.params.id);
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }

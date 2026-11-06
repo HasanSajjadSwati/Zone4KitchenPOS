@@ -1,6 +1,8 @@
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { runAsync, getAsync, allAsync, convertBooleans, convertBooleansArray } from '../db/database.js';
+import { moveToBin } from '../recycle/moveToBin.js';
+import { whereLive } from '../recycle/liveFilter.js';
 
 function parseAvailableOptionIds(raw: any): any[] {
   if (!raw && raw !== 0) {
@@ -40,7 +42,7 @@ export const menuItemRoutes = express.Router();
 menuItemRoutes.get('/', async (req, res) => {
   try {
     const items = await allAsync(
-      'SELECT * FROM menuItems ORDER BY createdAt DESC'
+      `SELECT * FROM menuItems${whereLive(req)} ORDER BY createdAt DESC`
     );
     res.json(convertBooleansArray(items));
   } catch (error) {
@@ -139,29 +141,7 @@ menuItemRoutes.put('/:id', async (req, res) => {
 // Delete menu item
 menuItemRoutes.delete('/:id', async (req, res) => {
   try {
-    const item = await getAsync('SELECT * FROM menuItems WHERE id = ?', [req.params.id]);
-    if (!item) {
-      return res.status(404).json({ error: 'Menu item not found' });
-    }
-
-    const dealUsage = await getAsync(
-      'SELECT COUNT(*) as count FROM dealItems WHERE menuItemId = ?',
-      [req.params.id]
-    );
-    if (dealUsage && dealUsage.count > 0) {
-      return res.status(409).json({
-        error: 'Menu item is part of one or more deals. Remove it from those deals before deleting.',
-      });
-    }
-
-    // Clear menuItemId reference in order items (itemName is preserved for display)
-    // This allows safe deletion without breaking historical orders
-    await runAsync('UPDATE orderItems SET menuItemId = NULL WHERE menuItemId = ?', [req.params.id]);
-    await runAsync('UPDATE pastOrderItems SET menuItemId = NULL WHERE menuItemId = ?', [req.params.id]);
-
-    await runAsync('DELETE FROM menuItemVariants WHERE menuItemId = ?', [req.params.id]);
-    await runAsync('DELETE FROM menuItems WHERE id = ?', [req.params.id]);
-    res.json({ message: 'Menu item deleted successfully' });
+    await moveToBin(res, 'menuItems', req.params.id);
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }
