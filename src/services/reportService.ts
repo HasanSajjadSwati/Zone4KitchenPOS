@@ -520,8 +520,8 @@ export async function getCategorySales(range: DateRange, registerSessionId?: str
   const allItems = await fetchOrderItemsByOrderIds(orderIds);
   const orderItems = allItems.filter((item: OrderItem) => item.itemType === 'menu_item');
 
-  const categories = await db.categories.toArray();
-  const menuItems = await db.menuItems.toArray();
+  const categories = await db.categories.toArrayWithDeleted();
+  const menuItems = await db.menuItems.toArrayWithDeleted();
 
   // Group by category
   // Key null = lines whose item is gone (id null, or pointing at no loaded item) -> the label row.
@@ -593,17 +593,16 @@ export async function getCategorySalesDetailed(range: DateRange, registerSession
   // Fallback: use existing getCategorySales + local category hierarchy
   const [flatSales, allCategories] = await Promise.all([
     getCategorySales(range, registerSessionId),
-    db.categories.toArray(),
+    db.categories.toArrayWithDeleted(),
   ]);
 
   // Same rule as the server: a live active category is always listed; a deleted or inactive one
   // only when it or one of its subcategories sold something.
-  type MaybeDeleted = Category & { deletedAt?: string | Date | null };
   const unlinked = flatSales.find((s) => s.categoryId === null);
   const salesMap = new Map(flatSales.filter((s) => s.categoryId !== null).map((s) => [s.categoryId, s]));
   const hasSales = (c: Category) =>
     salesMap.has(c.id) || allCategories.some((s: Category) => s.parentId === c.id && salesMap.has(s.id));
-  const isListed = (c: Category) => ((c as MaybeDeleted).deletedAt == null && c.isActive) || hasSales(c);
+  const isListed = (c: Category) => (c.deletedAt == null && c.isActive) || hasSales(c);
   const listed = allCategories.filter(isListed);
   const majorCategories = listed.filter((c: Category) => c.type === 'major');
 
@@ -784,8 +783,8 @@ export async function getItemSales(range: DateRange, registerSessionId?: string)
   const orderItems = allItems.filter((item: OrderItem) => item.itemType === 'menu_item');
   const variantMap = aggregateItemVariants(orderItems);
 
-  const menuItems = await db.menuItems.toArray();
-  const categories = await db.categories.toArray();
+  const menuItems = await db.menuItems.toArrayWithDeleted();
+  const categories = await db.categories.toArrayWithDeleted();
 
   // Group by item
   // Key null = lines whose item is gone (id null, or pointing at no loaded item) -> the label row.
@@ -878,7 +877,7 @@ export async function getDealSales(range: DateRange, registerSessionId?: string)
   const allItems = await fetchOrderItemsByOrderIds(orderIds);
   const orderItems = allItems.filter((item: OrderItem) => item.itemType === 'deal');
 
-  const deals = await db.deals.toArray();
+  const deals = await db.deals.toArrayWithDeleted();
 
   // Group by deal
   // Key null = lines whose deal is gone (id null, or pointing at no loaded deal) -> the label row.
@@ -931,7 +930,7 @@ export async function getWaiterPerformance(range: DateRange): Promise<WaiterPerf
   const orders = await apiClient.getOrders({ ...rangeFilters, status: 'completed', orderType: 'dine_in', includePast: 'true' });
   const dineInOrders = orders.filter((o: Order) => o.waiterId);
 
-  const waiters = await db.waiters.toArray();
+  const waiters = await db.waiters.toArrayWithDeleted();
 
   // Group by waiter
   const waiterMap = new Map<string, {
@@ -985,7 +984,7 @@ export async function getRiderPerformance(range: DateRange): Promise<RiderPerfor
   const orders = await apiClient.getOrders({ ...rangeFilters, status: 'completed', orderType: 'delivery', includePast: 'true' });
   const deliveryOrders = orders.filter((o: Order) => o.riderId);
 
-  const riders = await db.riders.toArray();
+  const riders = await db.riders.toArrayWithDeleted();
 
   // Group by rider
   const riderMap = new Map<string, {
@@ -1035,7 +1034,7 @@ export async function getRegisterSessions(range: DateRange): Promise<RegisterSes
     return openedAt >= range.startDate && openedAt <= range.endDate;
   });
 
-  const users = await db.users.toArray();
+  const users = await db.users.toArrayWithDeleted();
 
   const result: RegisterSessionSummary[] = [];
 
@@ -1257,8 +1256,8 @@ export async function getOrderDetailedReport(
   const [orderItems, payments, menuItems, deals] = await Promise.all([
     fetchOrderItemsByOrderIds(orderIds),
     fetchPaymentsByOrderIds(orderIds),
-    db.menuItems.toArray(),
-    db.deals.toArray(),
+    db.menuItems.toArrayWithDeleted(),
+    db.deals.toArrayWithDeleted(),
   ]);
 
   const menuNameById = new Map((menuItems as MenuItem[]).map((item: MenuItem) => [item.id, item.name]));
@@ -1369,7 +1368,7 @@ export async function getCancelledOrders(range: DateRange, registerSessionId?: s
     : { ...rangeFilters, status: 'cancelled', includePast: 'true' };
   const cancelledOrders = await apiClient.getOrders(orderQuery);
 
-  const users = (await db.users.toArray()) as User[];
+  const users = (await db.users.toArrayWithDeleted()) as User[];
   const userMap = new Map<string, string>(users.map((u: User) => [u.id, u.fullName]));
 
   return cancelledOrders
@@ -1571,8 +1570,8 @@ export async function getItemTrendData(range: DateRange, registerSessionId?: str
     }
   }
 
-  const menuItems = await db.menuItems.toArray();
-  const categories = await db.categories.toArray();
+  const menuItems = await db.menuItems.toArrayWithDeleted();
+  const categories = await db.categories.toArrayWithDeleted();
 
   const itemDateMap = new Map<string, Map<string, { quantity: number; sales: number }>>();
 

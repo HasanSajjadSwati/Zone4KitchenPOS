@@ -6,8 +6,10 @@ import {
   ClipboardDocumentListIcon,
   ShieldCheckIcon,
   ArchiveBoxIcon,
+  TrashIcon,
 } from '@heroicons/react/24/outline';
 import { PermissionManagement } from './PermissionManagement';
+import { RecycleBin } from './RecycleBin';
 import { Button, Card, Input, Modal, Select } from '@/components/ui';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -51,7 +53,7 @@ const userSchema = z.object({
 type BusinessInfoFormData = z.infer<typeof businessInfoSchema>;
 type KOTSettingsFormData = z.infer<typeof kotSettingsSchema>;
 type UserFormData = z.infer<typeof userSchema>;
-type TabType = 'business' | 'kot' | 'users' | 'permissions' | 'audit' | 'data';
+type TabType = 'business' | 'kot' | 'users' | 'permissions' | 'audit' | 'data' | 'recycle';
 
 export const Settings: React.FC = () => {
   const currentUser = useAuthStore((state) => state.currentUser);
@@ -306,6 +308,7 @@ export const Settings: React.FC = () => {
     ...(canViewUsers ? [{ id: 'users' as TabType, name: 'Users', icon: UserGroupIcon }] : []),
     ...(isAdmin ? [{ id: 'permissions' as TabType, name: 'Permissions', icon: ShieldCheckIcon }] : []),
     ...(isAdmin ? [{ id: 'data' as TabType, name: 'Data Management', icon: ArchiveBoxIcon }] : []),
+    ...(isAdmin ? [{ id: 'recycle' as TabType, name: 'Recycle Bin', icon: TrashIcon }] : []),
     ...(canViewAudit ? [{ id: 'audit' as TabType, name: 'Audit Logs', icon: ClipboardDocumentListIcon }] : []),
   ];
 
@@ -606,6 +609,10 @@ export const Settings: React.FC = () => {
 
         {activeTab === 'permissions' && isAdmin && (
           <PermissionManagement />
+        )}
+
+        {activeTab === 'recycle' && isAdmin && (
+          <RecycleBin />
         )}
 
         {activeTab === 'data' && isAdmin && (

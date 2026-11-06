@@ -54,7 +54,7 @@ export async function updateCategory(
   });
 }
 
-export async function deleteCategory(id: string, userId: string): Promise<void> {
+export async function deleteCategory(id: string, _userId: string): Promise<void> {
   const category = await db.categories.get(id);
 
   // Check if category has items
@@ -71,16 +71,8 @@ export async function deleteCategory(id: string, userId: string): Promise<void> 
     }
   }
 
+  // The server deletes the record, moves it to the Recycle Bin and writes the audit entry.
   await db.categories.delete(id);
-
-  await logAudit({
-    userId,
-    action: 'delete',
-    tableName: 'categories',
-    recordId: id,
-    description: `Deleted category: ${category?.name}`,
-    before: category,
-  });
 }
 
 export async function getAllCategories(): Promise<Category[]> {
@@ -146,29 +138,10 @@ export async function updateMenuItem(
   });
 }
 
-export async function deleteMenuItem(id: string, userId: string): Promise<void> {
-  const item = await db.menuItems.get(id);
-
-  // Clear menuItemId reference in order items (itemName is preserved for display)
-  // This allows safe deletion without breaking historical orders
-  const orderItemsWithItem = await db.orderItems.where('menuItemId').equals(id).toArray();
-  for (const orderItem of orderItemsWithItem) {
-    await db.orderItems.update(orderItem.id, { menuItemId: null });
-  }
-
-  // Delete associated variant links
-  await db.menuItemVariants.where('menuItemId').equals(id).delete();
-
+export async function deleteMenuItem(id: string, _userId: string): Promise<void> {
+  // The server moves the item to the Recycle Bin, keeps its variant links for a restore, leaves
+  // order history pointing at it and writes the audit entry.
   await db.menuItems.delete(id);
-
-  await logAudit({
-    userId,
-    action: 'delete',
-    tableName: 'menuItems',
-    recordId: id,
-    description: `Deleted menu item: ${item?.name}`,
-    before: item,
-  });
 }
 
 export async function getMenuItemsByCategory(categoryId: string): Promise<MenuItem[]> {
@@ -232,25 +205,10 @@ export async function updateVariant(
   });
 }
 
-export async function deleteVariant(id: string, userId: string): Promise<void> {
-  const variant = await db.variants.get(id);
-
-  // Delete associated options
-  await db.variantOptions.where('variantId').equals(id).delete();
-
-  // Delete menu item associations
-  await db.menuItemVariants.where('variantId').equals(id).delete();
-
+export async function deleteVariant(id: string, _userId: string): Promise<void> {
+  // The server moves the variant to the Recycle Bin (its options and links stay for a restore),
+  // and writes the audit entry.
   await db.variants.delete(id);
-
-  await logAudit({
-    userId,
-    action: 'delete',
-    tableName: 'variants',
-    recordId: id,
-    description: `Deleted variant: ${variant?.name}`,
-    before: variant,
-  });
 }
 
 export async function getAllVariants(): Promise<Variant[]> {
@@ -439,30 +397,10 @@ export async function updateDeal(
   });
 }
 
-export async function deleteDeal(id: string, userId: string): Promise<void> {
-  const deal = await db.deals.get(id);
-
-  // Clear dealId reference in order items (itemName is preserved for display)
-  // This allows safe deletion without breaking historical orders
-  const orderItemsWithDeal = await db.orderItems.where('dealId').equals(id).toArray();
-  for (const item of orderItemsWithDeal) {
-    await db.orderItems.update(item.id, { dealId: null });
-  }
-
-  // Delete associated items
-  await db.dealItems.where('dealId').equals(id).delete();
-  await db.dealVariants.where('dealId').equals(id).delete();
-
+export async function deleteDeal(id: string, _userId: string): Promise<void> {
+  // The server moves the deal to the Recycle Bin, keeps its items for a restore, leaves order
+  // history pointing at it and writes the audit entry.
   await db.deals.delete(id);
-
-  await logAudit({
-    userId,
-    action: 'delete',
-    tableName: 'deals',
-    recordId: id,
-    description: `Deleted deal: ${deal?.name}`,
-    before: deal,
-  });
 }
 
 export async function getAllDeals(): Promise<Deal[]> {

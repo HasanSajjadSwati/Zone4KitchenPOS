@@ -82,7 +82,7 @@ export async function updateEmployee(
   });
 }
 
-export async function deleteEmployee(id: string, userId: string): Promise<void> {
+export async function deleteEmployee(id: string, _userId: string): Promise<void> {
   const employee = await db.employees.get(id);
   if (!employee) throw new Error('Employee not found');
 
@@ -93,16 +93,8 @@ export async function deleteEmployee(id: string, userId: string): Promise<void> 
     throw new Error('Cannot delete employee with existing loans. Mark the employee inactive instead.');
   }
 
+  // The server deletes the record, moves it to the Recycle Bin and writes the audit entry.
   await db.employees.delete(id);
-
-  await logAudit({
-    userId,
-    action: 'delete',
-    tableName: 'employees',
-    recordId: id,
-    description: `Deleted employee: ${employee.name}`,
-    before: employee,
-  });
 }
 
 export async function getAllEmployees(): Promise<Employee[]> {

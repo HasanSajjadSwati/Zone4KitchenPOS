@@ -40,11 +40,10 @@ export async function getAuditLogs(
   return await apiClient.getAuditLogs(limit, offset, userId);
 }
 
-// Users for the management screen. Deleted users are kept on the server (orders and payments
-// point at them) and are hidden here; reports read db.users directly so their names still resolve.
+// Users for the management screen. The server leaves deleted users out of this list (they are in the
+// Recycle Bin); reports read db.users.toArrayWithDeleted() so their names still resolve.
 export async function getAllUsers() {
-  const users = await db.users.toArray();
-  return users.filter((user: { deletedAt?: string | null }) => !user.deletedAt);
+  return await db.users.toArray();
 }
 
 export async function getAllRoles() {

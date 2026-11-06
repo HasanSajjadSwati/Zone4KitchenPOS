@@ -56,8 +56,8 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ orderId, isO
       }
 
       // Load menu item and deal names for display
-      const menuItems = await db.menuItems.toArray();
-      const deals = await db.deals.toArray();
+      const menuItems = await db.menuItems.toArrayWithDeleted();
+      const deals = await db.deals.toArrayWithDeleted();
       const miMap: Record<string, string> = {};
       const dMap: Record<string, string> = {};
       for (const mi of menuItems) miMap[mi.id] = mi.name;

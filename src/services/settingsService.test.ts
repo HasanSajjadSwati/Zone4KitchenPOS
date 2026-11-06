@@ -10,12 +10,13 @@ vi.mock('@/utils/audit', () => ({ logAudit: vi.fn() }));
 
 import { getAllUsers } from './settingsService';
 
+// The server leaves deleted users out of the plain list, so management shows what it is given
+// (inactive users included).
 describe('user management list', () => {
-  it('leaves out deleted users but keeps inactive ones', async () => {
+  it('shows every user the server lists, inactive ones included', async () => {
     db.users.toArray.mockResolvedValue([
-      { id: 'u1', username: 'shiraz', isActive: true, deletedAt: null },
-      { id: 'u2', username: 'usman', isActive: false, deletedAt: null },
-      { id: 'u3', username: 'fahad.deleted.1', isActive: false, deletedAt: '2026-11-06T12:00:00.000Z' },
+      { id: 'u1', username: 'shiraz', isActive: true },
+      { id: 'u2', username: 'usman', isActive: false },
     ]);
 
     expect((await getAllUsers()).map((u: { id: string }) => u.id)).toEqual(['u1', 'u2']);

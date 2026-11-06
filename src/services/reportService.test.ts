@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const db = vi.hoisted(() => ({
-  menuItems: { toArray: vi.fn() },
-  categories: { toArray: vi.fn() },
-  deals: { toArray: vi.fn() },
+  menuItems: { toArrayWithDeleted: vi.fn() },
+  categories: { toArrayWithDeleted: vi.fn() },
+  deals: { toArrayWithDeleted: vi.fn() },
+  waiters: { toArrayWithDeleted: vi.fn() },
 }));
 const apiClient = vi.hoisted(() => ({
   getOrders: vi.fn(),
@@ -13,7 +14,7 @@ const apiClient = vi.hoisted(() => ({
 vi.mock('@/db', () => ({ db }));
 vi.mock('@/services/api', () => ({ apiClient }));
 
-import { getCategorySales, getCategorySalesDetailed, getDealSales, getItemSales } from './reportService';
+import { getWaiterPerformance, getCategorySales, getCategorySalesDetailed, getDealSales, getItemSales } from './reportService';
 import { DELETED_ITEMS_LABEL } from '@/constants/recycle';
 
 const range = { startDate: new Date('2026-11-01T00:00:00Z'), endDate: new Date('2026-11-06T23:59:59Z') };
@@ -22,9 +23,9 @@ const line = (o: Record<string, unknown>) => ({ itemType: 'menu_item', menuItemI
 beforeEach(() => {
   vi.clearAllMocks();
   apiClient.getOrders.mockResolvedValue([{ id: 'o1' }, { id: 'o2' }, { id: 'o3' }]);
-  db.menuItems.toArray.mockResolvedValue([{ id: 'm1', name: 'Zinger', categoryId: 'sub1' }]);
-  db.deals.toArray.mockResolvedValue([{ id: 'd1', name: 'Family Deal' }]);
-  db.categories.toArray.mockResolvedValue([
+  db.menuItems.toArrayWithDeleted.mockResolvedValue([{ id: 'm1', name: 'Zinger', categoryId: 'sub1' }]);
+  db.deals.toArrayWithDeleted.mockResolvedValue([{ id: 'd1', name: 'Family Deal' }]);
+  db.categories.toArrayWithDeleted.mockResolvedValue([
     { id: 'maj1', name: 'Fast Food', type: 'major', parentId: null, isActive: true },
     { id: 'sub1', name: 'Burgers', type: 'sub', parentId: 'maj1', isActive: true },
     { id: 'majGone', name: 'Old Drinks', type: 'major', parentId: null, isActive: true, deletedAt: '2026-11-05T00:00:00Z' },
@@ -79,5 +80,18 @@ describe('register-session reports keep every sale', () => {
     expect(tree.map((m) => m.categoryName)).toEqual(['Fast Food', DELETED_ITEMS_LABEL]);
     expect(tree[0].totalSales).toBe(500);
     expect(tree[1]).toMatchObject({ categoryId: null, totalSales: 350, totalQuantity: 4, orderCount: 3, subCategories: [] });
+  });
+});
+
+describe('history resolves rows deleted after the sale', () => {
+  it('waiter performance resolves a deleted waiter\'s name', async () => {
+    apiClient.getOrders.mockResolvedValue([{ id: 'o1', waiterId: 'w1', total: 400, tableId: 't1' }]);
+    db.waiters.toArrayWithDeleted.mockResolvedValue([
+      { id: 'w1', name: 'Ali', deletedAt: '2026-11-05T00:00:00Z' },
+    ]);
+
+    const rows = await getWaiterPerformance(range);
+
+    expect(rows.map((r) => [r.waiterId, r.waiterName, r.totalSales])).toEqual([['w1', 'Ali', 400]]);
   });
 });

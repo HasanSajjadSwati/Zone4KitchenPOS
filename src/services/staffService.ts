@@ -54,19 +54,9 @@ export async function updateWaiter(
   });
 }
 
-export async function deleteWaiter(id: string, userId: string): Promise<void> {
-  const waiter = await db.waiters.get(id);
-
+export async function deleteWaiter(id: string, _userId: string): Promise<void> {
+  // The server deletes the record, moves it to the Recycle Bin and writes the audit entry.
   await db.waiters.delete(id);
-
-  await logAudit({
-    userId,
-    action: 'delete',
-    tableName: 'waiters',
-    recordId: id,
-    description: `Deleted waiter: ${waiter?.name}`,
-    before: waiter,
-  });
 }
 
 export async function getAllWaiters(): Promise<Waiter[]> {
@@ -128,19 +118,9 @@ export async function updateRider(
   });
 }
 
-export async function deleteRider(id: string, userId: string): Promise<void> {
-  const rider = await db.riders.get(id);
-
+export async function deleteRider(id: string, _userId: string): Promise<void> {
+  // The server deletes the record, moves it to the Recycle Bin and writes the audit entry.
   await db.riders.delete(id);
-
-  await logAudit({
-    userId,
-    action: 'delete',
-    tableName: 'riders',
-    recordId: id,
-    description: `Deleted rider: ${rider?.name}`,
-    before: rider,
-  });
 }
 
 export async function getAllRiders(): Promise<Rider[]> {
@@ -198,19 +178,9 @@ export async function updateTable(
   });
 }
 
-export async function deleteTable(id: string, userId: string): Promise<void> {
-  const table = await db.diningTables.get(id);
-
+export async function deleteTable(id: string, _userId: string): Promise<void> {
+  // The server deletes the record, moves it to the Recycle Bin and writes the audit entry.
   await db.diningTables.delete(id);
-
-  await logAudit({
-    userId,
-    action: 'delete',
-    tableName: 'tables',
-    recordId: id,
-    description: `Deleted table: ${table?.tableNumber}`,
-    before: table,
-  });
 }
 
 export async function getAllTables(): Promise<TableRecord[]> {

@@ -108,14 +108,6 @@ export async function deleteUser(userId: string, deletedBy: string): Promise<voi
     throw new Error('You cannot delete your own user account');
   }
 
+  // The server deletes the record, moves it to the Recycle Bin and writes the audit entry.
   await apiClient.deleteUser(userId, deletedBy);
-
-  await logAudit({
-    userId: deletedBy,
-    action: 'delete',
-    tableName: 'users',
-    recordId: userId,
-    description: `Deleted user ${user.username}`,
-    before: user,
-  });
 }

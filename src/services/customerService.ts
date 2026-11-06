@@ -55,19 +55,9 @@ export async function updateCustomer(
   });
 }
 
-export async function deleteCustomer(id: string, userId: string): Promise<void> {
-  const customer = await db.customers.get(id);
-
+export async function deleteCustomer(id: string, _userId: string): Promise<void> {
+  // The server deletes the record, moves it to the Recycle Bin and writes the audit entry.
   await db.customers.delete(id);
-
-  await logAudit({
-    userId,
-    action: 'delete',
-    tableName: 'customers',
-    recordId: id,
-    description: `Deleted customer: ${customer?.name}`,
-    before: customer,
-  });
 }
 
 export async function getCustomerByPhone(phone: string): Promise<Customer | undefined> {

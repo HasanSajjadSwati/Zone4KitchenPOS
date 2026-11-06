@@ -323,6 +323,8 @@ export const db = {
   // Users table proxy
   users: {
     toArray: async () => apiClient.getUsers(),
+    // History (reports, past orders) keeps resolving rows that were deleted after the sale.
+    toArrayWithDeleted: async () => apiClient.getUsers({ includeDeleted: true }),
     get: async (id: string) => apiClient.getUser(id),
     add: async (user: any) => apiClient.createUser(user),
     put: async (user: any) => apiClient.updateUser(user.id, user),
@@ -354,6 +356,8 @@ export const db = {
   // Categories table proxy
   categories: {
     toArray: async () => apiClient.getCategories(),
+    // History (reports, past orders) keeps resolving rows that were deleted after the sale.
+    toArrayWithDeleted: async () => apiClient.getCategories({ includeDeleted: true }),
     get: async (id: string) => apiClient.getCategory(id),
     add: async (category: any) => apiClient.createCategory(category),
     put: async (category: any) => apiClient.updateCategory(category.id, category),
@@ -376,6 +380,8 @@ export const db = {
   // Menu Items table proxy
   menuItems: {
     toArray: async () => apiClient.getMenuItems(),
+    // History (reports, past orders) keeps resolving rows that were deleted after the sale.
+    toArrayWithDeleted: async () => apiClient.getMenuItems({ includeDeleted: true }),
     get: async (id: string) => apiClient.getMenuItem(id),
     add: async (item: any) => apiClient.createMenuItem(item),
     put: async (item: any) => apiClient.updateMenuItem(item.id, item),
@@ -665,6 +671,8 @@ export const db = {
   // Deals table proxy
   deals: {
     toArray: async () => apiClient.getDeals(),
+    // History (reports, past orders) keeps resolving rows that were deleted after the sale.
+    toArrayWithDeleted: async () => apiClient.getDeals({ includeDeleted: true }),
     get: async (id: string) => apiClient.getDeal(id),
     add: async (deal: any) => apiClient.createDeal(deal),
     put: async (deal: any) => apiClient.updateDeal(deal.id, deal),
@@ -937,6 +945,8 @@ export const db = {
   // Waiters table proxy
   waiters: {
     toArray: async () => apiClient.getWaiters(),
+    // History (reports, past orders) keeps resolving rows that were deleted after the sale.
+    toArrayWithDeleted: async () => apiClient.getWaiters({ includeDeleted: true }),
     get: async (id: string) => apiClient.getWaiter(id),
     add: async (waiter: any) => apiClient.createWaiter(waiter),
     put: async (waiter: any) => apiClient.updateWaiter(waiter.id, waiter),
@@ -969,6 +979,8 @@ export const db = {
   // Riders table proxy
   riders: {
     toArray: async () => apiClient.getRiders(),
+    // History (reports, past orders) keeps resolving rows that were deleted after the sale.
+    toArrayWithDeleted: async () => apiClient.getRiders({ includeDeleted: true }),
     get: async (id: string) => apiClient.getRider(id),
     add: async (rider: any) => apiClient.createRider(rider),
     put: async (rider: any) => apiClient.updateRider(rider.id, rider),
