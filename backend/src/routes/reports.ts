@@ -1,6 +1,7 @@
 import express from 'express';
 import { allAsync, getAsync } from '../db/database.js';
 import { logger } from '../utils/logger.js';
+import { DELETED_ITEMS_LABEL } from '../constants/recycle.js';
 
 export const reportRoutes = express.Router();
 
@@ -262,7 +263,7 @@ reportRoutes.get('/item-sales', async (req, res) => {
     const rows = await allAsync(
       `
         SELECT
-          oi.menuItemId AS "itemId",
+          m.id AS "itemId",
           m.name AS "itemName",
           m.categoryId AS "categoryId",
           c.name AS "categoryName",
@@ -276,18 +277,20 @@ reportRoutes.get('/item-sales', async (req, res) => {
           END AS "averagePrice"
         FROM ${ALL_ORDER_ITEMS} oi
         JOIN ${ALL_ORDERS} o ON o.id = oi.orderId
-        JOIN menuItems m ON m.id = oi.menuItemId
+        LEFT JOIN menuItems m ON m.id = oi.menuItemId
         LEFT JOIN categories c ON c.id = m.categoryId
         ${whereClause}
-        GROUP BY oi.menuItemId, m.name, m.categoryId, c.name
+        GROUP BY m.id, m.name, m.categoryId, c.name
         ORDER BY "totalSales" DESC
       `,
       params
     );
 
     const result = rows.map((row) => ({
-      itemId: row.itemId,
-      itemName: row.itemName,
+      // A line whose item row is gone (or was never recorded) has a null m.id: all of them
+      // collapse into this one row so the report total never drops a sale.
+      itemId: row.itemId || null,
+      itemName: row.itemId ? row.itemName : DELETED_ITEMS_LABEL,
       categoryId: row.categoryId || null,
       categoryName: row.categoryName || null,
       totalSales: toNumber(row.totalSales),
@@ -378,7 +381,7 @@ reportRoutes.get('/deal-sales', async (req, res) => {
     const rows = await allAsync(
       `
         SELECT
-          oi.dealId AS "dealId",
+          d.id AS "dealId",
           d.name AS "dealName",
           COALESCE(SUM(oi.totalPrice), 0) AS "totalSales",
           COALESCE(SUM(oi.quantity), 0) AS "totalQuantity",
@@ -390,17 +393,17 @@ reportRoutes.get('/deal-sales', async (req, res) => {
           END AS "averagePrice"
         FROM ${ALL_ORDER_ITEMS} oi
         JOIN ${ALL_ORDERS} o ON o.id = oi.orderId
-        JOIN deals d ON d.id = oi.dealId
+        LEFT JOIN deals d ON d.id = oi.dealId
         ${whereClause}
-        GROUP BY oi.dealId, d.name
+        GROUP BY d.id, d.name
         ORDER BY "totalSales" DESC
       `,
       params
     );
 
     const result = rows.map((row) => ({
-      dealId: row.dealId,
-      dealName: row.dealName,
+      dealId: row.dealId || null,
+      dealName: row.dealId ? row.dealName : DELETED_ITEMS_LABEL,
       totalSales: toNumber(row.totalSales),
       totalQuantity: toNumber(row.totalQuantity),
       orderCount: toNumber(row.orderCount),
@@ -427,7 +430,7 @@ reportRoutes.get('/category-sales', async (req, res) => {
     const rows = await allAsync(
       `
         SELECT
-          m.categoryId AS "categoryId",
+          c.id AS "categoryId",
           c.name AS "categoryName",
           COALESCE(SUM(oi.totalPrice), 0) AS "totalSales",
           COALESCE(SUM(oi.quantity), 0) AS "totalQuantity",
@@ -439,18 +442,19 @@ reportRoutes.get('/category-sales', async (req, res) => {
           END AS "averagePrice"
         FROM ${ALL_ORDER_ITEMS} oi
         JOIN ${ALL_ORDERS} o ON o.id = oi.orderId
-        JOIN menuItems m ON m.id = oi.menuItemId
-        JOIN categories c ON c.id = m.categoryId
+        LEFT JOIN menuItems m ON m.id = oi.menuItemId
+        LEFT JOIN categories c ON c.id = m.categoryId
         ${whereClause}
-        GROUP BY m.categoryId, c.name
+          AND (m.id IS NULL OR c.id IS NOT NULL)
+        GROUP BY c.id, c.name
         ORDER BY "totalSales" DESC
       `,
       params
     );
 
     const result = rows.map((row) => ({
-      categoryId: row.categoryId,
-      categoryName: row.categoryName,
+      categoryId: row.categoryId || null,
+      categoryName: row.categoryId ? row.categoryName : DELETED_ITEMS_LABEL,
       totalSales: toNumber(row.totalSales),
       totalQuantity: toNumber(row.totalQuantity),
       orderCount: toNumber(row.orderCount),
@@ -492,25 +496,32 @@ reportRoutes.get('/category-sales-detailed', async (req, res) => {
           END AS "averagePrice"
         FROM ${ALL_ORDER_ITEMS} oi
         JOIN ${ALL_ORDERS} o ON o.id = oi.orderId
-        JOIN menuItems m ON m.id = oi.menuItemId
-        JOIN categories c ON c.id = m.categoryId
+        LEFT JOIN menuItems m ON m.id = oi.menuItemId
+        LEFT JOIN categories c ON c.id = m.categoryId
         ${whereClause}
+          AND (m.id IS NULL OR c.id IS NOT NULL)
         GROUP BY c.id, c.name, c.type, c.parentId
         ORDER BY "totalSales" DESC
       `,
       params
     );
 
-    // Get all categories to build hierarchy (including those with no sales)
-    const allCategories = await allAsync(
-      `SELECT id, name, type, parentId, sortOrder FROM categories WHERE isActive = TRUE ORDER BY sortOrder`,
+    // Every category, deleted or inactive included: a live active one is always listed, any other
+    // only when it or one of its subcategories sold something in the range.
+    const everyCategory = await allAsync(
+      `SELECT id, name, type, parentId, sortOrder, isActive, deletedAt FROM categories ORDER BY sortOrder`,
       []
     );
 
     // Build maps
-    const majorCategories = allCategories.filter((c: any) => c.type === 'major');
     const salesByCategory = new Map<string, any>();
+    let unlinkedSales: any = null;
     for (const row of rows) {
+      if (!row.categoryId) {
+        // Menu-item lines with no item row left: one entry, appended below.
+        unlinkedSales = row;
+        continue;
+      }
       salesByCategory.set(row.categoryId, {
         categoryId: row.categoryId,
         categoryName: row.categoryName,
@@ -523,8 +534,14 @@ reportRoutes.get('/category-sales-detailed', async (req, res) => {
       });
     }
 
+    const isLive = (c: any) => c.deletedAt == null && (c.isActive === true || c.isActive === 't');
+    const hasSales = (c: any) =>
+      salesByCategory.has(c.id) || everyCategory.some((s: any) => s.parentId === c.id && salesByCategory.has(s.id));
+    const allCategories = everyCategory.filter((c: any) => isLive(c) || hasSales(c));
+    const majorCategories = allCategories.filter((c: any) => c.type === 'major');
+
     // Build hierarchical result
-    const result = majorCategories.map((major: any) => {
+    const result: any[] =majorCategories.map((major: any) => {
       // Find subcategories for this major category
       const subCategories = allCategories
         .filter((c: any) => c.parentId === major.id)
@@ -568,6 +585,19 @@ reportRoutes.get('/category-sales-detailed', async (req, res) => {
       };
     })
     .sort((a: any, b: any) => b.totalSales - a.totalSales);
+
+    if (unlinkedSales) {
+      result.push({
+        categoryId: null,
+        categoryName: DELETED_ITEMS_LABEL,
+        totalSales: toNumber(unlinkedSales.totalSales),
+        totalQuantity: toNumber(unlinkedSales.totalQuantity),
+        orderCount: toNumber(unlinkedSales.orderCount),
+        averagePrice: toNumber(unlinkedSales.averagePrice),
+        subCategories: [],
+      });
+      result.sort((a: any, b: any) => b.totalSales - a.totalSales);
+    }
 
     res.json(result);
   } catch (error) {

@@ -27,7 +27,7 @@ export const CategorySalesReport: React.FC = () => {
   const [customEndTime, setCustomEndTime] = useState('23:59');
   const [categorySales, setCategorySales] = useState<MajorCategorySales[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [expandedCategories, setExpandedCategories] = useState<Set<string | null>>(new Set());
 
   // Register session filter
   const [registerSessions, setRegisterSessions] = useState<RegisterSession[]>([]);
@@ -114,7 +114,7 @@ export const CategorySalesReport: React.FC = () => {
     }
   };
 
-  const toggleCategory = (categoryId: string) => {
+  const toggleCategory = (categoryId: string | null) => {
     setExpandedCategories((prev) => {
       const next = new Set(prev);
       if (next.has(categoryId)) {

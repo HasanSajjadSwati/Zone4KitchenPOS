@@ -1,6 +1,7 @@
 import { db } from '@/db';
 import { apiClient } from '@/services/api';
 import type { Order, OrderItem, Payment, RegisterSession, User, Customer, Expense, Waiter, Rider, MenuItem, Category, Deal } from '@/db/types';
+import { DELETED_ITEMS_LABEL } from '@/constants/recycle';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -36,7 +37,7 @@ export interface SalesSummary {
 }
 
 export interface CategorySales {
-  categoryId: string;
+  categoryId: string | null; // null = the DELETED_ITEMS_LABEL row
   categoryName: string;
   totalSales: number;
   totalQuantity: number;
@@ -54,7 +55,7 @@ export interface SubCategorySales {
 }
 
 export interface MajorCategorySales {
-  categoryId: string;
+  categoryId: string | null; // null = the DELETED_ITEMS_LABEL entry
   categoryName: string;
   totalSales: number;
   totalQuantity: number;
@@ -72,7 +73,7 @@ export interface VariantOptionSales {
 }
 
 export interface ItemSales {
-  itemId: string;
+  itemId: string | null; // null = the DELETED_ITEMS_LABEL row
   itemName: string;
   categoryId: string | null;
   categoryName: string | null;
@@ -84,7 +85,7 @@ export interface ItemSales {
 }
 
 export interface DealSales {
-  dealId: string;
+  dealId: string | null; // null = the DELETED_ITEMS_LABEL row
   dealName: string;
   totalSales: number;
   totalQuantity: number;
@@ -523,30 +524,32 @@ export async function getCategorySales(range: DateRange, registerSessionId?: str
   const menuItems = await db.menuItems.toArray();
 
   // Group by category
-  const categoryMap = new Map<string, {
+  // Key null = lines whose item is gone (id null, or pointing at no loaded item) -> the label row.
+  const categoryMap = new Map<string | null, {
     totalSales: number;
     totalQuantity: number;
     orderCount: Set<string>;
   }>();
 
   for (const item of orderItems) {
-    if (!item.menuItemId) continue;
+    const menuItem = item.menuItemId ? menuItems.find((m: MenuItem) => m.id === item.menuItemId) : undefined;
+    let categoryKey: string | null = null;
+    if (menuItem) {
+      if (!menuItem.categoryId) continue;
+      const category = categories.find((c: Category) => c.id === menuItem.categoryId);
+      if (!category) continue;
+      categoryKey = category.id;
+    }
 
-    const menuItem = menuItems.find((m: MenuItem) => m.id === item.menuItemId);
-    if (!menuItem || !menuItem.categoryId) continue;
-
-    const category = categories.find((c: Category) => c.id === menuItem.categoryId);
-    if (!category) continue;
-
-    if (!categoryMap.has(category.id)) {
-      categoryMap.set(category.id, {
+    if (!categoryMap.has(categoryKey)) {
+      categoryMap.set(categoryKey, {
         totalSales: 0,
         totalQuantity: 0,
         orderCount: new Set(),
       });
     }
 
-    const stats = categoryMap.get(category.id)!;
+    const stats = categoryMap.get(categoryKey)!;
     stats.totalSales += item.totalPrice;
     stats.totalQuantity += item.quantity;
     stats.orderCount.add(item.orderId);
@@ -554,12 +557,12 @@ export async function getCategorySales(range: DateRange, registerSessionId?: str
 
   const result: CategorySales[] = [];
   for (const [categoryId, stats] of categoryMap.entries()) {
-    const category = categories.find((c: Category) => c.id === categoryId);
-    if (!category) continue;
+    const category = categoryId === null ? null : categories.find((c: Category) => c.id === categoryId);
+    if (categoryId !== null && !category) continue;
 
     result.push({
       categoryId,
-      categoryName: category.name,
+      categoryName: category ? category.name : DELETED_ITEMS_LABEL,
       totalSales: stats.totalSales,
       totalQuantity: stats.totalQuantity,
       orderCount: stats.orderCount.size,
@@ -593,12 +596,20 @@ export async function getCategorySalesDetailed(range: DateRange, registerSession
     db.categories.toArray(),
   ]);
 
-  const majorCategories = allCategories.filter((c: Category) => c.type === 'major');
-  const salesMap = new Map(flatSales.map(s => [s.categoryId, s]));
+  // Same rule as the server: a live active category is always listed; a deleted or inactive one
+  // only when it or one of its subcategories sold something.
+  type MaybeDeleted = Category & { deletedAt?: string | Date | null };
+  const unlinked = flatSales.find((s) => s.categoryId === null);
+  const salesMap = new Map(flatSales.filter((s) => s.categoryId !== null).map((s) => [s.categoryId, s]));
+  const hasSales = (c: Category) =>
+    salesMap.has(c.id) || allCategories.some((s: Category) => s.parentId === c.id && salesMap.has(s.id));
+  const isListed = (c: Category) => ((c as MaybeDeleted).deletedAt == null && c.isActive) || hasSales(c);
+  const listed = allCategories.filter(isListed);
+  const majorCategories = listed.filter((c: Category) => c.type === 'major');
 
-  return majorCategories
+  const tree: MajorCategorySales[] = majorCategories
     .map((major: Category) => {
-      const subs = allCategories.filter((c: Category) => c.parentId === major.id);
+      const subs = listed.filter((c: Category) => c.parentId === major.id);
       const subCategorySales: SubCategorySales[] = subs
         .map((sub: Category) => {
           const sales = salesMap.get(sub.id);
@@ -633,6 +644,20 @@ export async function getCategorySalesDetailed(range: DateRange, registerSession
       };
     })
     .sort((a: MajorCategorySales, b: MajorCategorySales) => b.totalSales - a.totalSales);
+
+  if (unlinked) {
+    tree.push({
+      categoryId: null,
+      categoryName: DELETED_ITEMS_LABEL,
+      totalSales: unlinked.totalSales,
+      totalQuantity: unlinked.totalQuantity,
+      orderCount: unlinked.orderCount,
+      averagePrice: unlinked.averagePrice,
+      subCategories: [],
+    });
+    tree.sort((a, b) => b.totalSales - a.totalSales);
+  }
+  return tree;
 }
 
 /**
@@ -740,7 +765,7 @@ export async function getItemSales(range: DateRange, registerSessionId?: string)
         const variantMap = await getItemVariantSalesMap(range, undefined);
         return (items as ItemSales[]).map((item) => ({
           ...item,
-          variants: variantMap.get(item.itemId) || [],
+          variants: variantMap.get(item.itemId ?? '') || [],
         }));
       }
     } catch (error) {
@@ -763,24 +788,26 @@ export async function getItemSales(range: DateRange, registerSessionId?: string)
   const categories = await db.categories.toArray();
 
   // Group by item
-  const itemMap = new Map<string, {
+  // Key null = lines whose item is gone (id null, or pointing at no loaded item) -> the label row.
+  const knownItemIds = new Set(menuItems.map((m: MenuItem) => m.id));
+  const itemMap = new Map<string | null, {
     totalSales: number;
     totalQuantity: number;
     orderCount: Set<string>;
   }>();
 
   for (const item of orderItems) {
-    if (!item.menuItemId) continue;
+    const itemKey = item.menuItemId && knownItemIds.has(item.menuItemId) ? item.menuItemId : null;
 
-    if (!itemMap.has(item.menuItemId)) {
-      itemMap.set(item.menuItemId, {
+    if (!itemMap.has(itemKey)) {
+      itemMap.set(itemKey, {
         totalSales: 0,
         totalQuantity: 0,
         orderCount: new Set(),
       });
     }
 
-    const stats = itemMap.get(item.menuItemId)!;
+    const stats = itemMap.get(itemKey)!;
     stats.totalSales += item.totalPrice;
     stats.totalQuantity += item.quantity;
     stats.orderCount.add(item.orderId);
@@ -789,7 +816,20 @@ export async function getItemSales(range: DateRange, registerSessionId?: string)
   const result: ItemSales[] = [];
   for (const [itemId, stats] of itemMap.entries()) {
     const menuItem = menuItems.find((m: MenuItem) => m.id === itemId);
-    if (!menuItem) continue;
+    if (!menuItem) {
+      result.push({
+        itemId: null,
+        itemName: DELETED_ITEMS_LABEL,
+        categoryId: null,
+        categoryName: null,
+        totalSales: stats.totalSales,
+        totalQuantity: stats.totalQuantity,
+        orderCount: stats.orderCount.size,
+        averagePrice: stats.totalQuantity > 0 ? stats.totalSales / stats.totalQuantity : 0,
+        variants: [],
+      });
+      continue;
+    }
 
     const category = menuItem.categoryId
       ? categories.find((c: Category) => c.id === menuItem.categoryId)
@@ -804,7 +844,7 @@ export async function getItemSales(range: DateRange, registerSessionId?: string)
       totalQuantity: stats.totalQuantity,
       orderCount: stats.orderCount.size,
       averagePrice: stats.totalQuantity > 0 ? stats.totalSales / stats.totalQuantity : 0,
-      variants: variantMap.get(itemId) || [],
+      variants: variantMap.get(itemId ?? '') || [],
     });
   }
 
@@ -841,24 +881,26 @@ export async function getDealSales(range: DateRange, registerSessionId?: string)
   const deals = await db.deals.toArray();
 
   // Group by deal
-  const dealMap = new Map<string, {
+  // Key null = lines whose deal is gone (id null, or pointing at no loaded deal) -> the label row.
+  const knownDealIds = new Set(deals.map((d: Deal) => d.id));
+  const dealMap = new Map<string | null, {
     totalSales: number;
     totalQuantity: number;
     orderCount: Set<string>;
   }>();
 
   for (const item of orderItems) {
-    if (!item.dealId) continue;
+    const dealKey = item.dealId && knownDealIds.has(item.dealId) ? item.dealId : null;
 
-    if (!dealMap.has(item.dealId)) {
-      dealMap.set(item.dealId, {
+    if (!dealMap.has(dealKey)) {
+      dealMap.set(dealKey, {
         totalSales: 0,
         totalQuantity: 0,
         orderCount: new Set(),
       });
     }
 
-    const stats = dealMap.get(item.dealId)!;
+    const stats = dealMap.get(dealKey)!;
     stats.totalSales += item.totalPrice;
     stats.totalQuantity += item.quantity;
     stats.orderCount.add(item.orderId);
@@ -866,12 +908,11 @@ export async function getDealSales(range: DateRange, registerSessionId?: string)
 
   const result: DealSales[] = [];
   for (const [dealId, stats] of dealMap.entries()) {
-    const deal = deals.find((d: Deal) => d.id === dealId);
-    if (!deal) continue;
+    const deal = dealId === null ? null : deals.find((d: Deal) => d.id === dealId);
 
     result.push({
       dealId,
-      dealName: deal.name,
+      dealName: deal ? deal.name : DELETED_ITEMS_LABEL,
       totalSales: stats.totalSales,
       totalQuantity: stats.totalQuantity,
       orderCount: stats.orderCount.size,
