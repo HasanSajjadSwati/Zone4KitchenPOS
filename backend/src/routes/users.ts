@@ -30,8 +30,9 @@ const ensureAdmin = async (adminUserId: string) => {
 // Get all users
 userRoutes.get('/', async (req, res) => {
   try {
+    // Deleted users stay in the list (flagged by deletedAt) so reports can still show their names.
     const users = await allAsync(`
-      SELECT u.id, u.username, u.fullName, u.roleId, u.isActive, u.createdAt, u.updatedAt, r.name as roleName
+      SELECT u.id, u.username, u.fullName, u.roleId, u.isActive, u.deletedAt, u.createdAt, u.updatedAt, r.name as roleName
       FROM users u
       JOIN roles r ON u.roleId = r.id
       ORDER BY u.createdAt DESC
@@ -46,7 +47,7 @@ userRoutes.get('/', async (req, res) => {
 userRoutes.get('/:id', async (req, res) => {
   try {
     const user = await getAsync(`
-      SELECT u.id, u.username, u.fullName, u.roleId, u.isActive, u.createdAt, u.updatedAt, r.name as roleName
+      SELECT u.id, u.username, u.fullName, u.roleId, u.isActive, u.deletedAt, u.createdAt, u.updatedAt, r.name as roleName
       FROM users u
       JOIN roles r ON u.roleId = r.id
       WHERE u.id = ?
@@ -228,7 +229,7 @@ userRoutes.delete('/:id', async (req, res) => {
     }
 
     const user = await getAsync(
-      `SELECT u.id, r.name as roleName
+      `SELECT u.id, u.username, r.name as roleName
        FROM users u
        JOIN roles r ON u.roleId = r.id
        WHERE u.id = ?`,
@@ -242,7 +243,16 @@ userRoutes.delete('/:id', async (req, res) => {
       return res.status(403).json({ error: 'Admin users cannot be deleted' });
     }
 
-    await runAsync('DELETE FROM users WHERE id = ?', [req.params.id]);
+    // Soft delete. Orders, payments, register sessions and the audit log all reference the user
+    // (foreign keys), so a hard DELETE fails for anyone who ever logged in, and would erase who
+    // took which order. The user can no longer log in (inactive, renamed), the username is freed
+    // for a new account, and reports still resolve the name from the kept row.
+    const now = new Date().toISOString();
+    // isActive is bound, not written as a literal: Postgres rejects the integer 0 for a boolean column.
+    await runAsync(
+      'UPDATE users SET isActive = ?, deletedAt = ?, username = ?, updatedAt = ? WHERE id = ?',
+      [false, now, `${user.username}.deleted.${Date.now()}`, now, req.params.id]
+    );
     res.json({ message: 'User deleted successfully' });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });

@@ -18,6 +18,7 @@ export interface User {
   fullName: string;
   roleId: string;
   isActive: boolean;
+  deletedAt?: string | null; // set when the user is deleted; the row stays for history
   createdAt: Date;
   updatedAt: Date;
 }

@@ -23,6 +23,8 @@ export async function initializeDatabase() {
     await runAsync('ALTER TABLE settings ADD COLUMN IF NOT EXISTS deliveryCharge REAL DEFAULT 0');
     await runAsync('ALTER TABLE settings ADD COLUMN IF NOT EXISTS dayCountByRegister BOOLEAN DEFAULT FALSE');
     await runAsync('ALTER TABLE orders ADD COLUMN IF NOT EXISTS deliveryCharge REAL DEFAULT 0');
+    // Users are soft-deleted: history rows reference them, so the row must stay.
+    await runAsync('ALTER TABLE users ADD COLUMN IF NOT EXISTS deletedAt TIMESTAMPTZ');
     await runAsync('UPDATE settings SET printAllIncludeKOT = TRUE WHERE printAllIncludeKOT IS NULL');
     await runAsync('UPDATE settings SET printAllIncludeCustomer = TRUE WHERE printAllIncludeCustomer IS NULL');
     await runAsync('UPDATE settings SET printAllIncludeCounter = FALSE WHERE printAllIncludeCounter IS NULL');
