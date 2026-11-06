@@ -12,10 +12,11 @@ const defaultLookup: LiveUserLookup = async (id) => {
 };
 
 // Runs after requireAuth. A valid token is not enough: the user must still exist, be active and not
-// be in the Recycle Bin. Verdicts (live and not live) are cached per user for 30 s so the check is
-// not a query per request; a deleted user is therefore locked out within 30 s.
+// be in the Recycle Bin. Only a LIVE verdict is cached (30 s) so the check is not a query per
+// request; a deleted user is therefore locked out within 30 s. A not-live verdict is looked up again on
+// the next request, so a user restored from the Recycle Bin is back at once.
 export function requireLiveUser(lookup: LiveUserLookup = defaultLookup, now: () => number = Date.now) {
-  const cache = new Map<string, { live: boolean; at: number }>();
+  const cache = new Map<string, number>(); // user id -> when a live verdict was cached
 
   return async (req: Request, res: Response, next: NextFunction) => {
     if (isPublicApiRequest(req)) return next();
@@ -24,16 +25,12 @@ export function requireLiveUser(lookup: LiveUserLookup = defaultLookup, now: () 
     if (!id) return res.status(401).json({ error: 'Authentication required' });
 
     try {
-      let entry = cache.get(id);
-      if (entry && now() - entry.at >= CACHE_MS) {
+      const cachedAt = cache.get(id);
+      if (cachedAt === undefined || now() - cachedAt >= CACHE_MS) {
         cache.delete(id);
-        entry = undefined;
+        if (await lookup(id)) cache.set(id, now());
+        else return res.status(401).json({ error: 'Authentication required' });
       }
-      if (!entry) {
-        entry = { live: await lookup(id), at: now() };
-        cache.set(id, entry);
-      }
-      if (!entry.live) return res.status(401).json({ error: 'Authentication required' });
       next();
     } catch (error) {
       // Not cached: the next request retries the lookup. The real error stays server-side.

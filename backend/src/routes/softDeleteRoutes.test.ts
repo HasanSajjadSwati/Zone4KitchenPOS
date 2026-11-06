@@ -176,6 +176,15 @@ describe('list routes hide Recycle Bin rows', () => {
   });
 });
 
+describe('customer list', () => {
+  it('selects deletedAt so a deleted customer can be told apart', async () => {
+    state.statements.length = 0;
+    await fetch(`${baseUrl}/api/customers?includeDeleted=true`);
+
+    expect(state.statements.at(-1)).toContain('c.updatedAt, c.deletedAt,');
+  });
+});
+
 describe('single-record reads stay unfiltered', () => {
   it('GET /api/menu-items/:id returns a deleted item', async () => {
     state.menuItem = { id: 'm1', name: 'Zinger', deletedAt: '2026-11-01T00:00:00.000Z' };

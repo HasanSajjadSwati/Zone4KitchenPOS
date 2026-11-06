@@ -10,6 +10,7 @@ import {
   cancelLoan,
   getAllLoans,
   getActiveEmployees,
+  getEmployeesIncludingDeleted,
 } from '@/services/employeeService';
 import { useAuthStore } from '@/stores/authStore';
 import { useDialog } from '@/hooks/useDialog';
@@ -75,16 +76,18 @@ export const EmployeeLoanManagement: React.FC = () => {
   }, [loans, filterStatus]);
 
   const loadData = async () => {
-    const [loansData, employeesData] = await Promise.all([
+    const [loansData, employeesData, namedEmployees] = await Promise.all([
       getAllLoans(),
       getActiveEmployees(),
+      getEmployeesIncludingDeleted(),
     ]);
 
     setLoans(loansData);
     setEmployees(employeesData);
 
     const empMap = new Map<string, Employee>();
-    employeesData.forEach((emp) => empMap.set(emp.id, emp));
+    // Names come from every employee, so a loan of a deleted employee still shows who it was.
+    namedEmployees.forEach((emp) => empMap.set(emp.id, emp));
     setEmployeeMap(empMap);
   };
 

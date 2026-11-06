@@ -15,6 +15,7 @@ const CUSTOMER_WITH_ORDER_STATS_QUERY = `
     c.notes,
     c.createdAt,
     c.updatedAt,
+    c.deletedAt,
     (
       SELECT COUNT(*)::integer
       FROM orders o

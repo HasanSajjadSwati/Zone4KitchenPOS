@@ -101,7 +101,7 @@ export const RecycleBin: React.FC = () => {
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDateTime(entry.deletedAt)}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{entry.deletedByName || '-'}</td>
                 <td className="px-6 py-4 text-sm text-gray-500">
-                  {entry.usedBy.length === 0 ? '-' : entry.usedBy.map((u) => `${u.count} ${u.label}`).join(', ')}
+                  {entry.usedBy.length === 0 ? 'Not used anywhere' : entry.usedBy.map((u) => `${u.count} ${u.label}`).join(', ')}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right space-x-2">
                   <Button size="sm" variant="secondary" disabled={busyKeys.has(binKey(entry))} onClick={() => void actions.restore(entry)}>

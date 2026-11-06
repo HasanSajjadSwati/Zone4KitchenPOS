@@ -45,7 +45,7 @@ export async function initializeDatabase() {
       await runAsync(`CREATE UNIQUE INDEX IF NOT EXISTS uq_${table}_${column}_live ON ${table}(${column}) WHERE deletedAt IS NULL`);
     }
     // Undo the '<name>.deleted.<ms>' renames made by the first user soft delete.
-    await runAsync("UPDATE users SET username = split_part(username, '.deleted.', 1) WHERE deletedAt IS NOT NULL AND username LIKE '%.deleted.%'");
+    await runAsync(String.raw`UPDATE users SET username = regexp_replace(username, '\.deleted\.[0-9]+$', '') WHERE deletedAt IS NOT NULL AND username ~ '\.deleted\.[0-9]+$'`);
     await runAsync('UPDATE settings SET printAllIncludeKOT = TRUE WHERE printAllIncludeKOT IS NULL');
     await runAsync('UPDATE settings SET printAllIncludeCustomer = TRUE WHERE printAllIncludeCustomer IS NULL');
     await runAsync('UPDATE settings SET printAllIncludeCounter = FALSE WHERE printAllIncludeCounter IS NULL');

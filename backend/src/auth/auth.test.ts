@@ -230,11 +230,17 @@ describe('requireLiveUser', () => {
     spy.mockRestore();
   });
 
-  it('caches a not-live verdict too, and does not guard public paths', async () => {
+  it('does not cache a not-live verdict, so a restored user is back on the next request', async () => {
     lookup.mockClear();
     expect((await call('ghost')).status).toBe(401);
     expect((await call('ghost')).status).toBe(401);
-    expect(lookup).toHaveBeenCalledTimes(1);
+    expect(lookup).toHaveBeenCalledTimes(2);
+
+    live.add('ghost'); // restored from the Recycle Bin
+    expect((await call('ghost')).status).toBe(200);
+  });
+
+  it('does not guard public paths', async () => {
     expect((await fetch(`${base}/api/health`)).status).toBe(200);
   });
 });

@@ -86,13 +86,8 @@ export async function deleteEmployee(id: string, _userId: string): Promise<void>
   const employee = await db.employees.get(id);
   if (!employee) throw new Error('Employee not found');
 
-  // Check if employee has any loan history
-  const loans = await db.employeeLoans.where('employeeId').equals(id).toArray();
-
-  if (loans.length > 0) {
-    throw new Error('Cannot delete employee with existing loans. Mark the employee inactive instead.');
-  }
-
+  // The server is the single authority on loans: it answers 409 with a clear message while the
+  // employee has an outstanding (active) loan, and allows deletion once every loan is paid off.
   // The server deletes the record, moves it to the Recycle Bin and writes the audit entry.
   await db.employees.delete(id);
 }
@@ -103,6 +98,11 @@ export async function getAllEmployees(): Promise<Employee[]> {
 
 export async function getActiveEmployees(): Promise<Employee[]> {
   return await db.employees.where('isActive').equals(true).sortBy('name');
+}
+
+// Live and Recycle Bin employees: for name lookups on records (loans) that outlive the employee.
+export async function getEmployeesIncludingDeleted(): Promise<Employee[]> {
+  return (await db.employees.toArrayWithDeleted()) as Employee[];
 }
 
 export async function searchEmployees(query: string): Promise<Employee[]> {
@@ -257,7 +257,8 @@ export interface EmployeeLoanSummary {
 }
 
 export async function getEmployeeLoanSummaries(): Promise<EmployeeLoanSummary[]> {
-  const employees = (await db.employees.toArray()) as Employee[];
+  // Includes employees in the Recycle Bin: their loan history must stay in the report.
+  const employees = (await db.employees.toArrayWithDeleted()) as Employee[];
   const loans = (await db.employeeLoans.toArray()) as EmployeeLoan[];
 
   const summaries: EmployeeLoanSummary[] = [];

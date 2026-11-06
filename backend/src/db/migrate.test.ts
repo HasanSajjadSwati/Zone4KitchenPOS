@@ -51,7 +51,7 @@ describe('recycle bin migration', () => {
   });
 
   it('restores usernames renamed by the first user soft delete', () => {
-    const restore = "UPDATE users SET username = split_part(username, '.deleted.', 1) WHERE deletedAt IS NOT NULL AND username LIKE '%.deleted.%'";
+    const restore = String.raw`UPDATE users SET username = regexp_replace(username, '\.deleted\.[0-9]+$', '') WHERE deletedAt IS NOT NULL AND username ~ '\.deleted\.[0-9]+$'`;
     const at = sql.indexOf(restore);
     expect(at).toBeGreaterThan(-1);
     const lastIndex = Math.max(...sql.map((s, i) => (s.startsWith('CREATE UNIQUE INDEX') ? i : -1)));

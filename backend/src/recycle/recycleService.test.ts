@@ -480,6 +480,19 @@ describe('deleteForever', () => {
   });
 });
 
+describe('deleteForever live dependents', () => {
+  it('refuses to delete a binned role while a live user still has it', async () => {
+    add('roles', { id: 'r-old', name: 'Old role', ...IN_BIN });
+    add('users', { id: 'u9', username: 'sana', passwordHash: 'h', fullName: 'Sana', roleId: 'r-old', isActive: true });
+
+    expect(await deleteForever('roles', 'r-old', ADMIN)).toEqual(
+      conflict('Cannot delete: used by 1 live user (Sana). Move or delete it first.'),
+    );
+    expect(find('roles', 'r-old')).toBeDefined();
+    expect(audits()).toHaveLength(0);
+  });
+});
+
 describe('listBin', () => {
   it("listBin returns usedBy counts and the deleter's name", async () => {
     add('users', { id: 'u2', username: 'fahad', passwordHash: 'h', fullName: 'Fahad', roleId: 'r-admin', isActive: true,

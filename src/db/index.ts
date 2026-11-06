@@ -1344,6 +1344,7 @@ export const db = {
   // Employees proxy
   employees: {
     toArray: async () => apiClient.getEmployees(),
+    toArrayWithDeleted: async () => apiClient.getEmployees({ includeDeleted: true }),
     get: async (id: string) => apiClient.getEmployee(id),
     add: async (employee: any) => apiClient.createEmployee(employee),
     put: async (employee: any) => apiClient.updateEmployee(employee.id, employee),

@@ -176,6 +176,12 @@ export function deleteForever(type: RecycleType, id: string, actorId: string): P
       return conflict(`Delete forever or restore ${joinAnd(children.map(counted))} first`);
     }
 
+    // A parent must never be removed or tombstoned under a live child (same check as softDelete).
+    const dependents = await findHits(tx, def.liveDependents, id);
+    if (dependents.length > 0) {
+      return conflict(`Cannot delete: used by ${joinAnd(dependents.map(counted))}. Move or delete ${pronoun(dependents)} first.`);
+    }
+
     let references = 0;
     for (const check of def.history) {
       const counts = await tx.getAsync(check.sql, [id]);
