@@ -8,6 +8,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { Card, Button } from '@/components/ui';
 import { db } from '@/db';
+import { getDashboardOrderStats } from '@/services/orderService';
 import { formatCurrency } from '@/utils/validation';
 import { useDayRange } from '@/hooks/useDayRange';
 
@@ -35,31 +36,7 @@ export const Dashboard: React.FC = () => {
   const loadDashboardData = async () => {
     const { startDate: today, endDate: todayEnd } = await getTodayRange();
 
-    // Get today's orders
-    const todayOrders = await db.orders
-      .where('createdAt')
-      .between(today, todayEnd)
-      .toArray();
-
-    // Get open orders
-    const openOrders = await db.orders
-      .where('status')
-      .equals('open')
-      .count();
-
-    // Calculate stats
-    const todaySales = todayOrders
-      .filter((o) => o.status === 'completed')
-      .reduce((sum, o) => sum + o.total, 0);
-
-    const completedToday = todayOrders.filter((o) => o.status === 'completed').length;
-
-    setStats({
-      todayOrders: todayOrders.length,
-      todaySales,
-      openOrders,
-      completedToday,
-    });
+    setStats(await getDashboardOrderStats(today, todayEnd));
 
     // Check for active register session
     const session = await db.registerSessions

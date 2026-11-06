@@ -1090,26 +1090,21 @@ export const db = {
     toArray: async () => {
       return apiClient.getOrderItemsBulk();
     },
-    get: async (id: string) => {
-      const items = await apiClient.getOrderItemsBulk();
-      return items.find((i: any) => i.id === id) || null;
-    },
+    // get/update/delete fetch the one item by id: the table holds every item ever sold, and
+    // downloading all of it per edit or per printed KOT line is what broke on the tills.
+    get: async (id: string) => apiClient.getOrderItem(id),
     add: async (item: any) => {
       return apiClient.addOrderItem(item.orderId, item);
     },
     update: async (id: string, changes: any) => {
-      // First get the item to find its orderId (single API call)
-      const items = await apiClient.getOrderItemsBulk();
-      const item = items.find((i: any) => i.id === id);
+      const item = await apiClient.getOrderItem(id);
       if (item) {
         return apiClient.updateOrderItem(item.orderId, id, changes);
       }
       return null;
     },
     delete: async (id: string) => {
-      // First get the item to find its orderId (single API call)
-      const items = await apiClient.getOrderItemsBulk();
-      const item = items.find((i: any) => i.id === id);
+      const item = await apiClient.getOrderItem(id);
       if (item) {
         await apiClient.deleteOrderItem(item.orderId, id);
       }

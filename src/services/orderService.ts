@@ -768,14 +768,42 @@ export async function getOrdersPaginated(params: OrderQueryParams): Promise<Pagi
   if (params.limit) filters.limit = String(params.limit);
   if (params.offset !== undefined) filters.offset = String(params.offset);
   
-  const result = await apiClient.getOrders(filters);
-  
-  // Handle both old format (array) and new format ({ orders, total })
-  if (Array.isArray(result)) {
-    return { orders: result as Order[], total: result.length };
-  }
-  
-  return result as PaginatedOrdersResult;
+  // getOrdersPage keeps the server's total; getOrders returned only the rows, so the total was
+  // the page size and the Orders list never showed a second page.
+  const result = await apiClient.getOrdersPage(filters);
+  return { orders: result.orders as Order[], total: result.total };
+}
+
+export interface DashboardOrderStats {
+  todayOrders: number;
+  todaySales: number;
+  openOrders: number;
+  completedToday: number;
+}
+
+// Both queries are filtered on the server: the orders table holds every order ever taken.
+export async function getDashboardOrderStats(startDate: Date, endDate: Date): Promise<DashboardOrderStats> {
+  const [rangeOrders, openOrders] = await Promise.all([
+    apiClient.getOrders({ startDate: startDate.toISOString(), endDate: endDate.toISOString() }),
+    apiClient.getOrders({ status: 'open' }),
+  ]);
+
+  // The server also returns orders merely completed in the range; the dashboard counts the
+  // orders created in it.
+  const start = startDate.getTime();
+  const end = endDate.getTime();
+  const todayOrders = (rangeOrders as Order[]).filter((order) => {
+    const createdAt = new Date(order.createdAt as unknown as string).getTime();
+    return createdAt >= start && createdAt <= end;
+  });
+  const completed = todayOrders.filter((order) => order.status === 'completed');
+
+  return {
+    todayOrders: todayOrders.length,
+    todaySales: completed.reduce((sum, order) => sum + order.total, 0),
+    openOrders: openOrders.length,
+    completedToday: completed.length,
+  };
 }
 
 // FRAUD PREVENTION: Admin unlock function
