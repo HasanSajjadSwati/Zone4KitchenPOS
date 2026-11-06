@@ -926,6 +926,8 @@ export const db = {
   // Customers table proxy
   customers: {
     toArray: async () => apiClient.getCustomers(),
+    // History (customer reports) keeps finding customers deleted after they ordered.
+    toArrayWithDeleted: async () => apiClient.getCustomers({ includeDeleted: true }),
     get: async (id: string) => apiClient.getCustomer(id),
     add: async (customer: any) => apiClient.createCustomer(customer),
     put: async (customer: any) => apiClient.updateCustomer(customer.id, customer),

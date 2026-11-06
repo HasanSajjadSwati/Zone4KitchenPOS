@@ -1,14 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Card } from '@/components/ui';
 import { useDialog } from '@/hooks/useDialog';
 import { RECYCLE_TYPES } from '@/constants/recycle';
-import {
-  deleteForever,
-  describeForeverDelete,
-  listRecycleBin,
-  restore,
-  type BinEntry,
-} from '@/services/recycleBinService';
+import { deleteForever, listRecycleBin, restore, type BinEntry } from '@/services/recycleBinService';
+import { binKey, createRecycleBinActions } from '@/services/recycleBinActions';
 import { formatDateTime } from '@/utils/validation';
 
 // Admin-only. Everything deleted from the app lands here; it can be restored, or removed for good.
@@ -40,33 +35,22 @@ export const RecycleBin: React.FC = () => {
     return q ? entries.filter((e) => e.name.toLowerCase().includes(q)) : entries;
   }, [entries, search]);
 
-  const handleRestore = async (entry: BinEntry) => {
-    try {
-      await restore(entry.type, entry.id);
-      await load();
-    } catch (error) {
-      // The server explains why in plain words (e.g. "Restore category Drinks first").
-      await dialog.alert(error instanceof Error ? error.message : 'Failed to restore', 'Cannot restore');
-    }
-  };
-
-  const handleDeleteForever = async (entry: BinEntry) => {
-    const confirmed = await dialog.confirm({
-      title: 'Delete forever',
-      message: describeForeverDelete(entry),
-      variant: 'danger',
-      confirmLabel: 'Delete forever',
-      cancelLabel: 'Cancel',
-    });
-    if (!confirmed) return;
-
-    try {
-      await deleteForever(entry.type, entry.id);
-      await load();
-    } catch (error) {
-      await dialog.alert(error instanceof Error ? error.message : 'Failed to delete', 'Cannot delete');
-    }
-  };
+  const [busyKeys, setBusyKeys] = useState<ReadonlySet<string>>(new Set());
+  const loadRef = useRef(load);
+  loadRef.current = load;
+  const actions = useMemo(
+    () =>
+      createRecycleBinActions({
+        restore,
+        deleteForever,
+        confirm: (p) => dialog.confirm(p),
+        alert: (m, t) => dialog.alert(m, t),
+        reload: () => loadRef.current(),
+        onBusyChange: setBusyKeys,
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
   return (
     <Card padding="lg">
@@ -111,7 +95,7 @@ export const RecycleBin: React.FC = () => {
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {visible.map((entry) => (
-              <tr key={`${entry.type}:${entry.id}`}>
+              <tr key={binKey(entry)}>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{entry.typeLabel}</td>
                 <td className="px-6 py-4 text-sm font-medium text-gray-900">{entry.name}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDateTime(entry.deletedAt)}</td>
@@ -120,10 +104,10 @@ export const RecycleBin: React.FC = () => {
                   {entry.usedBy.length === 0 ? '-' : entry.usedBy.map((u) => `${u.count} ${u.label}`).join(', ')}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right space-x-2">
-                  <Button size="sm" variant="secondary" onClick={() => void handleRestore(entry)}>
+                  <Button size="sm" variant="secondary" disabled={busyKeys.has(binKey(entry))} onClick={() => void actions.restore(entry)}>
                     Restore
                   </Button>
-                  <Button size="sm" variant="danger" onClick={() => void handleDeleteForever(entry)}>
+                  <Button size="sm" variant="danger" disabled={busyKeys.has(binKey(entry))} onClick={() => void actions.deleteForever(entry)}>
                     Delete forever
                   </Button>
                 </td>

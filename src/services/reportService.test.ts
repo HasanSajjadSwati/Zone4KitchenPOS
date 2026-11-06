@@ -5,6 +5,7 @@ const db = vi.hoisted(() => ({
   categories: { toArrayWithDeleted: vi.fn() },
   deals: { toArrayWithDeleted: vi.fn() },
   waiters: { toArrayWithDeleted: vi.fn() },
+  customers: { toArrayWithDeleted: vi.fn() },
 }));
 const apiClient = vi.hoisted(() => ({
   getOrders: vi.fn(),
@@ -14,7 +15,7 @@ const apiClient = vi.hoisted(() => ({
 vi.mock('@/db', () => ({ db }));
 vi.mock('@/services/api', () => ({ apiClient }));
 
-import { getWaiterPerformance, getCategorySales, getCategorySalesDetailed, getDealSales, getItemSales } from './reportService';
+import { getWaiterPerformance, searchCustomerReports, getCategorySales, getCategorySalesDetailed, getDealSales, getItemSales } from './reportService';
 import { DELETED_ITEMS_LABEL } from '@/constants/recycle';
 
 const range = { startDate: new Date('2026-11-01T00:00:00Z'), endDate: new Date('2026-11-06T23:59:59Z') };
@@ -93,5 +94,21 @@ describe('history resolves rows deleted after the sale', () => {
     const rows = await getWaiterPerformance(range);
 
     expect(rows.map((r) => [r.waiterId, r.waiterName, r.totalSales])).toEqual([['w1', 'Ali', 400]]);
+  });
+});
+
+describe('customer reports', () => {
+  it('searchCustomerReports finds a deleted customer by name', async () => {
+    db.customers.toArrayWithDeleted.mockResolvedValue([
+      { id: 'c1', name: 'Bilal Khan', phone: '0300', deletedAt: '2026-11-05T00:00:00Z' },
+    ]);
+    apiClient.getOrders.mockResolvedValue([
+      { id: 'o1', customerId: 'c1', total: 700, isPaid: true, createdAt: '2026-11-04T10:00:00Z' },
+    ]);
+
+    const reports = await searchCustomerReports('bilal');
+
+    expect(reports).toHaveLength(1);
+    expect(reports[0].totalAmount).toBe(700);
   });
 });

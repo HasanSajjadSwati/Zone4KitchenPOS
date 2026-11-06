@@ -1502,7 +1502,7 @@ export async function getCustomerDetailedReport(customerId: string): Promise<Cus
  * Search customer reports by name or phone
  */
 export async function searchCustomerReports(query: string): Promise<CustomerDetailedReport[]> {
-  const customers = (await db.customers.toArray()) as Customer[];
+  const customers = (await db.customers.toArrayWithDeleted()) as Customer[];
   const lowerQuery = query.toLowerCase();
 
   const matchingCustomers = customers.filter(
