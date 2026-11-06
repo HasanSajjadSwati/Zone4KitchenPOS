@@ -12,7 +12,10 @@ const roles = vi.hoisted(() => new Map<string, Record<string, any>>());
 vi.mock('../db/database.js', () => ({
   getAsync: vi.fn(async (sql: string, params: any[] = []) => {
     const text = sql.replace(/\s+/g, ' ');
-    if (text.includes('FROM users')) return [...users.values()].find((u) => u.username === params[0]);
+    if (text.includes('FROM users')) {
+      const liveOnly = text.includes('deletedAt IS NULL');
+      return [...users.values()].find((u) => u.username === params[0] && (!liveOnly || !u.deletedAt));
+    }
     if (text.includes('FROM roles')) return roles.get(params[0]);
     throw new Error(`Unexpected SQL in test: ${text}`);
   }),
@@ -20,6 +23,7 @@ vi.mock('../db/database.js', () => ({
 
 import { signToken, verifyToken, getAuthSecret } from './token.js';
 import { requireAuth, isAuthorizedWebSocketUrl } from './requireAuth.js';
+import { requireLiveUser } from './requireLiveUser.js';
 import { createAuthRoutes } from '../routes/auth.js';
 
 const nowSeconds = () => Math.floor(Date.now() / 1000);
@@ -152,6 +156,17 @@ describe('HTTP: login and the API guard', () => {
     expect(await res.json()).toEqual({ error: 'Account is disabled' });
   });
 
+  it('login refuses a deleted user and finds the live user with the same username', async () => {
+    users.get('u1')!.deletedAt = '2026-11-01T00:00:00.000Z';
+    expect((await login('cashier', 'right-password')).status).toBe(401);
+
+    const passwordHash = await bcrypt.hash('new-password', 4);
+    users.set('u3', { id: 'u3', username: 'cashier', fullName: 'New Cashier', roleId: 'role-cashier', isActive: true, passwordHash, createdAt: 'x', updatedAt: 'x' });
+    const res = await login('cashier', 'new-password');
+    expect(res.status).toBe(200);
+    expect((await res.json()).user).toMatchObject({ id: 'u3' });
+  });
+
   it('requires both fields', async () => {
     expect((await login('cashier', '')).status).toBe(400);
   });
@@ -161,5 +176,52 @@ describe('HTTP: login and the API guard', () => {
     const locked = await login('manager', 'right-password');
     expect(locked.status).toBe(429);
     expect((await login('cashier', 'right-password')).status).toBe(200);
+  });
+});
+
+describe('requireLiveUser', () => {
+  let server: Server;
+  let base: string;
+  let clock = 1_000_000;
+  const live = new Set<string>(['u1']);
+  const lookup = vi.fn(async (id: string) => live.has(id));
+
+  beforeAll(async () => {
+    const app = express();
+    app.use(requireAuth(SECRET));
+    app.use(requireLiveUser(lookup, () => clock));
+    app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
+    app.get('/api/payments', (_req, res) => res.json({ ok: true }));
+    server = app.listen(0);
+    await new Promise((resolve) => server.once('listening', resolve));
+    base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  });
+
+  afterAll(() => new Promise<void>((resolve) => server.close(() => resolve())));
+
+  const call = (id: string) =>
+    fetch(`${base}/api/payments`, {
+      headers: { Authorization: `Bearer ${signToken({ sub: id, username: id, exp: nowSeconds() + 600 }, SECRET)}` },
+    });
+
+  it("a deleted user's token is rejected on the next request after the cache window", async () => {
+    expect((await call('u1')).status).toBe(200);
+
+    live.delete('u1'); // deleted in the Recycle Bin
+    clock += 29_000;
+    expect((await call('u1')).status).toBe(200); // still inside the 30 s window: cached verdict
+
+    clock += 2_000;
+    const res = await call('u1');
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: 'Authentication required' });
+  });
+
+  it('caches a not-live verdict too, and does not guard public paths', async () => {
+    lookup.mockClear();
+    expect((await call('ghost')).status).toBe(401);
+    expect((await call('ghost')).status).toBe(401);
+    expect(lookup).toHaveBeenCalledTimes(1);
+    expect((await fetch(`${base}/api/health`)).status).toBe(200);
   });
 });

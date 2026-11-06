@@ -4,9 +4,13 @@ import { verifyToken } from './token.js';
 // Everything else under /api needs a token. The web app's own files stay public.
 const PUBLIC_API_PATHS = new Set(['/api/health', '/api/auth/login']);
 
+export function isPublicApiRequest(req: Request): boolean {
+  return !req.path.startsWith('/api/') || PUBLIC_API_PATHS.has(req.path) || req.method === 'OPTIONS';
+}
+
 export function requireAuth(secret: string) {
   return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.path.startsWith('/api/') || PUBLIC_API_PATHS.has(req.path) || req.method === 'OPTIONS') {
+    if (isPublicApiRequest(req)) {
       return next();
     }
 

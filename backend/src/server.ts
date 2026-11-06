@@ -33,6 +33,7 @@ import { initializeDatabase } from './db/migrate.js';
 import { logger } from './utils/logger.js';
 import { getAuthSecret } from './auth/token.js';
 import { requireAuth } from './auth/requireAuth.js';
+import { requireLiveUser } from './auth/requireLiveUser.js';
 import { responseCompression } from './http/compression.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -52,6 +53,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 // Every /api call except health and login needs a token from POST /api/auth/login
 app.use(requireAuth(AUTH_SECRET));
+// A user who was deleted or disabled loses access even while their token is still valid
+app.use(requireLiveUser());
 
 // Request logging middleware (optional)
 if (DEBUG) {

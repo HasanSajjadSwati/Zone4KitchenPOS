@@ -5,9 +5,19 @@ import { broadcastSync } from '../websocket.js';
 
 type ReferentialTable = 'registerSessions' | 'users' | 'diningTables' | 'waiters' | 'customers' | 'riders';
 
+// Tables whose rows can be moved to the Recycle Bin (deletedAt set). A deleted row cannot start new work.
+const SOFT_DELETABLE: ReadonlySet<ReferentialTable> = new Set<ReferentialTable>(['diningTables', 'waiters', 'customers', 'riders']);
+
 async function recordExists(table: ReferentialTable, id: string): Promise<boolean> {
-  const row = await getAsync(`SELECT 1 FROM ${table} WHERE id = ?`, [id]);
+  const liveOnly = SOFT_DELETABLE.has(table) ? ' AND deletedAt IS NULL' : '';
+  const row = await getAsync(`SELECT 1 FROM ${table} WHERE id = ?${liveOnly}`, [id]);
   return Boolean(row);
+}
+
+// Said when a reference is not usable: tell the user if it is in the bin rather than gone.
+async function missingReason(table: ReferentialTable, id: string, label: string): Promise<string> {
+  const row = await getAsync(`SELECT 1 FROM ${table} WHERE id = ?`, [id]);
+  return row ? `This ${label} has been deleted` : `${label.charAt(0).toUpperCase()}${label.slice(1)} not found`;
 }
 
 // Helper to check if a user has a specific permission
@@ -474,19 +484,19 @@ orderRoutes.post('/', async (req, res) => {
     }
 
     if (tableId && !(await recordExists('diningTables', tableId))) {
-      return res.status(400).json({ error: 'Table not found' });
+      return res.status(400).json({ error: await missingReason('diningTables', tableId, 'table') });
     }
 
     if (waiterId && !(await recordExists('waiters', waiterId))) {
-      return res.status(400).json({ error: 'Waiter not found' });
+      return res.status(400).json({ error: await missingReason('waiters', waiterId, 'waiter') });
     }
 
     if (customerId && !(await recordExists('customers', customerId))) {
-      return res.status(400).json({ error: 'Customer not found' });
+      return res.status(400).json({ error: await missingReason('customers', customerId, 'customer') });
     }
 
     if (riderId && !(await recordExists('riders', riderId))) {
-      return res.status(400).json({ error: 'Rider not found' });
+      return res.status(400).json({ error: await missingReason('riders', riderId, 'rider') });
     }
 
     const parsedDeliveryCharge = Number(deliveryCharge);
@@ -586,11 +596,11 @@ orderRoutes.put('/:id', async (req, res) => {
     }
 
     if (waiterId && !(await recordExists('waiters', waiterId))) {
-      return res.status(400).json({ error: 'Waiter not found' });
+      return res.status(400).json({ error: await missingReason('waiters', waiterId, 'waiter') });
     }
 
     if (riderId && !(await recordExists('riders', riderId))) {
-      return res.status(400).json({ error: 'Rider not found' });
+      return res.status(400).json({ error: await missingReason('riders', riderId, 'rider') });
     }
 
     const updates: string[] = [];
@@ -722,6 +732,19 @@ orderRoutes.post('/:id/items', async (req, res) => {
 
     if (!itemType || !quantity || unitPrice === undefined || totalPrice === undefined) {
       return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    if (menuItemId) {
+      const menuItem = await getAsync('SELECT deletedAt FROM menuItems WHERE id = ?', [menuItemId]);
+      if (menuItem?.deletedAt) {
+        return res.status(400).json({ error: 'This menu item has been deleted' });
+      }
+    }
+    if (dealId) {
+      const deal = await getAsync('SELECT deletedAt FROM deals WHERE id = ?', [dealId]);
+      if (deal?.deletedAt) {
+        return res.status(400).json({ error: 'This deal has been deleted' });
+      }
     }
 
     // Use the ID provided by frontend, or generate a new one as fallback

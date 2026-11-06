@@ -46,7 +46,7 @@ export function createAuthRoutes(secret: string) {
 
       const user = await getAsync(
         `SELECT id, username, passwordHash, fullName, roleId, isActive, createdAt, updatedAt
-         FROM users WHERE username = ?`,
+         FROM users WHERE username = ? AND deletedAt IS NULL`,
         [username]
       );
       if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
