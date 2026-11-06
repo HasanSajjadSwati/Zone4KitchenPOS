@@ -164,6 +164,7 @@ export function allAsync(query: string, params: any[] = []): Promise<any[]> {
 export interface TransactionClient {
   runAsync(query: string, params?: any[]): Promise<{ rowCount: number | null }>;
   getAsync(query: string, params?: any[]): Promise<any>;
+  allAsync(query: string, params?: any[]): Promise<any[]>;
 }
 
 // Runs fn on one pooled connection inside BEGIN/COMMIT, rolling back if fn throws.
@@ -175,6 +176,9 @@ export async function withTransaction<T>(fn: (tx: TransactionClient) => Promise<
       client.query(normalizeQuery(query), params).then((result) => ({ rowCount: result.rowCount })),
     getAsync: (query, params = []) =>
       client.query(normalizeQuery(query), params).then((result) => convertBooleans(normalizeRowKeys(result.rows[0]))),
+    allAsync: (query, params = []) =>
+      client.query(normalizeQuery(query), params)
+        .then((result) => (result.rows || []).map((row) => convertBooleans(normalizeRowKeys(row)))),
   };
 
   try {
