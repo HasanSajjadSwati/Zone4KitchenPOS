@@ -20,6 +20,7 @@ function parseIdList(value: unknown): string[] {
 orderItemRoutes.get('/', async (req, res) => {
   try {
     const {
+      ids: itemIdsParam,
       orderIds,
       startDate,
       endDate,
@@ -83,6 +84,13 @@ orderItemRoutes.get('/', async (req, res) => {
     if (ids.length > 0) {
       conditions.push(`oi.orderId IN (${ids.map(() => '?').join(',')})`);
       params.push(...ids);
+    }
+
+    // Look up specific items by id, so a client touching one item does not download them all.
+    const itemIds = parseIdList(itemIdsParam);
+    if (itemIds.length > 0) {
+      conditions.push(`oi.id IN (${itemIds.map(() => '?').join(',')})`);
+      params.push(...itemIds);
     }
 
     if (conditions.length > 0) {

@@ -76,3 +76,42 @@ describe('API client authentication', () => {
     expect(JSON.parse(init.body)).toEqual({ username: 'cashier', password: 'secret' });
   });
 });
+
+describe('order items', () => {
+  it('fetches a single order item by id', async () => {
+    fetchMock.mockResolvedValue(reply(200, [{ id: 'item-1', orderId: 'order-1' }]));
+
+    expect(await apiClient.getOrderItem('item-1')).toEqual({ id: 'item-1', orderId: 'order-1' });
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/order-items\?ids=item-1$/);
+  });
+
+  it('returns null for an order item that does not exist', async () => {
+    fetchMock.mockResolvedValue(reply(200, []));
+
+    expect(await apiClient.getOrderItem('missing')).toBeNull();
+  });
+
+  it('keeps the server total when fetching a page of orders', async () => {
+    fetchMock.mockResolvedValue(reply(200, { orders: [{ id: 'o1' }], total: 63 }));
+
+    expect(await apiClient.getOrdersPage({ limit: '50', offset: '50' })).toEqual({ orders: [{ id: 'o1' }], total: 63 });
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/orders\?limit=50&offset=50$/);
+  });
+
+  it('counts the rows when an orders page comes back as a bare array', async () => {
+    fetchMock.mockResolvedValue(reply(200, [{ id: 'o1' }, { id: 'o2' }]));
+
+    expect(await apiClient.getOrdersPage({ limit: '50' })).toEqual({ orders: [{ id: 'o1' }, { id: 'o2' }], total: 2 });
+  });
+
+  // A failed or cut-off /order-items download used to trigger a "fallback" that fetched every
+  // order (12 MB+) and then one request per order: it turned one error into thousands of requests.
+  it('reports a failed order-items request instead of downloading every order', async () => {
+    fetchMock.mockResolvedValue(
+      new Response('{"truncated', { status: 200, headers: { 'Content-Type': 'application/json' } })
+    );
+
+    await expect(apiClient.getOrderItemsBulk()).rejects.toThrow('Invalid JSON response');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});

@@ -503,7 +503,7 @@ reportRoutes.get('/category-sales-detailed', async (req, res) => {
 
     // Get all categories to build hierarchy (including those with no sales)
     const allCategories = await allAsync(
-      `SELECT id, name, type, parentId, sortOrder FROM categories WHERE isActive = 1 ORDER BY sortOrder`,
+      `SELECT id, name, type, parentId, sortOrder FROM categories WHERE isActive = TRUE ORDER BY sortOrder`,
       []
     );
 

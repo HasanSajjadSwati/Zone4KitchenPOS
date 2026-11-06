@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   apiClient: {
     getPayments: vi.fn(),
     getPaymentsByOrder: vi.fn(),
+    getOrders: vi.fn(),
+    getOrdersPage: vi.fn(),
   },
 }));
 
@@ -18,7 +20,7 @@ vi.mock('@/services/api', () => ({ apiClient: mocks.apiClient }));
 vi.mock('@/utils/audit', () => ({ logAudit: vi.fn() }));
 vi.mock('@/stores/authStore', () => ({ useAuthStore: { getState: () => ({}) } }));
 
-import { completeOrder, markOrderAsPaid } from './orderService';
+import { completeOrder, getDashboardOrderStats, getOrdersPaginated, markOrderAsPaid } from './orderService';
 
 const ORDER_ID = 'order-1';
 
@@ -83,5 +85,65 @@ describe('paid-total lookup when settling an order', () => {
 
     expect(mocks.apiClient.getPayments).not.toHaveBeenCalled();
     expect(mocks.db.payments.add.mock.calls[0][0]).toMatchObject({ amount: 1000 });
+  });
+});
+
+describe('dashboard order stats', () => {
+  const START = new Date('2026-11-06T00:00:00.000Z');
+  const END = new Date('2026-11-06T23:59:59.999Z');
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('asks the server for this range and for open orders only, never the whole orders table', async () => {
+    mocks.apiClient.getOrders.mockResolvedValue([]);
+
+    await getDashboardOrderStats(START, END);
+
+    expect(mocks.apiClient.getOrders).toHaveBeenCalledWith({ startDate: START.toISOString(), endDate: END.toISOString() });
+    expect(mocks.apiClient.getOrders).toHaveBeenCalledWith({ status: 'open' });
+    for (const call of mocks.apiClient.getOrders.mock.calls) {
+      expect(call[0]).toBeTruthy();
+    }
+  });
+
+  it('counts orders created in the range and the sales of the completed ones', async () => {
+    mocks.apiClient.getOrders.mockImplementation(async (filters: Record<string, string>) => {
+      if (filters.status === 'open') return [{ id: 'o-open-1' }, { id: 'o-open-2' }];
+      return [
+        { id: 'a', status: 'completed', total: 500, createdAt: '2026-11-06T09:00:00.000Z' },
+        { id: 'b', status: 'completed', total: 700, createdAt: '2026-11-06T12:00:00.000Z' },
+        { id: 'c', status: 'open', total: 300, createdAt: '2026-11-06T13:00:00.000Z' },
+        // Created yesterday, completed today: the server returns it, but it is not one of today's orders.
+        { id: 'd', status: 'completed', total: 900, createdAt: '2026-11-05T23:00:00.000Z' },
+      ];
+    });
+
+    expect(await getDashboardOrderStats(START, END)).toEqual({
+      todayOrders: 3,
+      todaySales: 1200,
+      completedToday: 2,
+      openOrders: 2,
+    });
+  });
+});
+
+describe('orders list paging', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // Busy days pass 50 orders (58-63 seen in production); the list must know the real total
+  // to show page 2.
+  it('returns the server total, not the size of the current page', async () => {
+    const page = Array.from({ length: 50 }, (_, i) => ({ id: `o${i}` }));
+    mocks.apiClient.getOrdersPage.mockResolvedValue({ orders: page, total: 63 });
+
+    const result = await getOrdersPaginated({ limit: 50, offset: 0 });
+
+    expect(result.total).toBe(63);
+    expect(result.orders).toHaveLength(50);
+    expect(mocks.apiClient.getOrdersPage).toHaveBeenCalledWith({ limit: '50', offset: '0' });
   });
 });

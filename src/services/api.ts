@@ -365,6 +365,16 @@ class APIClient {
     return Array.isArray(response) ? response : (response?.orders || []);
   }
 
+  // A page of orders with the server's total row count (getOrders drops the total).
+  async getOrdersPage(filters: Record<string, string>): Promise<{ orders: any[]; total: number }> {
+    const response = await this.get(`/orders?${new URLSearchParams(filters).toString()}`);
+    if (Array.isArray(response)) {
+      return { orders: response, total: response.length };
+    }
+    const orders = response?.orders || [];
+    return { orders, total: typeof response?.total === 'number' ? response.total : orders.length };
+  }
+
   async getOrder(id: string) {
     return this.get(`/orders/${id}`);
   }
@@ -395,53 +405,15 @@ class APIClient {
       const params = new URLSearchParams(filters);
       endpoint += `?${params.toString()}`;
     }
-    try {
-      return await this.get(endpoint);
-    } catch (error) {
-      // Fallback for older backends that don't support /order-items
-      const orderIds: string[] = [];
-      const orderIdsParam = filters?.orderIds;
+    // No fallback on failure: the old one re-downloaded every order and then requested each
+    // order's items one by one, turning one failed request into thousands.
+    return this.get(endpoint);
+  }
 
-      if (orderIdsParam) {
-        orderIds.push(
-          ...orderIdsParam
-            .split(',')
-            .map((id) => id.trim())
-            .filter(Boolean)
-        );
-      } else {
-        const orderFilters: Record<string, string> = {};
-        const allowedOrderFilters = [
-          'startDate',
-          'endDate',
-          'status',
-          'orderType',
-          'registerSessionId',
-          'customerId',
-        ];
-        for (const key of allowedOrderFilters) {
-          const value = filters?.[key];
-          if (value) {
-            orderFilters[key] = value;
-          }
-        }
-
-        const orders = await this.getOrders(
-          Object.keys(orderFilters).length > 0 ? orderFilters : undefined
-        );
-        for (const order of orders) {
-          if (order?.id) orderIds.push(order.id);
-        }
-      }
-
-      const allItems: any[] = [];
-      for (const id of orderIds) {
-        const items = await this.getOrderItems(id);
-        allItems.push(...items);
-      }
-
-      return allItems;
-    }
+  // One order item by id (the backend filters with ?ids=); null when it does not exist.
+  async getOrderItem(id: string) {
+    const items = await this.get(`/order-items?ids=${encodeURIComponent(id)}`);
+    return Array.isArray(items) && items.length > 0 ? items[0] : null;
   }
 
   async updateOrderItem(orderId: string, itemId: string, data: any) {

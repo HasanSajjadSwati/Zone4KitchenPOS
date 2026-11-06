@@ -32,6 +32,7 @@ import { initializeDatabase } from './db/migrate.js';
 import { logger } from './utils/logger.js';
 import { getAuthSecret } from './auth/token.js';
 import { requireAuth } from './auth/requireAuth.js';
+import { responseCompression } from './http/compression.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({
@@ -44,6 +45,7 @@ const DEBUG = process.env.DEBUG === 'true';
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
 // Middleware
+app.use(responseCompression());
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
