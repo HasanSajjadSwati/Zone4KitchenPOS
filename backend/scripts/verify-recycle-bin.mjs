@@ -103,10 +103,12 @@ async function capture(label) {
 }
 
 function compareSnaps(name, before, after, renamed = new Set()) {
+  // Category ids this script deleted: a zero-sales one may leave the detailed tree.
+  const removableIds = new Set(deletedCategoryIds);
   const diffs = [];
   for (const rangeName of Object.keys(RANGES)) {
     for (const ep of ENDPOINTS) {
-      for (const d of compareReports(before[rangeName][ep], after[rangeName][ep], renamed, `${rangeName}/${ep}`)) diffs.push(d);
+      for (const d of compareReports(before[rangeName][ep], after[rangeName][ep], renamed, removableIds, `${rangeName}/${ep}`)) diffs.push(d);
     }
   }
   const shown = diffs.slice(0, 15)
@@ -229,6 +231,7 @@ const staffUserId = (() => {
   try { return JSON.parse(Buffer.from(STAFF_TOKEN.split('.')[1], 'base64url').toString()).sub; } catch { return null; }
 })();
 
+const deletedCategoryIds = []; // ids of categories this run soft-deleted
 const tombstoned = new Set(); // names of records deleted forever that stayed behind as a tombstone
 
 async function softDelete(label, urlPath) {
@@ -303,6 +306,7 @@ async function main() {
       if (await softDelete(`category item ${it.name}`, `/api/menu-items/${it.id}`)) itemsDeleted.push(it);
     }
     categoryDeleted = await softDelete(`category ${category.name}`, `/api/categories/${category.id}`);
+    if (categoryDeleted) deletedCategoryIds.push(category.id);
     if (itemsDeleted.length) {
       const r2 = await api('POST', `/api/recycle-bin/menuItems/${itemsDeleted[0].id}/restore`);
       check('restore item whose category is in the bin -> 409 "Restore category ... first"',

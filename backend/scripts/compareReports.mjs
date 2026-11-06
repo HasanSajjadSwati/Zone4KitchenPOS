@@ -6,7 +6,24 @@
 // { path, before, after, reason }; an empty list means "the same, apart from allowed renames".
 export const TOMBSTONE_SUFFIX = ' (Deleted)';
 
-export function compareReports(before, after, renamed = new Set(), path = '$', out = []) {
+// True when every number inside the value (recursively) is 0.
+const allZero = (v) =>
+  v === null || v === undefined ? true
+    : typeof v === 'number' ? v === 0
+      : Array.isArray(v) ? v.every(allZero)
+        : typeof v === 'object' ? Object.values(v).every(allZero)
+          : true;
+
+// One more allowed difference (ruling 10): an array element that is a category (has `categoryId`)
+// in `removableIds`, with every number 0, may be absent from `after` (a deleted category with no
+// sales leaves the detailed tree). Matched by categoryId, never by index.
+function dropRemovable(before, after, removableIds) {
+  if (removableIds.size === 0 || before.length <= after.length) return before;
+  const afterIds = new Set(after.filter((e) => e && typeof e === 'object').map((e) => e.categoryId));
+  return before.filter((e) => !(e && typeof e === 'object' && removableIds.has(e.categoryId) && !afterIds.has(e.categoryId) && allZero(e)));
+}
+
+export function compareReports(before, after, renamed = new Set(), removableIds = new Set(), path = '$', out = []) {
   const typeOf = (v) => (v === null ? 'null' : Array.isArray(v) ? 'array' : typeof v);
   const tb = typeOf(before);
   const ta = typeOf(after);
@@ -15,11 +32,12 @@ export function compareReports(before, after, renamed = new Set(), path = '$', o
     return out;
   }
   if (tb === 'array') {
+    before = dropRemovable(before, after, removableIds);
     if (before.length !== after.length) {
       out.push({ path, before: `array(${before.length})`, after: `array(${after.length})`, reason: 'array length changed' });
       return out;
     }
-    before.forEach((item, i) => compareReports(item, after[i], renamed, `${path}[${i}]`, out));
+    before.forEach((item, i) => compareReports(item, after[i], renamed, removableIds, `${path}[${i}]`, out));
     return out;
   }
   if (tb === 'object') {
@@ -27,7 +45,7 @@ export function compareReports(before, after, renamed = new Set(), path = '$', o
       const p = `${path}.${key}`;
       if (!(key in after)) out.push({ path: p, before: before[key], after: undefined, reason: 'key missing after' });
       else if (!(key in before)) out.push({ path: p, before: undefined, after: after[key], reason: 'key added after' });
-      else compareReports(before[key], after[key], renamed, p, out);
+      else compareReports(before[key], after[key], renamed, removableIds, p, out);
     }
     return out;
   }

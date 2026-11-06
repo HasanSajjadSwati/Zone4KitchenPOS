@@ -44,3 +44,23 @@ describe('compareReports', () => {
     expect(compareReports({ a: 1 }, { a: '1' })[0].reason).toContain('type changed');
   });
 });
+
+describe('compareReports: removable zero-sales categories', () => {
+  const zero = (id) => ({ categoryId: id, categoryName: id, totalSales: 0, totalQuantity: 0, orderCount: 0, averagePrice: 0 });
+  const sold = (id) => ({ ...zero(id), totalSales: 5, totalQuantity: 1, orderCount: 1, averagePrice: 5 });
+  const tree = (...subs) => [{ categoryId: 'm', totalSales: 5, subCategories: subs }];
+
+  it('allows removal of an all-zero entry for a deleted category id', () => {
+    expect(compareReports(tree(sold('a'), zero('b')), tree(sold('a')), new Set(), new Set(['b']))).toEqual([]);
+  });
+  it('rejects removal of an all-zero entry for a non-deleted id', () => {
+    expect(compareReports(tree(sold('a'), zero('b')), tree(sold('a')), new Set(), new Set(['x']))).not.toEqual([]);
+  });
+  it('rejects removal of a deleted category entry that has sales', () => {
+    expect(compareReports(tree(sold('a'), sold('b')), tree(sold('a')), new Set(), new Set(['b']))).not.toEqual([]);
+  });
+  it('still compares the remaining entries', () => {
+    const changed = { ...sold('a'), totalSales: 6 };
+    expect(compareReports(tree(sold('a'), zero('b')), tree(changed), new Set(), new Set(['b']))).toHaveLength(1);
+  });
+});
