@@ -595,12 +595,18 @@ orderRoutes.put('/:id', async (req, res) => {
       return res.status(400).json({ error: 'Customer phone is required for delivery orders' });
     }
 
-    if (waiterId && !(await recordExists('waiters', waiterId))) {
+    // Liveness is checked only for a reference being CHANGED: an order may keep a waiter/rider/customer
+    // that was deleted after the order was taken (the whole object is often re-sent on save).
+    if (waiterId && waiterId !== order.waiterId && !(await recordExists('waiters', waiterId))) {
       return res.status(400).json({ error: await missingReason('waiters', waiterId, 'waiter') });
     }
 
-    if (riderId && !(await recordExists('riders', riderId))) {
+    if (riderId && riderId !== order.riderId && !(await recordExists('riders', riderId))) {
       return res.status(400).json({ error: await missingReason('riders', riderId, 'rider') });
+    }
+
+    if (customerId && customerId !== order.customerId && !(await recordExists('customers', customerId))) {
+      return res.status(400).json({ error: await missingReason('customers', customerId, 'customer') });
     }
 
     const updates: string[] = [];

@@ -217,6 +217,19 @@ describe('requireLiveUser', () => {
     expect(await res.json()).toEqual({ error: 'Authentication required' });
   });
 
+  it('answers a generic 500, logs the real error and does not cache a failed lookup', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    lookup.mockRejectedValueOnce(new Error('connection to db-host:5432 refused'));
+    const res = await call('flaky');
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: 'Could not verify the session' });
+    expect(spy).toHaveBeenCalled();
+
+    live.add('flaky');
+    expect((await call('flaky')).status).toBe(200);
+    spy.mockRestore();
+  });
+
   it('caches a not-live verdict too, and does not guard public paths', async () => {
     lookup.mockClear();
     expect((await call('ghost')).status).toBe(401);

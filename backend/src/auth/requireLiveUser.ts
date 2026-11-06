@@ -25,14 +25,20 @@ export function requireLiveUser(lookup: LiveUserLookup = defaultLookup, now: () 
 
     try {
       let entry = cache.get(id);
-      if (!entry || now() - entry.at >= CACHE_MS) {
+      if (entry && now() - entry.at >= CACHE_MS) {
+        cache.delete(id);
+        entry = undefined;
+      }
+      if (!entry) {
         entry = { live: await lookup(id), at: now() };
         cache.set(id, entry);
       }
       if (!entry.live) return res.status(401).json({ error: 'Authentication required' });
       next();
     } catch (error) {
-      res.status(500).json({ error: (error as Error).message });
+      // Not cached: the next request retries the lookup. The real error stays server-side.
+      console.error('Could not verify the session user:', error);
+      res.status(500).json({ error: 'Could not verify the session' });
     }
   };
 }

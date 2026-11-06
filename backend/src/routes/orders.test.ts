@@ -29,6 +29,7 @@ function fakeQuery(sql: string, params: any[] = []) {
     state.listQueries.push(text);
     return { total: 0 };
   }
+  if (text.startsWith('UPDATE orders SET') && !text.startsWith('UPDATE orders SET isPaid')) return { rowCount: 1 };
   if (text.startsWith('UPDATE orders SET isPaid')) {
     Object.assign(state.orders.get(params[1])!, { isPaid: false, status: 'open', updatedAt: params[0] });
     return { rowCount: 1 };
@@ -176,6 +177,18 @@ describe('deleted records cannot start new work', () => {
 
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: 'This deal has been deleted' });
+  });
+
+  it('a completed order keeps its deleted waiter: resending the same waiterId is 200, changing to another deleted waiter is 400', async () => {
+    state.orders.set('order-done', { id: 'order-done', isPaid: false, status: 'completed', waiterId: 'waiter-old', subtotal: 0, discountAmount: 0, total: 0 });
+    state.deleted.add('waiter-old');
+    state.deleted.add('waiter-other');
+
+    expect((await send('PUT', '/order-done', { waiterId: 'waiter-old', notes: 'x' })).status).toBe(200);
+
+    const res = await send('PUT', '/order-done', { waiterId: 'waiter-other' });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'This waiter has been deleted' });
   });
 
   it('creating an order with a deleted waiter is 400', async () => {
