@@ -86,20 +86,12 @@ export async function updateExpense(
   });
 }
 
-export async function deleteExpense(id: string, userId: string): Promise<void> {
+export async function deleteExpense(id: string, _userId: string): Promise<void> {
   const expense = await db.expenses.get(id);
   if (!expense) throw new Error('Expense not found');
 
+  // The server deletes the record, moves it to the Recycle Bin and writes the audit entry.
   await db.expenses.delete(id);
-
-  await logAudit({
-    userId,
-    action: 'delete',
-    tableName: 'expenses',
-    recordId: id,
-    description: `Deleted expense: ${expense.description} - ${expense.amount}`,
-    before: expense,
-  });
 }
 
 export async function getExpensesByDateRange(range: DateRange): Promise<Expense[]> {

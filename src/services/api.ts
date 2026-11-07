@@ -4,6 +4,16 @@ import { useAuthStore } from '@/stores/authStore';
 const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:3001/api' : '/api');
 const LOGIN_ENDPOINT = '/auth/login';
 
+// Lists hide soft-deleted rows. History (reports, past orders) passes includeDeleted to keep
+// resolving the names of things that were deleted after they were sold.
+export interface ListOptions {
+  includeDeleted?: boolean;
+}
+
+function withDeleted(path: string, opts?: ListOptions): string {
+  return opts?.includeDeleted ? `${path}?includeDeleted=true` : path;
+}
+
 class APIClient {
   private baseUrl: string;
 
@@ -106,8 +116,8 @@ class APIClient {
   }
 
   // Users
-  async getUsers() {
-    return this.get('/users');
+  async getUsers(opts?: ListOptions) {
+    return this.get(withDeleted('/users', opts));
   }
 
   async getUser(id: string) {
@@ -152,8 +162,8 @@ class APIClient {
   }
 
   // Roles
-  async getRoles() {
-    return this.get('/roles');
+  async getRoles(opts?: ListOptions) {
+    return this.get(withDeleted('/roles', opts));
   }
 
   async getRole(id: string) {
@@ -173,8 +183,8 @@ class APIClient {
   }
 
   // Categories
-  async getCategories() {
-    return this.get('/categories');
+  async getCategories(opts?: ListOptions) {
+    return this.get(withDeleted('/categories', opts));
   }
 
   async getCategory(id: string) {
@@ -194,8 +204,8 @@ class APIClient {
   }
 
   // Menu Items
-  async getMenuItems() {
-    return this.get('/menu-items');
+  async getMenuItems(opts?: ListOptions) {
+    return this.get(withDeleted('/menu-items', opts));
   }
 
   async getMenuItem(id: string) {
@@ -232,8 +242,8 @@ class APIClient {
   }
 
   // Variants
-  async getVariants() {
-    return this.get('/variants');
+  async getVariants(opts?: ListOptions) {
+    return this.get(withDeleted('/variants', opts));
   }
 
   async getVariant(id: string) {
@@ -270,8 +280,8 @@ class APIClient {
   }
 
   // Deals
-  async getDeals() {
-    return this.get('/deals');
+  async getDeals(opts?: ListOptions) {
+    return this.get(withDeleted('/deals', opts));
   }
 
   async getDeal(id: string) {
@@ -329,8 +339,8 @@ class APIClient {
   }
 
   // Customers
-  async getCustomers() {
-    return this.get('/customers');
+  async getCustomers(opts?: ListOptions) {
+    return this.get(withDeleted('/customers', opts));
   }
 
   async getCustomer(id: string) {
@@ -609,8 +619,8 @@ class APIClient {
   }
 
   // Waiters
-  async getWaiters() {
-    return this.get('/staff/waiters');
+  async getWaiters(opts?: ListOptions) {
+    return this.get(withDeleted('/staff/waiters', opts));
   }
 
   async getWaiter(id: string) {
@@ -630,8 +640,8 @@ class APIClient {
   }
 
   // Riders
-  async getRiders() {
-    return this.get('/staff/riders');
+  async getRiders(opts?: ListOptions) {
+    return this.get(withDeleted('/staff/riders', opts));
   }
 
   async getRider(id: string) {
@@ -651,8 +661,8 @@ class APIClient {
   }
 
   // Dining Tables
-  async getDiningTables() {
-    return this.get('/staff/tables');
+  async getDiningTables(opts?: ListOptions) {
+    return this.get(withDeleted('/staff/tables', opts));
   }
 
   async getDiningTable(id: string) {
@@ -715,8 +725,8 @@ class APIClient {
   }
 
   // Employees
-  async getEmployees() {
-    return this.get('/employees');
+  async getEmployees(opts?: ListOptions) {
+    return this.get(withDeleted('/employees', opts));
   }
 
   async getEmployee(id: string) {
@@ -766,6 +776,19 @@ class APIClient {
 
   async cancelLoan(loanId: string) {
     return this.post(`/employees/loans/${loanId}/cancel`, {});
+  }
+
+  // Recycle Bin (admin)
+  async getRecycleBin(type?: string) {
+    return this.get(type ? `/recycle-bin?type=${encodeURIComponent(type)}` : '/recycle-bin');
+  }
+
+  async restoreRecycleItem(type: string, id: string) {
+    return this.post(`/recycle-bin/${encodeURIComponent(type)}/${encodeURIComponent(id)}/restore`, {});
+  }
+
+  async deleteRecycleItemForever(type: string, id: string) {
+    return this.delete(`/recycle-bin/${encodeURIComponent(type)}/${encodeURIComponent(id)}`);
   }
 
   // Health check

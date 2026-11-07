@@ -115,3 +115,17 @@ describe('order items', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('API client list options', () => {
+  it('getMenuItems({ includeDeleted: true }) requests ?includeDeleted=true', async () => {
+    fetchMock.mockResolvedValue(reply(200, []));
+    await apiClient.getMenuItems({ includeDeleted: true });
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/menu-items\?includeDeleted=true$/);
+  });
+
+  it('getMenuItems() asks for the plain list', async () => {
+    fetchMock.mockResolvedValue(reply(200, []));
+    await apiClient.getMenuItems();
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/menu-items$/);
+  });
+});

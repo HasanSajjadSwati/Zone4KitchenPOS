@@ -3,6 +3,9 @@ export const schema = `
 -- Roles Table
 CREATE TABLE IF NOT EXISTS roles (
   id TEXT PRIMARY KEY,
+  deletedAt DATETIME,
+  deletedBy TEXT,
+  purgedAt DATETIME,
   name TEXT NOT NULL UNIQUE,
   permissions TEXT NOT NULL,
   createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -11,6 +14,9 @@ CREATE TABLE IF NOT EXISTS roles (
 -- Users Table
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
+  deletedAt DATETIME,
+  deletedBy TEXT,
+  purgedAt DATETIME,
   username TEXT NOT NULL UNIQUE,
   passwordHash TEXT NOT NULL,
   fullName TEXT NOT NULL,
@@ -24,6 +30,9 @@ CREATE TABLE IF NOT EXISTS users (
 -- Categories Table
 CREATE TABLE IF NOT EXISTS categories (
   id TEXT PRIMARY KEY,
+  deletedAt DATETIME,
+  deletedBy TEXT,
+  purgedAt DATETIME,
   name TEXT NOT NULL,
   type TEXT NOT NULL CHECK(type IN ('major', 'sub')),
   parentId TEXT,
@@ -37,6 +46,9 @@ CREATE TABLE IF NOT EXISTS categories (
 -- Menu Items Table
 CREATE TABLE IF NOT EXISTS menuItems (
   id TEXT PRIMARY KEY,
+  deletedAt DATETIME,
+  deletedBy TEXT,
+  purgedAt DATETIME,
   name TEXT NOT NULL,
   categoryId TEXT NOT NULL,
   price REAL NOT NULL,
@@ -52,6 +64,9 @@ CREATE TABLE IF NOT EXISTS menuItems (
 -- Variants Table
 CREATE TABLE IF NOT EXISTS variants (
   id TEXT PRIMARY KEY,
+  deletedAt DATETIME,
+  deletedBy TEXT,
+  purgedAt DATETIME,
   name TEXT NOT NULL,
   type TEXT NOT NULL CHECK(type IN ('size', 'flavour', 'custom')),
   sortOrder INTEGER DEFAULT 0,
@@ -88,6 +103,9 @@ CREATE TABLE IF NOT EXISTS menuItemVariants (
 -- Deals Table
 CREATE TABLE IF NOT EXISTS deals (
   id TEXT PRIMARY KEY,
+  deletedAt DATETIME,
+  deletedBy TEXT,
+  purgedAt DATETIME,
   name TEXT NOT NULL,
   description TEXT,
   price REAL NOT NULL,
@@ -129,6 +147,9 @@ CREATE TABLE IF NOT EXISTS dealVariants (
 -- Customers Table
 CREATE TABLE IF NOT EXISTS customers (
   id TEXT PRIMARY KEY,
+  deletedAt DATETIME,
+  deletedBy TEXT,
+  purgedAt DATETIME,
   phone TEXT NOT NULL UNIQUE,
   name TEXT NOT NULL,
   address TEXT,
@@ -142,6 +163,9 @@ CREATE TABLE IF NOT EXISTS customers (
 -- Waiters Table
 CREATE TABLE IF NOT EXISTS waiters (
   id TEXT PRIMARY KEY,
+  deletedAt DATETIME,
+  deletedBy TEXT,
+  purgedAt DATETIME,
   name TEXT NOT NULL,
   phone TEXT,
   isActive BOOLEAN DEFAULT 1,
@@ -152,6 +176,9 @@ CREATE TABLE IF NOT EXISTS waiters (
 -- Riders Table
 CREATE TABLE IF NOT EXISTS riders (
   id TEXT PRIMARY KEY,
+  deletedAt DATETIME,
+  deletedBy TEXT,
+  purgedAt DATETIME,
   name TEXT NOT NULL,
   phone TEXT,
   isActive BOOLEAN DEFAULT 1,
@@ -162,6 +189,9 @@ CREATE TABLE IF NOT EXISTS riders (
 -- Dining Tables Table
 CREATE TABLE IF NOT EXISTS diningTables (
   id TEXT PRIMARY KEY,
+  deletedAt DATETIME,
+  deletedBy TEXT,
+  purgedAt DATETIME,
   tableNumber TEXT NOT NULL UNIQUE,
   capacity INTEGER NOT NULL,
   isActive BOOLEAN DEFAULT 1,
@@ -283,7 +313,7 @@ CREATE TABLE IF NOT EXISTS kotPrints (
 CREATE TABLE IF NOT EXISTS auditLogs (
   id TEXT PRIMARY KEY,
   userId TEXT NOT NULL,
-  action TEXT NOT NULL CHECK(action IN ('create', 'update', 'delete', 'print', 'export', 'login', 'logout', 'wipe', 'import')),
+  action TEXT NOT NULL CHECK(action IN ('create', 'update', 'delete', 'print', 'export', 'login', 'logout', 'backup', 'restore', 'wipe', 'import')),
   tableName TEXT NOT NULL,
   recordId TEXT,
   before TEXT,
@@ -334,6 +364,9 @@ CREATE TABLE IF NOT EXISTS uploadQueue (
 -- Employees Table
 CREATE TABLE IF NOT EXISTS employees (
   id TEXT PRIMARY KEY,
+  deletedAt DATETIME,
+  deletedBy TEXT,
+  purgedAt DATETIME,
   name TEXT NOT NULL,
   phone TEXT,
   cnic TEXT UNIQUE,
@@ -369,6 +402,9 @@ CREATE TABLE IF NOT EXISTS employeeLoans (
 -- Expenses Table
 CREATE TABLE IF NOT EXISTS expenses (
   id TEXT PRIMARY KEY,
+  deletedAt DATETIME,
+  deletedBy TEXT,
+  purgedAt DATETIME,
   date DATETIME NOT NULL,
   category TEXT NOT NULL,
   amount REAL NOT NULL,

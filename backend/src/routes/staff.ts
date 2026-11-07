@@ -1,6 +1,8 @@
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { runAsync, getAsync, allAsync, convertBooleans, convertBooleansArray } from '../db/database.js';
+import { moveToBin } from '../recycle/moveToBin.js';
+import { whereLive } from '../recycle/liveFilter.js';
 
 export const staffRoutes = express.Router();
 
@@ -9,7 +11,7 @@ export const staffRoutes = express.Router();
 // Get all waiters
 staffRoutes.get('/waiters', async (req, res) => {
   try {
-    const waiters = await allAsync('SELECT * FROM waiters ORDER BY name');
+    const waiters = await allAsync(`SELECT * FROM waiters${whereLive(req)} ORDER BY name`);
     res.json(convertBooleansArray(waiters));
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -86,13 +88,7 @@ staffRoutes.put('/waiters/:id', async (req, res) => {
 // Delete waiter
 staffRoutes.delete('/waiters/:id', async (req, res) => {
   try {
-    const waiter = await getAsync('SELECT * FROM waiters WHERE id = ?', [req.params.id]);
-    if (!waiter) {
-      return res.status(404).json({ error: 'Waiter not found' });
-    }
-
-    await runAsync('DELETE FROM waiters WHERE id = ?', [req.params.id]);
-    res.json({ message: 'Waiter deleted successfully' });
+    await moveToBin(res, 'waiters', req.params.id);
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }
@@ -103,7 +99,7 @@ staffRoutes.delete('/waiters/:id', async (req, res) => {
 // Get all riders
 staffRoutes.get('/riders', async (req, res) => {
   try {
-    const riders = await allAsync('SELECT * FROM riders ORDER BY name');
+    const riders = await allAsync(`SELECT * FROM riders${whereLive(req)} ORDER BY name`);
     res.json(convertBooleansArray(riders));
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -180,13 +176,7 @@ staffRoutes.put('/riders/:id', async (req, res) => {
 // Delete rider
 staffRoutes.delete('/riders/:id', async (req, res) => {
   try {
-    const rider = await getAsync('SELECT * FROM riders WHERE id = ?', [req.params.id]);
-    if (!rider) {
-      return res.status(404).json({ error: 'Rider not found' });
-    }
-
-    await runAsync('DELETE FROM riders WHERE id = ?', [req.params.id]);
-    res.json({ message: 'Rider deleted successfully' });
+    await moveToBin(res, 'riders', req.params.id);
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }
@@ -197,7 +187,7 @@ staffRoutes.delete('/riders/:id', async (req, res) => {
 // Get all dining tables
 staffRoutes.get('/tables', async (req, res) => {
   try {
-    const tables = await allAsync('SELECT * FROM diningTables ORDER BY tableNumber');
+    const tables = await allAsync(`SELECT * FROM diningTables${whereLive(req)} ORDER BY tableNumber`);
     res.json(convertBooleansArray(tables));
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -280,13 +270,7 @@ staffRoutes.put('/tables/:id', async (req, res) => {
 // Delete dining table
 staffRoutes.delete('/tables/:id', async (req, res) => {
   try {
-    const table = await getAsync('SELECT * FROM diningTables WHERE id = ?', [req.params.id]);
-    if (!table) {
-      return res.status(404).json({ error: 'Table not found' });
-    }
-
-    await runAsync('DELETE FROM diningTables WHERE id = ?', [req.params.id]);
-    res.json({ message: 'Table deleted successfully' });
+    await moveToBin(res, 'diningTables', req.params.id);
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }

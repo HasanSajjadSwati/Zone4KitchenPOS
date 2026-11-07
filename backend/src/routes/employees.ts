@@ -1,13 +1,15 @@
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { runAsync, getAsync, allAsync, convertBooleans, convertBooleansArray } from '../db/database.js';
+import { moveToBin } from '../recycle/moveToBin.js';
+import { whereLive } from '../recycle/liveFilter.js';
 
 export const employeeRoutes = express.Router();
 
 // Get all employees
 employeeRoutes.get('/', async (req, res) => {
   try {
-    const employees = await allAsync('SELECT * FROM employees ORDER BY name');
+    const employees = await allAsync(`SELECT * FROM employees${whereLive(req)} ORDER BY name`);
     res.json(convertBooleansArray(employees));
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -98,33 +100,9 @@ employeeRoutes.put('/:id', async (req, res) => {
 // Delete employee
 employeeRoutes.delete('/:id', async (req, res) => {
   try {
-    const employee = await getAsync('SELECT * FROM employees WHERE id = ?', [req.params.id]);
-    if (!employee) {
-      return res.status(404).json({ error: 'Employee not found' });
-    }
-
-    // Prevent deletion if any loan history exists (FK constraint would fail)
-    const existingLoans = await allAsync(
-      'SELECT id, status FROM employeeLoans WHERE employeeId = ? LIMIT 1',
-      [req.params.id]
-    );
-
-    if (existingLoans.length > 0) {
-      return res.status(409).json({
-        error: 'Cannot delete employee with existing loans. Mark the employee inactive instead.',
-      });
-    }
-
-    await runAsync('DELETE FROM employees WHERE id = ?', [req.params.id]);
-    res.json({ message: 'Employee deleted successfully' });
+    await moveToBin(res, 'employees', req.params.id);
   } catch (error) {
-    const message = (error as Error).message;
-    if (message.includes('violates foreign key constraint')) {
-      return res.status(409).json({
-        error: 'Cannot delete employee with existing loans. Mark the employee inactive instead.',
-      });
-    }
-    res.status(500).json({ error: message });
+    res.status(500).json({ error: (error as Error).message });
   }
 });
 

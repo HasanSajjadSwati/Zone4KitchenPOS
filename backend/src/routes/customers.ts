@@ -1,6 +1,8 @@
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { runAsync, getAsync, allAsync } from '../db/database.js';
+import { moveToBin } from '../recycle/moveToBin.js';
+import { whereLive } from '../recycle/liveFilter.js';
 
 export const customerRoutes = express.Router();
 
@@ -13,6 +15,7 @@ const CUSTOMER_WITH_ORDER_STATS_QUERY = `
     c.notes,
     c.createdAt,
     c.updatedAt,
+    c.deletedAt,
     (
       SELECT COUNT(*)::integer
       FROM orders o
@@ -32,7 +35,7 @@ const CUSTOMER_WITH_ORDER_STATS_QUERY = `
 customerRoutes.get('/', async (req, res) => {
   try {
     const customers = await allAsync(
-      `${CUSTOMER_WITH_ORDER_STATS_QUERY} ORDER BY c.createdAt DESC`
+      `${CUSTOMER_WITH_ORDER_STATS_QUERY}${whereLive(req, 'c')} ORDER BY c.createdAt DESC`
     );
     res.json(customers);
   } catch (error) {
@@ -60,7 +63,7 @@ customerRoutes.get('/:id', async (req, res) => {
 customerRoutes.get('/phone/:phone', async (req, res) => {
   try {
     const customer = await getAsync(
-      `${CUSTOMER_WITH_ORDER_STATS_QUERY} WHERE c.phone = ?`,
+      `${CUSTOMER_WITH_ORDER_STATS_QUERY} WHERE c.phone = ? AND c.deletedAt IS NULL`,
       [req.params.phone]
     );
     res.json(customer || null);
@@ -146,13 +149,7 @@ customerRoutes.put('/:id', async (req, res) => {
 // Delete customer
 customerRoutes.delete('/:id', async (req, res) => {
   try {
-    const customer = await getAsync('SELECT * FROM customers WHERE id = ?', [req.params.id]);
-    if (!customer) {
-      return res.status(404).json({ error: 'Customer not found' });
-    }
-
-    await runAsync('DELETE FROM customers WHERE id = ?', [req.params.id]);
-    res.json({ message: 'Customer deleted successfully' });
+    await moveToBin(res, 'customers', req.params.id);
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }

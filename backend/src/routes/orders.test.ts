@@ -11,6 +11,8 @@ const state = vi.hoisted(() => ({
   users: new Map<string, { id: string; fullName: string; roleName: string }>(),
   audits: [] as Array<{ userId: string | null; action: string; tableName: string; recordId: string; description: string }>,
   listQueries: [] as string[],
+  deleted: new Set<string>(),
+  items: [] as string[],
 }));
 
 // isPaid/isActive are BOOLEAN in Postgres, which rejects an integer literal there.
@@ -27,6 +29,7 @@ function fakeQuery(sql: string, params: any[] = []) {
     state.listQueries.push(text);
     return { total: 0 };
   }
+  if (text.startsWith('UPDATE orders SET') && !text.startsWith('UPDATE orders SET isPaid')) return { rowCount: 1 };
   if (text.startsWith('UPDATE orders SET isPaid')) {
     Object.assign(state.orders.get(params[1])!, { isPaid: false, status: 'open', updatedAt: params[0] });
     return { rowCount: 1 };
@@ -45,6 +48,18 @@ function fakeQuery(sql: string, params: any[] = []) {
     state.audits.push({ userId, action, tableName, recordId, description });
     return { rowCount: 1 };
   }
+  const exists = text.match(/^SELECT 1 FROM (\w+) WHERE id = \?( AND deletedAt IS NULL)?$/);
+  if (exists) {
+    const id = params[0];
+    return exists[1] === 'registerSessions' || exists[1] === 'users' || !(exists[2] && state.deleted.has(id)) ? { '?column?': 1 } : undefined;
+  }
+  const deletedAtRow = text.match(/^SELECT deletedAt FROM (menuItems|deals) WHERE id = \?$/);
+  if (deletedAtRow) return { deletedAt: state.deleted.has(params[0]) ? '2026-11-01T00:00:00.000Z' : null };
+  if (text.startsWith('INSERT INTO orderItems')) {
+    state.items.push(params[0]);
+    return { rowCount: 1 };
+  }
+  if (text.startsWith('SELECT * FROM orderItems WHERE id')) return { id: params[0] };
   throw new Error(`Unexpected SQL in test: ${text}`);
 }
 
@@ -85,6 +100,8 @@ beforeEach(() => {
   state.users.clear();
   state.audits.length = 0;
   state.listQueries.length = 0;
+  state.deleted.clear();
+  state.items.length = 0;
   state.orders.set('order-1', { id: 'order-1', isPaid: true, status: 'completed', subtotal: 1000, discountAmount: 0, total: 1000 });
 });
 
@@ -135,5 +152,50 @@ describe('boolean columns in order SQL', () => {
     expect(state.orders.get('order-1')).toMatchObject({ isPaid: false, status: 'open' });
     expect(state.audits[0]).toMatchObject({ userId: 'admin-1', action: 'update' });
     expect(state.audits[0].description).toMatch(/^\[ADMIN_UNLOCK_ORDER\] /);
+  });
+});
+
+describe('deleted records cannot start new work', () => {
+  const item = { itemType: 'menuItem', quantity: 1, unitPrice: 100, totalPrice: 100 };
+
+  beforeEach(() => {
+    state.orders.set('order-open', { id: 'order-open', isPaid: false, status: 'open', subtotal: 0, discountAmount: 0, total: 0 });
+  });
+
+  it('adding a deleted menu item to an order is 400', async () => {
+    state.deleted.add('menu-1');
+    const res = await send('POST', '/order-open/items', { ...item, menuItemId: 'menu-1' });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'This menu item has been deleted' });
+    expect(state.items).toHaveLength(0);
+  });
+
+  it('adding a deleted deal to an order is 400', async () => {
+    state.deleted.add('deal-1');
+    const res = await send('POST', '/order-open/items', { ...item, itemType: 'deal', dealId: 'deal-1' });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'This deal has been deleted' });
+  });
+
+  it('a completed order keeps its deleted waiter: resending the same waiterId is 200, changing to another deleted waiter is 400', async () => {
+    state.orders.set('order-done', { id: 'order-done', isPaid: false, status: 'completed', waiterId: 'waiter-old', subtotal: 0, discountAmount: 0, total: 0 });
+    state.deleted.add('waiter-old');
+    state.deleted.add('waiter-other');
+
+    expect((await send('PUT', '/order-done', { waiterId: 'waiter-old', notes: 'x' })).status).toBe(200);
+
+    const res = await send('PUT', '/order-done', { waiterId: 'waiter-other' });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'This waiter has been deleted' });
+  });
+
+  it('creating an order with a deleted waiter is 400', async () => {
+    state.deleted.add('waiter-1');
+    const res = await send('POST', '/', { registerSessionId: 's1', orderType: 'dine-in', createdBy: 'cashier-1', waiterId: 'waiter-1' });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'This waiter has been deleted' });
   });
 });

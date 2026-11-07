@@ -1,13 +1,15 @@
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { runAsync, getAsync, allAsync, convertBooleans, convertBooleansArray } from '../db/database.js';
+import { moveToBin } from '../recycle/moveToBin.js';
+import { whereLive } from '../recycle/liveFilter.js';
 
 export const dealRoutes = express.Router();
 
 // Get all deals
 dealRoutes.get('/', async (req, res) => {
   try {
-    const deals = await allAsync('SELECT * FROM deals ORDER BY createdAt DESC');
+    const deals = await allAsync(`SELECT * FROM deals${whereLive(req)} ORDER BY createdAt DESC`);
     res.json(convertBooleansArray(deals));
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -109,20 +111,7 @@ dealRoutes.put('/:id', async (req, res) => {
 // Delete deal
 dealRoutes.delete('/:id', async (req, res) => {
   try {
-    const deal = await getAsync('SELECT * FROM deals WHERE id = ?', [req.params.id]);
-    if (!deal) {
-      return res.status(404).json({ error: 'Deal not found' });
-    }
-
-    // Clear dealId reference in order items (itemName is preserved for display)
-    // This allows safe deletion without breaking historical orders
-    await runAsync('UPDATE orderItems SET dealId = NULL WHERE dealId = ?', [req.params.id]);
-    await runAsync('UPDATE pastOrderItems SET dealId = NULL WHERE dealId = ?', [req.params.id]);
-
-    await runAsync('DELETE FROM dealItems WHERE dealId = ?', [req.params.id]);
-    await runAsync('DELETE FROM dealVariants WHERE dealId = ?', [req.params.id]);
-    await runAsync('DELETE FROM deals WHERE id = ?', [req.params.id]);
-    res.json({ message: 'Deal deleted successfully' });
+    await moveToBin(res, 'deals', req.params.id);
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }

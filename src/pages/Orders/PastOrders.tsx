@@ -97,8 +97,8 @@ export const PastOrders: React.FC = () => {
     const loadItemLookups = async () => {
       try {
         const [menuItems, deals] = await Promise.all([
-          db.menuItems.toArray(),
-          db.deals.toArray(),
+          db.menuItems.toArrayWithDeleted(),
+          db.deals.toArrayWithDeleted(),
         ]);
         const menuItemNames: Record<string, string> = {};
         const dealNames: Record<string, string> = {};

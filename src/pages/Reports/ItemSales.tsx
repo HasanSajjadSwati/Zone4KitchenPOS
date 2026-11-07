@@ -36,9 +36,9 @@ export const ItemSales: React.FC = () => {
   const [categorySales, setCategorySales] = useState<CategorySales[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [expandedItems, setExpandedItems] = useState<Set<string | null>>(new Set());
 
-  const toggleItemExpanded = (itemId: string) => {
+  const toggleItemExpanded = (itemId: string | null) => {
     setExpandedItems((prev) => {
       const next = new Set(prev);
       if (next.has(itemId)) {

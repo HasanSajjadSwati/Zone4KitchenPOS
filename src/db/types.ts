@@ -1,30 +1,37 @@
+// Rows deleted from the app are kept (history points at them) and moved to the Recycle Bin.
+// Set by the server; lists hide them unless includeDeleted is requested.
+export interface SoftDeletable {
+  deletedAt?: string | null;
+  deletedBy?: string | null;
+  purgedAt?: string | null;
+}
+
 // User and Role Types
 export interface Permission {
   resource: string;
   actions: ('create' | 'read' | 'update' | 'delete' | 'export' | 'cancel')[];
 }
 
-export interface Role {
+export interface Role extends SoftDeletable {
   id: string;
   name: 'Admin' | 'Manager' | 'Cashier';
   permissions: Permission[];
   createdAt: Date;
 }
 
-export interface User {
+export interface User extends SoftDeletable {
   id: string;
   username: string;
   passwordHash: string;
   fullName: string;
   roleId: string;
   isActive: boolean;
-  deletedAt?: string | null; // set when the user is deleted; the row stays for history
   createdAt: Date;
   updatedAt: Date;
 }
 
 // Menu Types
-export interface Category {
+export interface Category extends SoftDeletable {
   id: string;
   name: string;
   type: 'major' | 'sub';
@@ -35,7 +42,7 @@ export interface Category {
   updatedAt: Date;
 }
 
-export interface MenuItem {
+export interface MenuItem extends SoftDeletable {
   id: string;
   name: string;
   categoryId: string;
@@ -50,7 +57,7 @@ export interface MenuItem {
 
 export type SelectionMode = 'single' | 'multiple' | 'all';
 
-export interface Variant {
+export interface Variant extends SoftDeletable {
   id: string;
   name: string;
   type: 'size' | 'flavour' | 'custom';
@@ -79,7 +86,7 @@ export interface MenuItemVariant {
   createdAt: Date;
 }
 
-export interface Deal {
+export interface Deal extends SoftDeletable {
   id: string;
   name: string;
   description: string | null;
@@ -112,7 +119,7 @@ export interface DealVariant {
 }
 
 // Customer and Staff Types
-export interface Customer {
+export interface Customer extends SoftDeletable {
   id: string;
   phone: string;
   name: string;
@@ -124,7 +131,7 @@ export interface Customer {
   totalOrders: number;
 }
 
-export interface Waiter {
+export interface Waiter extends SoftDeletable {
   id: string;
   name: string;
   phone: string;
@@ -133,7 +140,7 @@ export interface Waiter {
   updatedAt: Date;
 }
 
-export interface Rider {
+export interface Rider extends SoftDeletable {
   id: string;
   name: string;
   phone: string;
@@ -142,7 +149,7 @@ export interface Rider {
   updatedAt: Date;
 }
 
-export interface TableRecord {
+export interface TableRecord extends SoftDeletable {
   id: string;
   tableNumber: string;
   capacity: number;
@@ -370,7 +377,7 @@ export interface KOTTicket {
 }
 
 // Employee Management Types
-export interface Employee {
+export interface Employee extends SoftDeletable {
   id: string;
   name: string;
   phone: string;
@@ -402,7 +409,7 @@ export interface EmployeeLoan {
 }
 
 // Expense Management Types
-export interface Expense {
+export interface Expense extends SoftDeletable {
   id: string;
   date: Date;
   category: string;

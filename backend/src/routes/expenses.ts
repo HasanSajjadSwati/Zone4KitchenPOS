@@ -1,6 +1,8 @@
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { runAsync, getAsync, allAsync, convertBooleans, convertBooleansArray } from '../db/database.js';
+import { moveToBin } from '../recycle/moveToBin.js';
+import { liveOnly } from '../recycle/liveFilter.js';
 
 export const expenseRoutes = express.Router();
 
@@ -13,6 +15,8 @@ expenseRoutes.get('/', async (req, res) => {
     const conditions: string[] = [];
     const params: any[] = [];
 
+    const live = liveOnly(req);
+    if (live) conditions.push(live);
     if (startDate) {
       conditions.push('date >= ?');
       params.push(startDate);
@@ -128,13 +132,7 @@ expenseRoutes.put('/:id', async (req, res) => {
 // Delete expense
 expenseRoutes.delete('/:id', async (req, res) => {
   try {
-    const expense = await getAsync('SELECT * FROM expenses WHERE id = ?', [req.params.id]);
-    if (!expense) {
-      return res.status(404).json({ error: 'Expense not found' });
-    }
-
-    await runAsync('DELETE FROM expenses WHERE id = ?', [req.params.id]);
-    res.json({ message: 'Expense deleted successfully' });
+    await moveToBin(res, 'expenses', req.params.id);
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }
@@ -149,7 +147,8 @@ expenseRoutes.get('/summary/by-category', async (req, res) => {
       SELECT category, SUM(amount) as total, COUNT(*) as count
       FROM expenses
     `;
-    const conditions: string[] = [];
+    // Sums never include Recycle Bin rows, whatever includeDeleted says.
+    const conditions: string[] = ['deletedAt IS NULL'];
     const params: any[] = [];
 
     if (startDate) {

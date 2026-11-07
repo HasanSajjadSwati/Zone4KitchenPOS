@@ -6,6 +6,7 @@ import type { AddressInfo } from 'net';
 const state = vi.hoisted(() => ({
   users: new Map<string, Record<string, any>>(),
   statements: [] as string[],
+  softDelete: null as any,
 }));
 
 function fakeQuery(sql: string, params: any[] = []) {
@@ -15,16 +16,9 @@ function fakeQuery(sql: string, params: any[] = []) {
     const user = state.users.get(params[0]);
     return user ? { id: user.id, username: user.username, roleName: user.roleName } : undefined;
   }
-  if (text.startsWith('UPDATE users SET isActive = ?, deletedAt = ?, username = ?, updatedAt = ? WHERE id = ?')) {
-    const [isActive, deletedAt, username, , id] = params;
-    // users.isActive is BOOLEAN in Postgres: an integer would be rejected.
-    if (typeof isActive !== 'boolean') throw new Error('column "isactive" is of type boolean but expression is of type integer');
-    Object.assign(state.users.get(id)!, { isActive, deletedAt, username });
-    return { rowCount: 1 };
-  }
-  if (text.startsWith('DELETE FROM users')) {
-    // Every user who ever logged in or took an order is referenced by auditLogs/orders/payments.
-    throw new Error('update or delete on table "users" violates foreign key constraint "auditlogs_userid_fkey" on table "auditlogs"');
+  if (text.startsWith('DELETE FROM users') || text.startsWith('UPDATE users')) {
+    // Deleting is the Recycle Bin service's job now; the route must not write users itself.
+    throw new Error(`users route wrote directly: ${text}`);
   }
   throw new Error(`Unexpected SQL in test: ${text}`);
 }
@@ -38,6 +32,8 @@ vi.mock('../db/database.js', () => ({
   }),
 }));
 
+vi.mock('../recycle/recycleService.js', () => ({ softDelete: (...args: any[]) => state.softDelete(...args) }));
+
 import { userRoutes } from './users.js';
 
 let server: Server;
@@ -46,6 +42,10 @@ let baseUrl: string;
 beforeAll(async () => {
   const app = express();
   app.use(express.json());
+  app.use((_req, res, next) => {
+    res.locals.authUser = { id: 'admin-1', username: 'admin' };
+    next();
+  });
   app.use('/api/users', userRoutes);
   server = app.listen(0);
   await new Promise((resolve) => server.once('listening', resolve));
@@ -57,6 +57,7 @@ afterAll(() => new Promise<void>((resolve) => server.close(() => resolve())));
 beforeEach(() => {
   state.users.clear();
   state.statements.length = 0;
+  state.softDelete = vi.fn(async () => ({ ok: true, outcome: 'tombstoned' }));
   state.users.set('admin-1', { id: 'admin-1', username: 'admin', roleName: 'Admin', isActive: true, deletedAt: null });
   state.users.set('cashier-1', { id: 'cashier-1', username: 'fahad', roleName: 'Cashier', isActive: true, deletedAt: null });
 });
@@ -64,22 +65,19 @@ beforeEach(() => {
 const remove = (id: string) => fetch(`${baseUrl}/${id}?adminUserId=admin-1`, { method: 'DELETE' });
 
 describe('DELETE /api/users/:id', () => {
-  it('deletes a user who has history, keeping the rows that point at them', async () => {
+  it('moves a user to the Recycle Bin without writing the users table itself', async () => {
     const res = await remove('cashier-1');
 
     expect(res.status).toBe(200);
-    expect(state.statements.some((s) => s.startsWith('DELETE FROM users'))).toBe(false);
-    const user = state.users.get('cashier-1')!;
-    expect(user.isActive).toBe(false);
-    expect(user.deletedAt).toBeTruthy();
+    expect(await res.json()).toEqual({ message: 'Moved to the Recycle Bin' });
+    expect(state.softDelete).toHaveBeenCalledWith('users', 'cashier-1', 'admin-1');
+    expect(state.statements.some((s) => s.startsWith('DELETE FROM users') || s.startsWith('UPDATE users'))).toBe(false);
   });
 
-  it('frees the username so a new user can take it', async () => {
+  it('no longer renames the username (restore needs the original)', async () => {
     await remove('cashier-1');
 
-    const user = state.users.get('cashier-1')!;
-    expect(user.username).not.toBe('fahad');
-    expect(user.username).toMatch(/^fahad\.deleted\./);
+    expect(state.users.get('cashier-1')!.username).toBe('fahad');
   });
 
   it('still refuses to delete an admin', async () => {
@@ -89,14 +87,16 @@ describe('DELETE /api/users/:id', () => {
 
     expect(res.status).toBe(403);
     expect(await res.json()).toEqual({ error: 'Admin users cannot be deleted' });
-    expect(state.users.get('admin-2')!.deletedAt).toBeNull();
+    expect(state.softDelete).not.toHaveBeenCalled();
   });
 });
 
 describe('GET /api/users', () => {
-  it('returns deletedAt so screens can hide deleted users while reports still find their names', async () => {
+  it('hides deleted users unless includeDeleted=true', async () => {
     await fetch(baseUrl);
+    expect(state.statements.at(-1)).toContain('u.deletedAt IS NULL');
 
-    expect(state.statements.at(-1)).toContain('u.deletedAt');
+    await fetch(`${baseUrl}?includeDeleted=true`);
+    expect(state.statements.at(-1)).not.toContain('u.deletedAt IS NULL');
   });
 });

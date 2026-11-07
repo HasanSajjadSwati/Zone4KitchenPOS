@@ -5,6 +5,7 @@ const api = vi.hoisted(() => ({
   getOrderItemsBulk: vi.fn(),
   updateOrderItem: vi.fn(),
   deleteOrderItem: vi.fn(),
+  getMenuItems: vi.fn(),
 }));
 
 vi.mock('@/services/api', () => ({ apiClient: api }));
@@ -51,5 +52,19 @@ describe('db.orderItems single-item access', () => {
 
     expect(api.deleteOrderItem).toHaveBeenCalledWith('order-1', 'item-1');
     expect(api.getOrderItemsBulk).not.toHaveBeenCalled();
+  });
+});
+
+describe('db toArrayWithDeleted', () => {
+  it('menuItems.toArrayWithDeleted() asks for deleted rows', async () => {
+    api.getMenuItems.mockResolvedValue([]);
+    await db.menuItems.toArrayWithDeleted();
+    expect(api.getMenuItems).toHaveBeenCalledWith({ includeDeleted: true });
+  });
+
+  it('menuItems.toArray() does not', async () => {
+    api.getMenuItems.mockResolvedValue([]);
+    await db.menuItems.toArray();
+    expect(api.getMenuItems).toHaveBeenCalledWith();
   });
 });
